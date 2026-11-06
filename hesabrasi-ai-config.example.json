@@ -1,0 +1,41 @@
+{
+  "v": 1,
+  "cooldownMs": 60000,
+  "order": [
+    "nvidia_nim",
+    "open_router",
+    "tokenrouter",
+    "groq",
+    "gemini",
+    "iranrouter"
+  ],
+  "slots": {
+    "nvidia_nim": {
+      "enabled": true,
+      "key": "",
+      "model": "meta/llama-3.1-8b-instruct",
+      "extra": {},
+      "lastOk": false,
+      "lastError": "",
+      "lastTestAt": 0
+    },
+    "open_router": {
+      "enabled": true,
+      "key": "",
+      "model": "openai/gpt-4o-mini",
+      "extra": {},
+      "lastOk": false,
+      "lastError": "",
+      "lastTestAt": 0
+    },
+    "tokenrouter": {
+      "enabled": true,
+      "key": "",
+      "model": "openai/gpt-4o-mini",
+      "extra": {},
+      "lastOk": false,
+      "lastError": "",
+      "lastTestAt": 0
+    }
+  }
+}
