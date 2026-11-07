@@ -7884,11 +7884,7 @@ el('routerForget').onclick=()=>{
     var model = card.querySelector('[data-f="model"]');
     sl.enabled = !!(en && en.checked);
     if (key && key.value) sl.key = key.value.trim();
-    if (model) {
-      var nextModel = model.value.trim() || spec.model;
-      if (nextModel !== sl.model) { sl.lastOk = false; sl.lastError = ''; sl.lastTestAt = 0; }
-      sl.model = nextModel;
-    }
+    if (model) sl.model = model.value.trim() || spec.model;
     if (spec.extra === 'base') {
       var b = card.querySelector('[data-f="base"]');
       sl.extra = sl.extra || {};
@@ -8012,21 +8008,6 @@ el('routerForget').onclick=()=>{
     syncPrimary();
   }
 
-  // Curated from OpenRouter model pages; this is a convenience list, not a
-  // guarantee of account access, pricing, or audit accuracy.
-  var OPENROUTER_ANALYSIS_MODELS = [
-    { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'رایگان — NVIDIA Nemotron 3 Ultra' },
-    { id: 'deepseek/deepseek-v4-flash:free', name: 'رایگان — DeepSeek V4 Flash' },
-    { id: 'deepseek/deepseek-r1-0528:free', name: 'رایگان — DeepSeek R1 0528' },
-    { id: 'deepseek/deepseek-v4-flash-0731', name: 'پولی اقتصادی — DeepSeek V4 Flash 0731' },
-    { id: 'qwen/qwen3.5-flash-02-23', name: 'پولی اقتصادی — Qwen 3.5 Flash' },
-    { id: 'openai/gpt-6.1-terra-pro', name: 'پولی — GPT-6.1 Terra Pro' },
-    { id: 'anthropic/claude-opus-5.5', name: 'پولی — Claude Opus 5.5' },
-    { id: 'anthropic/claude-sonnet-5.5', name: 'پولی — Claude Sonnet 5.5' },
-    { id: 'google/gemini-4-argon', name: 'پولی — Gemini 4 Argon' },
-    { id: 'deepseek/deepseek-v4-pro', name: 'پولی — DeepSeek V4 Pro' }
-  ];
-
   function cardHtml(spec) {
     var sl = state.slots[spec.id] || emptySlot(spec.id);
     var extra = '';
@@ -8050,8 +8031,7 @@ el('routerForget').onclick=()=>{
         '</div>' +
         '<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
-          (spec.id === 'open_router' ? '<label>مدل‌های پیشنهادی برای تحلیل<select data-f="model-choice"><option value="">انتخاب مدل یا ورود دستی</option>' + OPENROUTER_ANALYSIS_MODELS.map(function (m) { return '<option value="' + esc(m.id) + '"' + (sl.model === m.id ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>' : '') +
-          '<label>شناسهٔ مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '">' + (spec.id === 'open_router' ? '<small>گزینه‌های رایگان محدودیت درخواست و دسترسی متغیر دارند؛ گزینه‌های پولی هزینه دارند. تعرفه و دسترسی را در OpenRouter بررسی کنید. در صورت فعال‌بودن سرویس‌های دیگر، سوییچ به آن‌ها ممکن است هزینه داشته باشد.</small>' : '') + '</label>' +
+          '<label>مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '"></label>' +
         '</div>' + extra +
         '<div class="aihub-links">' + links + '</div>' +
         '<div class="aihub-actions">' +
@@ -8118,15 +8098,9 @@ el('routerForget').onclick=()=>{
     if (!t || !t.getAttribute) return;
     var card = t.closest('[data-aihub-card]');
     if (!card) return;
-    var field = t.getAttribute('data-f');
-    if (field === 'model-choice') {
-      if (!t.value) return;
-      var input = card.querySelector('[data-f="model"]');
-      if (input) input.value = t.value;
-    }
     readCard(card.getAttribute('data-aihub-card'));
     save();
-    if (field === 'enabled' || field === 'model-choice') { syncPrimary(); paintStatus(); }
+    if (t.getAttribute('data-f') === 'enabled') syncPrimary();
   }
 
   function mount() {
