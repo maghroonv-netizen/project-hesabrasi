@@ -8012,6 +8012,16 @@ el('routerForget').onclick=()=>{
     syncPrimary();
   }
 
+  // Curated from OpenRouter model pages; this is a convenience list, not a
+  // guarantee of account access, pricing, or audit accuracy.
+  var OPENROUTER_ANALYSIS_MODELS = [
+    { id: 'openai/gpt-6.1-terra-pro', name: 'GPT-6.1 Terra Pro — تحلیل دشوار' },
+    { id: 'anthropic/claude-opus-5.5', name: 'Claude Opus 5.5 — تحلیل عمیق' },
+    { id: 'anthropic/claude-sonnet-5.5', name: 'Claude Sonnet 5.5 — تحلیل و نگارش' },
+    { id: 'google/gemini-4-argon', name: 'Gemini 4 Argon — تحلیل اسناد' },
+    { id: 'deepseek/deepseek-v4-pro', name: 'DeepSeek V4 Pro — استدلال' }
+  ];
+
   function cardHtml(spec) {
     var sl = state.slots[spec.id] || emptySlot(spec.id);
     var extra = '';
@@ -8035,7 +8045,8 @@ el('routerForget').onclick=()=>{
         '</div>' +
         '<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
-          '<label>مدل<input data-f="model" dir="ltr"' + (spec.id === 'open_router' ? ' list="aihub-openrouter-models"' : '') + ' value="' + esc(sl.model) + '">' + (spec.id === 'open_router' ? '<datalist id="aihub-openrouter-models"><option value="openai/gpt-6.1-terra-pro"></option></datalist><small>شناسهٔ پیشنهادی تأیید نشده است؛ دسترسی و تعرفه را در OpenRouter بررسی کنید.</small>' : '') + '</label>' +
+          (spec.id === 'open_router' ? '<label>مدل‌های پیشنهادی برای تحلیل<select data-f="model-choice"><option value="">انتخاب مدل یا ورود دستی</option>' + OPENROUTER_ANALYSIS_MODELS.map(function (m) { return '<option value="' + esc(m.id) + '"' + (sl.model === m.id ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>' : '') +
+          '<label>شناسهٔ مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '">' + (spec.id === 'open_router' ? '<small>دسترسی و تعرفه هر مدل به حساب و شرایط OpenRouter بستگی دارد؛ پیش از استفاده بررسی کنید.</small>' : '') + '</label>' +
         '</div>' + extra +
         '<div class="aihub-links">' + links + '</div>' +
         '<div class="aihub-actions">' +
@@ -8102,9 +8113,15 @@ el('routerForget').onclick=()=>{
     if (!t || !t.getAttribute) return;
     var card = t.closest('[data-aihub-card]');
     if (!card) return;
+    var field = t.getAttribute('data-f');
+    if (field === 'model-choice') {
+      if (!t.value) return;
+      var input = card.querySelector('[data-f="model"]');
+      if (input) input.value = t.value;
+    }
     readCard(card.getAttribute('data-aihub-card'));
     save();
-    if (t.getAttribute('data-f') === 'enabled') syncPrimary();
+    if (field === 'enabled' || field === 'model-choice') { syncPrimary(); paintStatus(); }
   }
 
   function mount() {
