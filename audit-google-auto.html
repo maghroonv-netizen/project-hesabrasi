@@ -7884,7 +7884,11 @@ el('routerForget').onclick=()=>{
     var model = card.querySelector('[data-f="model"]');
     sl.enabled = !!(en && en.checked);
     if (key && key.value) sl.key = key.value.trim();
-    if (model) sl.model = model.value.trim() || spec.model;
+    if (model) {
+      var nextModel = model.value.trim() || spec.model;
+      if (nextModel !== sl.model) { sl.lastOk = false; sl.lastError = ''; sl.lastTestAt = 0; }
+      sl.model = nextModel;
+    }
     if (spec.extra === 'base') {
       var b = card.querySelector('[data-f="base"]');
       sl.extra = sl.extra || {};
@@ -8031,7 +8035,7 @@ el('routerForget').onclick=()=>{
         '</div>' +
         '<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
-          '<label>مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '"></label>' +
+          '<label>مدل<input data-f="model" dir="ltr"' + (spec.id === 'open_router' ? ' list="aihub-openrouter-models"' : '') + ' value="' + esc(sl.model) + '">' + (spec.id === 'open_router' ? '<datalist id="aihub-openrouter-models"><option value="openai/gpt-6.1-terra-pro"></option></datalist><small>شناسهٔ پیشنهادی تأیید نشده است؛ دسترسی و تعرفه را در OpenRouter بررسی کنید.</small>' : '') + '</label>' +
         '</div>' + extra +
         '<div class="aihub-links">' + links + '</div>' +
         '<div class="aihub-actions">' +
