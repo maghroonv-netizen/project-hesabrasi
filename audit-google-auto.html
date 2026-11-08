@@ -1609,16 +1609,16 @@
 .sampling-template .recap td.pct{position:relative;font-weight:bold;white-space:nowrap;padding-bottom:5px}
 .sampling-template .pct i{position:absolute;right:0;bottom:0;height:2.5px;width:var(--w);background:linear-gradient(90deg,#f0b429,#9e0000);border-radius:2px}
 
-/* Paper preview & print container: generous 17mm top margin for top hole-punching (پانچ از بالا),
-   12mm bottom footer margin, and full horizontal + vertical centering on the page */
-.sample-paper-box{width:var(--sample-full-width,297mm);min-height:var(--sample-full-height,210mm);padding:17mm 7.5mm 12mm 7.5mm;margin:0 auto 16px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 18px #00000014;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.sheet.sampling-template.sample-print-page{height:auto!important;max-height:var(--sample-paper-height,181mm);margin:0!important;padding:4px!important;min-width:var(--sample-paper-width,268mm);width:var(--sample-paper-width,268mm);line-height:1.38}
+/* Paper preview & print container: uniform 16mm top margin for top hole-punching (پانچ از بالا) + 14mm bottom margin,
+   horizontally centered, and ALWAYS top-aligned (never vertically centered on short last pages) */
+.sample-paper-box{width:var(--sample-full-width,297mm);min-height:var(--sample-full-height,210mm);padding:16mm 7.5mm 14mm 7.5mm;margin:0 auto 16px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 18px #00000014;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.sheet.sampling-template.sample-print-page{height:auto!important;max-height:var(--sample-paper-height,180mm);margin:0 auto!important;padding:4px!important;min-width:var(--sample-paper-width,268mm);width:var(--sample-paper-width,268mm);line-height:1.38}
 .sampling-template.sample-print-page>.inner{height:auto;display:flex;flex-direction:column;min-height:0}
 .sampling-template.sample-print-page .sample-main-frame{display:flex;flex-direction:column;flex:0 0 auto;min-height:0;overflow:hidden}
 .sampling-template.sample-print-page .sample-main-frame>table{flex:0 0 auto}
 .sampling-template.sample-print-page .sample-page-footer{margin-top:0;border-top:1.6px solid var(--sample-red)}
 /* During pagination measurement (.sample-measuring), lock exact printable capacity so overflow() splits accurately */
-.sample-measuring .sheet.sampling-template.sample-print-page{height:var(--sample-paper-height,181mm)!important}
+.sample-measuring .sheet.sampling-template.sample-print-page{height:var(--sample-paper-height,180mm)!important}
 .sample-measuring .sampling-template.sample-print-page>.inner{height:100%}
 .sample-measuring .sampling-template.sample-print-page .sample-main-frame{flex:1 1 0}
 .sample-measuring .sampling-template.sample-print-page .sample-page-footer{margin-top:auto}
@@ -1663,11 +1663,11 @@ body.is-col-resizing,body.is-col-resizing *{cursor:col-resize!important;user-sel
 @media print{
  #appVersionBar,#projectMeta,.topbar,#modbar,#stepper,#globalBackBtn,.sample-print-controls,.sample-page-badge,.sample-col-tools,.col-resize-handle,.col-resize-guide,.col-resize-tooltip,.sample-pdf-progress,.direct-pdf-btn,.no-print,dialog{display:none!important}
  body.printing>*:not(#printHost){display:none!important}
- body.printing #printHost{display:block!important;width:100%!important;margin:0!important;padding:0!important}
- .sample-paper-box{width:100vw!important;height:calc(100vh - 1mm)!important;min-height:0!important;padding:17mm 7mm 12mm 7mm!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;break-after:page;page-break-after:always;overflow:hidden}
+ body.printing #printHost{display:block!important;width:100%!important;margin:0!important;padding:0!important;overflow:visible!important}
+ .sample-paper-box{width:var(--sample-full-width,297mm)!important;max-width:100%!important;height:auto!important;min-height:0!important;padding:16mm 0 14mm 0!important;margin:0 auto!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;display:block!important;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid;overflow:visible!important}
  .sample-paper-box:last-child{break-after:auto;page-break-after:auto}
- .sheet.sampling-template{--sample-line:#334155;margin:0!important;width:var(--sample-paper-width,268mm);min-width:0;padding:4px;box-shadow:none!important;border:1.8px solid var(--sample-red);border-radius:15px;overflow:visible}
- .sampling-template .inner{border-color:#475569}
+ .sheet.sampling-template,.sheet.sampling-template.sample-print-page{--sample-line:#334155;margin:0 auto!important;width:var(--sample-paper-width,268mm)!important;min-width:0!important;height:auto!important;max-height:none!important;padding:4px!important;box-shadow:none!important;border:1.8px solid var(--sample-red)!important;border-radius:15px!important;overflow:visible!important}
+ .sampling-template .inner{border-color:#475569;height:auto!important}
  .sampling-template .frame{overflow:hidden}
  .sampling-template thead{display:table-header-group}
  .sampling-template tr.sample-oversize,.sampling-template tr.sample-oversize td{break-inside:auto;page-break-inside:auto}
@@ -3451,14 +3451,30 @@ function shrinkDesc(root){
     root._amtTimer=setTimeout(()=>{ if(root.isConnected) shrinkDesc(root); },60);
   }
 }
+function schedulePrintRestore(restore){
+  window.__activePrintRestore=restore;
+  window.addEventListener('afterprint',restore,{once:true});
+  setTimeout(()=>{
+    if(window.__activePrintRestore!==restore)return;
+    const onInteract=()=>restore();
+    window.addEventListener('pointerdown',onInteract,{once:true,capture:true});
+    window.addEventListener('keydown',onInteract,{once:true,capture:true});
+  },1500);
+}
 function printSheet(host){
+  if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
   const ph=document.getElementById('printHost');
   const viewIdx=host&&host.dataset&&host.dataset.view!==undefined?Number(host.dataset.view):-1;
   const sheetItem=viewIdx>=0&&SHEET_OUT[viewIdx]?SHEET_OUT[viewIdx]:null;
   const isWorkpaper=!sheetItem&&!!host?.querySelector('.wp-paper');
   const isSampling=!!sheetItem||!!host?.querySelector('.sampling-template');
-  let pageRule=null;const oldTitle=document.title;
-  const restore=()=>{document.title=oldTitle;document.body.classList.remove('printing');ph.innerHTML='';if(pageRule)pageRule.remove();window.removeEventListener('afterprint',restore);};
+  let pageRule=null,done=false;const oldTitle=document.title;
+  const restore=()=>{
+    if(done)return;done=true;
+    if(window.__activePrintRestore===restore)window.__activePrintRestore=null;
+    document.title=oldTitle;document.body.classList.remove('printing');ph.innerHTML='';
+    if(pageRule)pageRule.remove();window.removeEventListener('afterprint',restore);
+  };
   try{
   ph.innerHTML=sheetItem?sheetHTML(sheetItem.w,sheetItem.sel):host.querySelector('.sheet').outerHTML;
   ph.querySelectorAll('.col-resize-handle').forEach(el=>el.remove());
@@ -3470,7 +3486,7 @@ function printSheet(host){
     pageRule=document.createElement('style');pageRule.dataset.temporaryPrint='true';
     const layout=isSampling?samplePrintLayout(sheetItem?.w):null;
     pageRule.textContent=isSampling
-      ?`@page{size:A4 ${layout.orientation};margin:0!important}@media print{html,body{width:100%!important;margin:0!important;padding:0!important;background:#fff!important}body.printing #printHost{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}}`
+      ?`@page{size:A4 ${layout.orientation};margin:0!important}@media print{html,body{width:100%!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important}body.printing #printHost{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}}`
       :'@page{size:8.5in 11in;margin:0!important}';
     document.head.appendChild(pageRule);
   }
@@ -3480,8 +3496,10 @@ function printSheet(host){
   if(typeof sampleTemplatePreparePrint==='function')sampleTemplatePreparePrint(ph,{worksheet:sheetItem?.w});
 // <<<SAMPLE-TEMPLATE-PRINT-END>>>
 
-  document.title=' ';window.addEventListener('afterprint',restore);window.print();
-  }catch(error){window.alert(error.message||'چاپ انجام نشد؛ هیچ اطلاعاتی حذف نشد.');}finally{restore();}
+  document.title=' ';
+  schedulePrintRestore(restore);
+  window.print();
+  }catch(error){restore();window.alert(error.message||'چاپ انجام نشد؛ هیچ اطلاعاتی حذف نشد.');}
 }
 
 // ===================== مرحله ششم — کاربرگ خروجی =====================
@@ -6096,13 +6114,14 @@ function reportBuildPrintPages(sheet,target){
   target.classList.remove('report-measuring');return pages;
 }
 function reportPrintSheet(host){
+  if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
   const sheet=host.querySelector('.wp-paper'),target=document.getElementById('printHost');if(!sheet)return;
-  let rule;const title=document.title;
-  const restore=()=>{document.title=title;document.body.classList.remove('printing');target.innerHTML='';if(rule)rule.remove();window.removeEventListener('afterprint',restore);};
+  let rule,done=false;const title=document.title;
+  const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=title;document.body.classList.remove('printing');target.innerHTML='';if(rule)rule.remove();window.removeEventListener('afterprint',restore);};
   try{
     reportBuildPrintPages(sheet,target);
     rule=document.createElement('style');rule.textContent='@page { size:8.5in 11in; margin:0; }';document.head.appendChild(rule);
-    document.body.classList.add('printing');document.title='';window.addEventListener('afterprint',restore);window.print();restore();
+    document.body.classList.add('printing');document.title='';schedulePrintRestore(restore);window.print();
   }catch(error){restore();alert(error.message);}
 }
 // <<<ACCOUNT-T-END>>>
@@ -6263,9 +6282,10 @@ function auditTemplatePrintPages(o,source,target){
   target.classList.remove('template-measuring');return pages;
 }
 function auditTemplatePrint(host){
+  if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
   const o=ANA.out[ANA.active],source=host.querySelector('.audit-template'),target=document.getElementById('printHost');if(!o||!source)return;
-  let rule;const title=document.title;const restore=()=>{document.title=title;document.body.classList.remove('printing');target.classList.remove('template-measuring');target.innerHTML='';if(rule)rule.remove();window.removeEventListener('afterprint',restore);};
-  try{auditTemplatePrintPages(o,source,target);rule=document.createElement('style');rule.textContent='@page{size:A4 portrait;margin:0!important}@media print{body.printing #printHost{padding:6mm!important;box-sizing:border-box!important}}';document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';window.addEventListener('afterprint',restore);window.print();restore();}catch(error){restore();alert(error.message);}
+  let rule,done=false;const title=document.title;const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=title;document.body.classList.remove('printing');target.classList.remove('template-measuring');target.innerHTML='';if(rule)rule.remove();window.removeEventListener('afterprint',restore);};
+  try{auditTemplatePrintPages(o,source,target);rule=document.createElement('style');rule.textContent='@page{size:A4 portrait;margin:0!important}@media print{body.printing #printHost{padding:6mm!important;box-sizing:border-box!important}}';document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';schedulePrintRestore(restore);window.print();}catch(error){restore();alert(error.message);}
 }
 // <<<WORKSHEET-VIEW-END>>>
 
@@ -6432,11 +6452,11 @@ function sampleBasePrintMetrics(){
  const orientation=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
  const density=SHEET_CFG.density==='compact'?'compact':'normal';
  const n=Math.max(1,Math.min(15,Math.round(Number(SHEET_CFG.ctrl)||10)));
- // Width 268mm (Landscape) / 194mm (Portrait) fits BOTH A4 (297x210) and US Letter (279.4x215.9) without browser downscaling,
- // while height 181mm / 258mm leaves a punch-safe >=17mm top margin (پانچ از بالا) + >=12mm bottom footer margin.
+ // Width 268mm (Landscape) / 192mm (Portrait) fits BOTH A4 (297x210) and US Letter (279.4x215.9) without browser downscaling,
+ // while height 180mm / 258mm leaves a punch-safe 16mm top margin (پانچ از بالا) + 14mm bottom footer margin on every page.
  return orientation==='landscape'
-  ?{orientation,density,n,paperWidth:297,paperHeight:210,width:268,height:181,table:261,baseCols:[6.5,10.5,16.5,43,101.5,8,21.5,21.5],baseControls:32,minControl:3.2}
-  :{orientation,density,n,paperWidth:210,paperHeight:297,width:194,height:258,table:187,baseCols:[5.8,9.5,16,31,46.2,7.5,20,20],baseControls:31,minControl:3.1};
+  ?{orientation,density,n,paperWidth:297,paperHeight:210,width:268,height:180,table:261,baseCols:[6.5,10.5,16.5,43,101.5,8,21.5,21.5],baseControls:32,minControl:3.2}
+  :{orientation,density,n,paperWidth:210,paperHeight:297,width:192,height:258,table:185,baseCols:[5.8,9.5,16,30,45.2,7.5,20,20],baseControls:31,minControl:3.1};
 }
 function sampleDefaultColumnVector(m){
  const cols=m.baseCols.slice();
@@ -6940,7 +6960,7 @@ if(typeof window!=='undefined'&&!window.__sampleDirectPrintBound){
  let directRule=null,directTitle='';
  window.addEventListener('beforeprint',()=>{
   if(document.body.classList.contains('printing'))return;
-  const activeWrap=document.querySelector('#s6:not(.hide) .sheetwrap:not(.hide)');
+  const activeWrap=document.querySelector('.stage.active[data-stage="6"] .sheetwrap:not(.hide)');
   const ph=document.getElementById('printHost');
   if(!activeWrap||!ph)return;
   const idx=Number(activeWrap.dataset.view);
@@ -6953,7 +6973,7 @@ if(typeof window!=='undefined'&&!window.__sampleDirectPrintBound){
    if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(ph);
    const layout=samplePrintLayout(item.w);
    directRule=document.createElement('style');directRule.dataset.temporaryPrint='direct';
-   directRule.textContent=`@page{size:A4 ${layout.orientation};margin:0!important}@media print{html,body{width:${layout.paperWidth}mm!important;margin:0!important;padding:0!important;background:#fff!important}body.printing #printHost{width:${layout.paperWidth}mm!important;max-width:none!important;margin:0!important;padding:0!important}}`;
+   directRule.textContent=`@page{size:A4 ${layout.orientation};margin:0!important}@media print{html,body{width:100%!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important}body.printing #printHost{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}}`;
    document.head.appendChild(directRule);
    document.body.classList.add('printing');
    shrinkDesc(ph);
