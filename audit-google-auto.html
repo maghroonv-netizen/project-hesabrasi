@@ -1474,7 +1474,7 @@
 #cpWorksheetDialog .cp-resolved-account>span{font-size:12px;color:#56717e;white-space:nowrap}
 @media(max-width:480px){#cpWorksheetDialog{padding:14px;width:calc(100vw - 20px)}#cpWorksheetDialog header b{font-size:14px}#cpWorksheetDialog .cp-entry-main>strong{max-width:65%}#cpWorksheetDialog .cp-entry-amount b{font-size:16px}#cpWorksheetDialog .cp-ws-option{padding:10px}#cpWorksheetDialog .cp-basket-title{font-size:12px}}
 
-.sheet .cp-ws-result .cp-txt{font-size:11px;line-height:1.55}
+.sheet .cp-ws-result .cp-txt{font-size:9px;line-height:1.55}
 
 /* v9.5: one-line dates and accounting-only print content. */
 .sheet table.main td.sample-date{white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important;direction:ltr;text-align:center;padding-inline:2px}
@@ -1524,7 +1524,7 @@
 .sampling-template .sample-desc-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
 .sampling-template .sub{font-size:10.5px;color:var(--sample-mute);margin:2px 0 0;line-height:1.75}
 .sampling-template td.cp{text-align:right;font-size:10.5px;line-height:1.7}
-.sampling-template .cp .cp-txt{line-height:1.7;font-size:11px}
+.sampling-template .cp .cp-txt{line-height:1.7;font-size:9px}
 .sampling-template .cp .p{margin-bottom:3px}
 .sampling-template td.ctl{padding:0}
 .sampling-template .box{display:inline-block;width:var(--sample-box,12px);height:var(--sample-box,12px);border:1px solid #bfa860;border-radius:3px;background:#fff;padding:0;margin:0;min-height:0}
@@ -1561,6 +1561,7 @@
 .sampling-template.sample-print-page .sample-page-footer td{border-bottom:0;background:var(--sample-gold2)!important;font-weight:bold}
 .sampling-template.sample-print-page .sample-page-footer .lbl,.sampling-template .sample-brought-forward .lbl{text-align:right;padding-right:14px;color:#5a4300}
 .sampling-template.sample-print-page .sample-recap{flex:0 0 auto}
+.sampling-template.sample-print-page .sample-page-number{flex:0 0 auto;margin-top:auto;padding:3px 0 0;text-align:center;font-size:10px;font-weight:700;color:var(--sample-red);line-height:1.4;direction:rtl}
 .sampling-template .sample-brought-forward td{background:#fff2cc!important;font-weight:bold}
 
 .sampling-template.sample-print-page .sample-page-footer tr.total td{border-top:0}
@@ -3109,15 +3110,13 @@ function sheetHTML(w, sel){
   const othD=sum(cur,'بدهکار')-sd,othC=sum(cur,'بستانکار')-sc;
   const totD=opD+sd+othD,totC=opC+sc+othC,end=totD-totC;
   const R=(label,d,cr,kind='')=>`<tr class="${kind}"><td class="lab">${label}</td><td class="num dr">${fmt(d)}</td>${samplePercentCell(d,totD)}<td class="num cr">${fmt(cr)}</td>${samplePercentCell(cr,totC)}</tr>`;
-  const path=w.keyPath.map((kp,i)=>{const at=kp.indexOf('|'),code=at<0?kp:kp.slice(0,at),title=at<0?'':kp.slice(at+1);return `<span class="chip">${esc(ACCOUNT_LEVELS[i].label)}: <b>${esc(sampleDisplayDigits(code))}</b> - ${esc(title)}</span>`;}).join('<span class="arrow">←</span>');
-  const lastKey=w.keyPath[w.keyPath.length-1],lastTitle=lastKey.slice(lastKey.indexOf('|')+1);
+  const path=w.keyPath.map(kp=>{const at=kp.indexOf('|'),code=at<0?kp:kp.slice(0,at),title=at<0?'':kp.slice(at+1);return `${esc(title)}${code?` (<bdi>${esc(sampleDisplayDigits(code))}</bdi>)`:""}`;}).join(' <span class="arrow">←</span> ');
   const widths=layout.columns,roles=['serial','voucher','date','description','counterparty','reference','debit','credit'];
   const cols=widths.map((mm,i)=>`<col class="sample-col-${roles[i]}" style="width:${mm}mm">`).join('')+Array.from({length:n},()=>`<col class="sample-col-control" style="width:${(layout.controls/n).toFixed(6)}mm">`).join('');
   const nums=Array.from({length:n},(_,i)=>`<th class="n cn">${faNum(i+1)}</th>`).join('');
   const boxSize=2.8*96/25.4;
   return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" style="--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-box:${boxSize.toFixed(2)}px;--sample-control-font:${Math.min(10,(layout.controls/n*96/25.4-2)/1.25).toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
-  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="refcircle" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(lastTitle)}</span></div><div class="big"><span class="k">تاریخ ترازنامه :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
-  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="path"><span class="lab">مسیر حساب :</span>${path}</div></th></tr>
+  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="refcircle" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${path}</span></div><div class="big"><span class="k">تاریخ ترازنامه :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
   <tr class="cols"><th rowspan="2">ردیف</th><th rowspan="2">سند</th><th rowspan="2">تاریخ</th><th rowspan="2">شرح</th><th rowspan="2">طرف حساب</th><th rowspan="2">عطف</th><th rowspan="2">بدهکار</th><th rowspan="2">بستانکار</th><th class="sample-controls-title" colspan="${n}">کنترل‌های حسابرسی</th></tr><tr class="cols">${nums}</tr></thead><tbody>${body}${total}</tbody></table></div>
   <div class="recap frame sample-recap"><div class="ttl">تفکیک گردش و مانده</div><table class="sum"><thead><tr><th style="width:34%">تفکیک</th><th>بدهکار</th><th style="width:11%">درصد</th><th>بستانکار</th><th style="width:11%">درصد</th></tr></thead><tbody>${R('افتتاحیه (مانده ابتدای سال)',opD,opC)}${R('اقلام رسیدگی‌شده',sd,sc)}${R('سایر اقلام (رسیدگی‌نشده)',othD,othC)}${R('جمع',totD,totC,'sumrow')}<tr class="rest"><td class="lab">مانده در پایان سال مالی</td><td class="num" colspan="4" style="text-align:right;padding-right:14px;direction:rtl">${fmtSignedBalance(end)}</td></tr></tbody></table></div></div></div>`;
 }
@@ -3127,7 +3126,7 @@ function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function shrinkDesc(root){
   // [انتخابگر، اندازه‌ی اولیه، سقف ارتفاع بر حسب «خط»، کمینه‌ی مجاز]
   // شرح و طرف حساب هر دو از ۱۰ پیکسل شروع می‌شوند و متناسب با طولشان کوچک می‌شوند.
-  const rules=[['.desc-txt',10,3.6,6.5], ['.cp-txt',11,4.2,11]];
+  const rules=[['.desc-txt',10,3.6,6.5], ['.cp-txt',9,4.2,9]];
   rules.forEach(r=>{
     const [sel,top,lim,min]=r;
     root.querySelectorAll(sel).forEach(el=>{
@@ -6169,6 +6168,7 @@ function sampleTemplatePreparePrint(host){
   const totalRow=(className,label)=>{const tr=total.cloneNode(true);tr.className=className;tr.cells[0].textContent=label;tr.querySelector('.dr').textContent=fmt(0);tr.querySelector('.cr').textContent=fmt(0);return tr;};
   const makePage=()=>{
    const p=base.cloneNode(true);host.appendChild(p);
+   const pageNumber=document.createElement('div');pageNumber.className='sample-page-number';pageNumber.textContent='صفحه ۰ از ۰';p.querySelector('.inner').appendChild(pageNumber);
    if(pages.length)p.querySelector('table.main>tbody').appendChild(totalRow('sample-brought-forward','انتقال از صفحات قبل'));
    const footer=document.createElement('table');footer.className='main sample-page-footer';footer.appendChild(p.querySelector('colgroup').cloneNode(true));
    const tb=document.createElement('tbody');tb.appendChild(totalRow('sample-page-total','جمع تا پایان این صفحه'));footer.appendChild(tb);p.querySelector('.sample-main-frame').appendChild(footer);pages.push(p);return p;
@@ -6219,11 +6219,11 @@ function sampleTemplatePreparePrint(host){
     }
    }
   }
-  page.querySelector('.inner').appendChild(recap);
+  page.querySelector('.inner').insertBefore(recap,page.querySelector('.sample-page-number'));
   if(overflow(page)){
    recap.remove();page=makePage();
    page.querySelectorAll('thead tr.cols').forEach(r=>r.remove());
-   page.querySelector('.inner').appendChild(recap);
+   page.querySelector('.inner').insertBefore(recap,page.querySelector('.sample-page-number'));
   }
   let debit=0,credit=0;
   pages.forEach((p,i)=>{
@@ -6241,6 +6241,7 @@ function sampleTemplatePreparePrint(host){
    footer.dataset.debit=debit;footer.dataset.credit=credit;
    if(last)footer.classList.add('total','tot','sample-final-total');
    p.dataset.pageIndex=i+1;p.dataset.pageCount=pages.length;
+   p.querySelector('.sample-page-number').textContent='صفحه '+faNum(i+1)+' از '+faNum(pages.length);
   });
   if(typeof shrinkDesc==='function')shrinkDesc(host);
   if(!sampleFitNumbers(host))throw new Error('مبلغ در ستون جا نمی‌گیرد؛ حالت افقی را انتخاب کنید. هیچ مبلغی بریده یا خلاصه نشد.');
@@ -6369,7 +6370,7 @@ function cpWorksheetCell(row,ctx){
  const m=cpWorksheetModel(row,ctx),id=ctx.rowIds.get(row),token=ctx.wsToken;
  const reason=m.kind==='automatic'?m.badge:m.kind==='manual'?'انتخاب کاربر':m.kind==='ambiguous'?'چند گزینه؛ بدون انتخاب خودکار':m.reason;
  if(typeof noteCp==='function')noteCp(reason,m.names.join('، '));
- const value=m.names.length?m.names.map(name=>`<div class="p">${typeof samplePathText==='function'?samplePathText(name):esc(name)}</div>`).join(''):`<span>${m.kind==='ambiguous'?'طرف حساب انتخاب نشده':'تعیین نشد'}</span>`;
+ const value=m.names.length?m.names.map(name=>`<div class="p">${typeof samplePathText==='function'?samplePathText(name):esc(name)}${m.names.length>1?' <span class="cp-path-end">/</span>':''}</div>`).join(''):`<span>${m.kind==='ambiguous'?'طرف حساب انتخاب نشده':'تعیین نشد'}</span>`;
  const choose=m.kind==='ambiguous'||m.kind==='manual'||m.referenceAuto;
  return `<div class="cp-ws-result" data-cp-kind="${m.kind}" data-cp-result="${id||'unknown'}"><div class="cp-txt">${value}</div><small class="cp-ws-status">${esc(m.badge)}</small>${id?`<button type="button" class="cp-ws-action" data-cp-ws="${id}" data-cp-token="${token}">${choose?(m.kind==='manual'?'ویرایش انتخاب':m.referenceAuto?'بررسی / ویرایش تطبیق':'انتخاب از '+cpLabNumber(m.groups.length)+' گزینه'):'شواهد'}</button>`:''}</div>`;
 }
