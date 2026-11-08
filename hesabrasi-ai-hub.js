@@ -645,6 +645,7 @@
         '</div>' + extra +
         '<div class="aihub-links">' + links + '</div>' +
         '<div class="aihub-actions">' +
+          (spec.id === 'open_router' ? '<button type="button" data-act="select-gpt4o-mini">انتخاب GPT-4o mini</button>' : '') +
           '<button type="button" data-act="save">ذخیره</button>' +
           '<button type="button" data-act="test">آزمایش اتصال</button>' +
           '<button type="button" data-act="clear">پاک‌کردن کلید</button>' +
@@ -684,6 +685,22 @@
     ev.preventDefault();
     if (act === 'up') move(id, -1);
     else if (act === 'down') move(id, 1);
+    else if (act === 'select-gpt4o-mini' && id === 'open_router') {
+      var modelInput = card.querySelector('[data-f="model"]');
+      if (!modelInput) return;
+      var previousModel = state.slots[id] && state.slots[id].model;
+      modelInput.value = 'openai/gpt-4o-mini';
+      readCard(id);
+      if (previousModel !== state.slots[id].model) {
+        state.slots[id].lastOk = false;
+        state.slots[id].lastError = '';
+        state.slots[id].lastTestAt = 0;
+      }
+      save();
+      syncPrimary();
+      paintStatus();
+      logLine('مدل GPT-4o mini انتخاب و ذخیره شد. برای تأیید اتصال، آزمایش اتصال را بزنید.');
+    }
     else if (act === 'save') {
       readCard(id);
       state.slots[id].enabled = true;
