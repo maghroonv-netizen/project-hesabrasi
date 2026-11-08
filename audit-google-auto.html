@@ -1674,6 +1674,199 @@ body.is-col-resizing,body.is-col-resizing *{cursor:col-resize!important;user-sel
  .sampling-template .cp-ws-action,.sampling-template .cp-ws-status,.sampling-template .cp-ws-footnote{display:none!important}
 }
 /* SAMPLING-TEMPLATE-CSS-END */
+
+/* ===== FLAT-LAYOUT-BEGIN =====
+   لایه‌ی چیدمان تخت: فقط ظاهرِ صفحه‌ی نمایش را مرتب می‌کند.
+   قانون: هر صفحه فقط «یک» سطح کادر دارد (صفحه ← پنل)؛ داخل پنل هیچ کادر، سایه یا
+   پس‌زمینه‌ی دومی نیست و بخش‌ها با فاصله و خط نازک از هم جدا می‌شوند.
+   به شناسه‌ها، کلاس‌های مورد استفاده‌ی برنامه و کاربرگ‌های چاپی دست نمی‌زند. */
+@media screen{
+
+/* ---------- پایه ---------- */
+body{background:var(--bg);}
+.wrap{max-width:1120px;padding:0 28px;padding-top:0;}
+:where(button,summary,input,select,textarea,a):focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+/* ---------- دکمه‌ها: یک نظام واحد ---------- */
+.btn,.btn-file,button.confirm{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:40px;padding:8px 18px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink);font:inherit;font-size:.86rem;font-weight:600;
+  line-height:1.5;cursor:pointer;box-shadow:none;transition:background .15s,border-color .15s,color .15s;
+}
+.btn:hover,.btn-file:hover{border-color:var(--accent);color:var(--accent);}
+.btn.primary,.btn.confirm,button.confirm{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:none;}
+.btn.primary:hover,.btn.confirm:hover,button.confirm:hover{color:var(--accent-ink);filter:brightness(1.08);opacity:1;}
+.btn.ghost{background:transparent;}
+.btn.sm{min-height:30px;padding:3px 11px;font-size:.78rem;}
+.btn[disabled],button.confirm[disabled]{opacity:.45;cursor:not-allowed;filter:none;}
+.drop .btn{padding:9px 26px;}
+
+/* ---------- نسخه و نوار بالا: یک نوار تخت به‌جای کارتِ شناور ---------- */
+#appVersionBar{
+  padding:5px 20px!important;background:transparent!important;color:var(--muted)!important;
+  font-family:'Vazirmatn',Tahoma,sans-serif!important;font-size:.72rem!important;font-weight:600;
+  text-align:center;border-bottom:1px solid var(--line);
+}
+.topbar{
+  position:sticky;top:0;z-index:40;overflow:visible;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
+  margin:0 0 26px;padding:10px 0 0;
+  background:var(--bg);border:0;border-bottom:1px solid var(--line);border-radius:0;
+  box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+/* ردیفِ عنوان و ابزارها باز می‌شود تا همه‌چیز در یک خط بنشیند، نه جعبه در جعبه */
+.topbar-row{display:contents;}
+.topbar h1{order:1;flex:0 0 auto;margin:0;font-size:1.02rem;display:flex;align-items:center;gap:10px;}
+.topbar h1::before{width:30px;height:30px;border-radius:9px;font-size:1rem;box-shadow:none;}
+.topbar .modbar{order:2;flex:1 1 auto;margin:0;padding:0;gap:4px;}
+.topbar #routerPanel{order:3;margin-inline-start:auto;}
+.topbar #usageOpen{order:4;}
+.topbar .topbar-tools{order:5;gap:6px;}
+.topbar .stepper{order:6;flex:1 0 100%;margin:0;padding:0;border:0;gap:4px 18px;overflow-x:auto;}
+
+/* ابزارهای نوار بالا: همه هم‌شکل و کم‌صدا */
+.topbar .theme-btn,.topbar .back-top-btn,.topbar .back-top-btn:not(:disabled),
+.topbar #usageOpen,.topbar #editProjectMeta,.topbar .router-mini>summary{
+  display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 12px;
+  border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink);
+  font-family:inherit;font-size:.78rem;font-weight:600;box-shadow:none;cursor:pointer;
+  white-space:nowrap;list-style:none;transform:none;filter:none;
+}
+.topbar .router-mini>summary::-webkit-details-marker{display:none;}
+.topbar .theme-btn:hover,.topbar .back-top-btn:hover:not(:disabled),.topbar #usageOpen:hover,
+.topbar #editProjectMeta:hover,.topbar .router-mini>summary:hover{border-color:var(--accent);color:var(--accent);transform:none;filter:none;}
+.topbar .back-top-btn:disabled{opacity:.4;}
+.topbar #routerBadge{font-size:.72rem;color:var(--muted);font-weight:500;}
+.topbar .step-count{font-size:.76rem;color:var(--muted);}
+
+/* ماژول‌ها: دکمه‌های قطعه‌ای */
+.mod{min-height:36px;padding:4px 14px;border-radius:10px;border:1px solid transparent;background:transparent;font-size:.8rem;}
+.mod:hover{border-color:var(--line);color:var(--ink);}
+.mod.active{background:var(--ink);color:var(--panel);border-color:var(--ink);box-shadow:none;}
+.mod.home{border:1px solid transparent;}
+
+/* مرحله‌ها: زبانه‌های خط‌دار، متمایز از ماژول‌ها */
+.stepper .step{
+  min-height:0;padding:8px 2px;border:0;border-bottom:2px solid transparent;border-radius:0;
+  background:transparent;color:var(--muted);font-size:.8rem;gap:7px;
+}
+.stepper .step i{width:20px;height:20px;font-size:.68rem;background:var(--line);color:var(--ink);}
+.stepper .step.ready,.stepper .step.done{background:transparent;border-color:transparent;border-bottom-color:transparent;color:var(--ink);}
+.stepper .step.ready:hover,.stepper .step.done:hover{background:transparent;color:var(--accent);}
+.stepper .step.ready i{background:var(--line);color:var(--ink);}
+.stepper .step.done i{background:var(--ok-bg);color:var(--ok);}
+.stepper .step.active{background:transparent;color:var(--ink);border-color:transparent;border-bottom-color:var(--accent);}
+.stepper .step.active i{background:var(--accent);color:var(--accent-ink);}
+
+/* ---------- صفحه‌ی «اطلاعات عمومی پرونده»: یک پنل، فرم تخت ---------- */
+#projectMeta{
+  max-width:760px!important;margin:30px auto 40px!important;padding:26px 28px!important;
+  background:var(--panel)!important;border:1px solid var(--line)!important;border-radius:14px!important;
+  font-family:'Vazirmatn',Tahoma,sans-serif!important;color:var(--ink);
+}
+#projectMeta[hidden]{display:none!important;}
+#projectMeta>p{margin:0 0 6px;color:var(--muted);font-size:.88rem;line-height:1.9;max-width:66ch;}
+#projectMeta>p:first-child{font-size:.76rem;}
+#projectMeta h2{margin:0 0 8px;font-size:1.45rem;}
+#projectMeta>div[style]{gap:16px 18px!important;margin-top:20px;}
+#projectMeta label{display:flex;flex-direction:column;gap:6px;font-size:.84rem;font-weight:600;}
+#projectMeta input{
+  display:block;width:100%;padding:10px 12px!important;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--ink);font:inherit;font-size:.9rem;font-weight:400;
+}
+#projectMeta #metaStatus{margin:14px 0 0;font-size:.82rem;}
+#projectMeta .meta-actions{display:flex;justify-content:flex-end;margin-top:6px;}
+/* تا وقتی مشخصات پرونده تأیید نشده، فقط همین فرم دیده می‌شود: هدر و مراحل هم پنهان‌اند (وضعیت برنامه دست‌نخورده می‌ماند) */
+body.meta-stage-active .wrap{display:none!important;}
+
+/* ---------- عنوان صفحه ---------- */
+.stage h1{font-size:1.6rem;letter-spacing:0;margin:2px 0 4px;}
+.stage .sub{margin:0 0 22px;max-width:70ch;font-size:.94rem;}
+
+/* ---------- پنل: تنها سطحِ کادر‌دار ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 26px;margin:0 0 20px;box-shadow:none;}
+.card .card{background:transparent;border:0;border-radius:0;padding:0;margin:0;box-shadow:none;}
+.card>h1{margin:0 0 4px;font-size:1.5rem;}
+.card>h2,.card .card-h{margin:0 0 6px;font-size:1.08rem;font-weight:700;}
+.card .card-b{padding:0;}
+.btnrow{margin-top:20px;padding-top:16px;border-top:1px solid var(--line);}
+
+/* آمار: یک سطرِ ساده به‌جای جعبه‌های کوچکِ تو‌در‌تو */
+.card .summary,#moduleHome .summary{display:flex;flex-wrap:wrap;gap:6px 30px;margin:0 0 18px!important;}
+.card .stat,#moduleHome .stat{
+  flex:0 0 auto;min-width:0;display:flex;align-items:baseline;gap:8px;
+  padding:0;background:transparent;border:0;border-radius:0;
+}
+.card .stat .n,#moduleHome .stat .n{font-size:1.05rem!important;line-height:1.7;}
+.card .stat .l{margin:0;font-size:.82rem;}
+
+/* راهنما: متنِ ساده با یک خطِ کناری، نه کادرِ خط‌چین داخل کارت */
+.help{background:transparent;border:0;border-inline-start:3px solid var(--accent);border-radius:0;padding:2px 14px;margin:10px 0 14px;}
+
+/* ردیف‌ها: خطِ نازک، بدون راه‌راه و بدون کادر */
+.map-row{padding:12px 4px;border-radius:0;}
+.card .map-row:nth-child(even){background:transparent;}
+.level-box{border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;margin:0;padding:10px 6px;}
+.level-box:hover{background:color-mix(in srgb,var(--accent) 5%,transparent);border-color:var(--line);}
+.level-box.chosen{background:color-mix(in srgb,var(--accent) 9%,transparent);border-inline-start:3px solid var(--accent);}
+.level-box.disabled{border-style:solid;background:transparent;opacity:.55;}
+.ana-levels .level-box{min-height:var(--tap);padding:10px 8px;border-radius:0;}
+.ana-levels{gap:0;margin:14px 0;}
+#levelsHost,.ana-levels{border-top:1px solid var(--line);}
+.candidate-row{padding:10px 0;}
+.restore-chip{background:transparent;}
+
+/* ---------- صفحه‌ی نخست: بارگذاری و انتخاب ماژول ---------- */
+#moduleHome .card:has(.drop){display:block;padding:24px 26px;}
+#moduleHome .drop{min-height:210px;background:transparent;}
+#moduleHome .hint{margin:14px 0 0;padding:0;background:transparent;border-radius:0;font-size:.82rem;}
+#homeDrop #progressCard{padding:0;border:0;background:transparent;margin:16px 0 0;}
+.entry-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:6px;}
+.entry-tile{
+  display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px 16px;
+  min-height:0;padding:20px 22px;border-radius:14px;box-shadow:none;text-align:right;
+}
+.entry-tile::after{display:none;}
+.entry-tile:hover{transform:none;box-shadow:none;}
+.entry-tile .et-ic{grid-row:1 / span 2;width:auto;height:auto;border-radius:0;background:transparent;font-size:28px;}
+.entry-tile .et-nm,.entry-tile .et-ds{grid-column:2;max-width:none;}
+
+/* ---------- ماژول آنالیز: چیدمانِ تخت (کلاس‌ها پیش‌تر استایل نداشتند) ---------- */
+.ana-workspace{display:block;}
+.ana-workspace-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin:0 0 20px;}
+.ana-workspace-head h1{margin:2px 0 4px;font-size:1.6rem;}
+.ana-workspace-head p{margin:0;max-width:70ch;color:var(--muted);font-size:.94rem;}
+.ana-workspace .eyebrow{font-size:.78rem;font-weight:700;color:var(--accent);}
+.ana-independence{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);white-space:nowrap;}
+.ana-independence span{color:var(--ok);}
+.ana-picker-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 26px;margin:0 0 14px;}
+.ana-card-title{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin:0 0 14px;}
+.ana-card-title h2{margin:0 0 2px;}
+.ana-card-title p{margin:0;color:var(--muted);font-size:.86rem;}
+.ana-step-pill{font-size:.76rem;color:var(--muted);white-space:nowrap;}
+.ana-picker-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);}
+.ana-help-row{display:flex;gap:8px;padding:4px 2px;color:var(--muted);font-size:.84rem;}
+
+/* ---------- نوارِ ابزارِ خروجی: خطِ نازک، نه کادر ---------- */
+.report-controls{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:10px 0;}
+.report-controls .report-controls{border:0;padding:6px 0;}
+
+/* ---------- صفحه‌ی باریک ---------- */
+@media (max-width:760px){
+  .wrap{padding:0 14px;}
+  .topbar{position:static;}
+  .topbar h1{order:1;flex:1 1 auto;}
+  .topbar #routerPanel{order:2;margin-inline-start:0;}
+  .topbar #usageOpen{order:3;}
+  .topbar .topbar-tools{order:4;flex:1 1 100%;justify-content:space-between;}
+  .topbar .modbar{order:5;flex:1 1 100%;}
+  .topbar .stepper{order:6;}
+  .card,.ana-picker-card,#projectMeta{padding:18px 16px!important;}
+  .entry-tile{padding:16px;}
+}
+}
+/* ===== FLAT-LAYOUT-END ===== */
 </style>
 </head>
 <body class="meta-stage-active">
