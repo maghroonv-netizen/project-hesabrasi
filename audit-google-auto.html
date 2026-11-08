@@ -1482,116 +1482,195 @@
 @media print{
  .sheet .cp-ws-status,.sheet .cp-ws-footnote,.sheet .cp-ws-action{display:none!important}
  .sheet .cp-ws-result[data-cp-kind="ambiguous"] .cp-txt,.sheet .cp-ws-result[data-cp-kind="unresolved"] .cp-txt{display:none!important}
+ .shared-cp-panel,.shared-cp-banner,.no-print{display:none!important}
 }
+
+/* Shared Upfront Counterparty Hub & Cross-Module Chooser Enhancements */
+.shared-cp-pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:11.5px;border:1px solid var(--line,#d0dce3);background:var(--bg,#f5f8fa);color:var(--ink,#1d2d35);white-space:nowrap}
+.shared-cp-pill.is-ok{border-color:#8cc5a6;background:#edf8f2;color:#175938}
+.shared-cp-pill.is-manual{border-color:#7fb2cc;background:#eef6fb;color:#194e68}
+.shared-cp-pill.is-warn{border-color:#d8ad56;background:#fdf6e4;color:#6f4a07;font-weight:bold}
+.shared-cp-pill.is-muted{border-color:#c6d0d6;background:#f3f5f7;color:#51616b}
+[data-theme="dark"] .shared-cp-pill.is-ok{background:#123324;color:#9fe3bd;border-color:#2c6b4b}
+[data-theme="dark"] .shared-cp-pill.is-manual{background:#132f3f;color:#9fd4f0;border-color:#2d6584}
+[data-theme="dark"] .shared-cp-pill.is-warn{background:#3a2b0d;color:#f6d27a;border-color:#7c5d1c}
+[data-theme="dark"] .shared-cp-pill.is-muted{background:#232b31;color:#b8c4cc;border-color:#44525c}
+
+.shared-cp-panel{margin:12px 0;padding:14px 16px;border:1px solid var(--line,#cdd8df);border-radius:12px;background:var(--panel,#fff);color:var(--ink,#1d2d35)}
+.shared-cp-panel.is-compact{padding:10px 14px}
+.shared-cp-panel.has-attention{border-color:#d8ad56}
+.shared-cp-head{display:flex;flex-wrap:wrap;gap:8px 14px;justify-content:space-between;align-items:center}
+.shared-cp-head h3{margin:0;font-size:14px;line-height:1.6}
+.shared-cp-head p{margin:2px 0 0;font-size:11.5px;color:var(--muted,#60727d)}
+.shared-cp-toggle{padding:5px 11px;border:1px solid var(--line,#b8c7d0);border-radius:8px;background:var(--bg,#f4f8fa);color:var(--ink,#1d2d35);cursor:pointer;font:11.5px/1.6 Tahoma,sans-serif}
+.shared-cp-resolved-box{margin-top:10px;padding:9px 11px;border:1px solid var(--line,#dce5ea);border-radius:10px;background:var(--bg,#f8fbfc)}
+.shared-cp-resolved-title{font-size:11.5px;font-weight:bold;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.shared-cp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.shared-cp-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--line,#cfdbe2);border-radius:8px;background:var(--panel,#fff);font-size:11.5px;line-height:1.5;max-width:100%}
+.shared-cp-chip b{overflow-wrap:anywhere}
+.shared-cp-chip small{color:var(--muted,#5e707b);white-space:nowrap}
+.shared-cp-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 8px}
+.shared-cp-tab{padding:4px 10px;border:1px solid var(--line,#c7d4dc);border-radius:7px;background:var(--bg,#f5f8fa);color:var(--ink,#23333e);cursor:pointer;font:11.5px/1.6 Tahoma,sans-serif}
+.shared-cp-tab.is-active{background:#28657c;color:#fff;border-color:#28657c;font-weight:bold}
+.shared-cp-scroll{overflow-x:auto;max-height:400px;overflow-y:auto;border:1px solid var(--line,#d8e2e8);border-radius:9px}
+.shared-cp-table{width:100%;min-width:680px;border-collapse:collapse;font-size:12px;line-height:1.65}
+.shared-cp-table th,.shared-cp-table td{padding:7px 9px;border-bottom:1px solid var(--line,#e2eaee);text-align:right;vertical-align:top}
+.shared-cp-table thead th{position:sticky;top:0;z-index:1;background:var(--bg,#eef4f7);font-weight:bold;white-space:nowrap}
+.shared-cp-table td.num{font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr;text-align:left}
+.shared-cp-table tr[data-cp-row-kind="ambiguous"]{background:#fffaf0}
+[data-theme="dark"] .shared-cp-table tr[data-cp-row-kind="ambiguous"]{background:#2a2210}
+.shared-cp-panel .cp-ws-result,#reportEvidence .cp-ws-result{overflow-wrap:anywhere}
+.shared-cp-panel .cp-ws-result .cp-txt,#reportEvidence .cp-ws-result .cp-txt{font-size:12px;line-height:1.6}
+.shared-cp-panel .cp-ws-result .cp-txt .sep,#reportEvidence .cp-ws-result .cp-txt .sep{color:var(--muted,#6e7f89);padding:0 2px}
+.shared-cp-panel .cp-ws-status,#reportEvidence .cp-ws-status{display:block;font-size:10.5px;line-height:1.5;color:var(--muted,#536772);margin-top:2px}
+.shared-cp-panel .cp-ws-action,#reportEvidence .cp-ws-action{display:inline-block;padding:3px 8px;margin-top:4px;border:1px solid #88a7b5;border-radius:6px;background:#eef6fa;color:#1d4b5c;cursor:pointer;font:11px/1.6 Tahoma,sans-serif;white-space:normal}
+.shared-cp-panel .cp-ws-result[data-cp-kind="ambiguous"] .cp-ws-action,#reportEvidence .cp-ws-result[data-cp-kind="ambiguous"] .cp-ws-action{border-color:#c9962c;background:#fff4d9;color:#694400;font-weight:bold}
+[data-theme="dark"] .shared-cp-panel .cp-ws-action,[data-theme="dark"] #reportEvidence .cp-ws-action{background:#183442;color:#b8e1f2;border-color:#3a6a80}
+[data-theme="dark"] .shared-cp-panel .cp-ws-result[data-cp-kind="ambiguous"] .cp-ws-action,[data-theme="dark"] #reportEvidence .cp-ws-result[data-cp-kind="ambiguous"] .cp-ws-action{background:#42300c;color:#ffd982;border-color:#967020}
+.shared-cp-ai-notice{margin-top:10px;padding:8px 12px;border:1px solid #d5ab54;border-radius:9px;background:#fef8e8;color:#5f4005;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;font-size:12px}
+[data-theme="dark"] .shared-cp-ai-notice{background:#34270d;color:#f5d589;border-color:#7d5e1c}
+.shared-cp-ai-notice button{padding:4px 10px;border:1px solid #b88c32;border-radius:7px;background:#fff;color:#4f3504;cursor:pointer;font:11.5px/1.6 Tahoma,sans-serif}
+.shared-cp-more{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted,#60727d)}
+
+/* Smart Evidence, Recommendation, Batch-Confirm & Cross-Voucher Styles inside #cpWorksheetDialog */
+#cpWorksheetDialog .cp-smart-rec{margin:0 0 12px;padding:10px 12px;border:1px solid #6ca88b;border-radius:9px;background:#eef9f3;color:#154b32;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;font-size:12px}
+#cpWorksheetDialog .cp-smart-rec button{padding:4px 10px;border:1px solid #2b7a56;border-radius:7px;background:#236b4a;color:#fff;font-size:11.5px;cursor:pointer}
+#cpWorksheetDialog .cp-struct-warn{margin:0 0 12px;padding:10px 12px;border:1.5px solid #cc8828;border-radius:9px;background:#fff6e5;color:#663e05;font-size:12px;line-height:1.7}
+#cpWorksheetDialog .cp-ws-option.is-recommended{border-color:#4b9b74;box-shadow:inset 3px 0 0 #2f855a}
+#cpWorksheetDialog .cp-smart-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+#cpWorksheetDialog .cp-smart-badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;background:#edf6fb;border:1px solid #9dc6dc;color:#1b4f6b}
+#cpWorksheetDialog .cp-smart-badge.is-strong{background:#e9f7ef;border-color:#84c3a3;color:#165436;font-weight:bold}
+#cpWorksheetDialog .cp-batch-box{margin:10px 0;padding:9px 12px;border:1px dashed #608fa2;border-radius:9px;background:#f4f9fc;font-size:12px;color:#1f4759}
+#cpWorksheetDialog .cp-batch-box label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+#cpWorksheetDialog .cp-cross-box{margin:12px 0 0;padding:10px 12px;border:1px solid #c9d8e2;border-radius:9px;background:#f7fafc;font-size:11.5px;color:#2c4654}
+#cpWorksheetDialog .cp-cross-item{padding:4px 0;border-top:1px dashed #dde6ec;margin-top:4px}
 
 /* ACCOUNT-ANALYSIS-CSS-END */
 /* SAMPLING-TEMPLATE-CSS-BEGIN */
-/* Scoped adaptation of the supplied raw sampling template; other modules untouched. */
-@page samplingPortrait{size:A4 portrait;margin:7mm}
-@page samplingLandscape{size:A4 landscape;margin:7mm}
-.sheet.sampling-template{--sample-red:#c00000;--sample-gold:#fff2cc;--sample-gold2:#fbe3a0;--sample-blue:#0070c0;--sample-ink:#1c2430;--sample-mute:#6b7280;--sample-line:#e3d6ad;--sample-zebra:#fffcf2;--bad:#c00000;page:samplingPortrait;width:var(--sample-paper-width,196mm);min-width:var(--sample-paper-width,196mm);max-width:none;margin:10px auto;background:#fff;border:1.6px solid var(--sample-red);border-radius:20px;padding:5px;box-shadow:0 6px 24px #00000026;direction:rtl;color:var(--sample-ink);font-size:12px;line-height:1.7;box-sizing:border-box}
+/* Landscape-first, zero-browser-footer (@page margin:0) paginated sampling worksheet */
+@page samplingPortrait{size:A4 portrait;margin:0!important}
+@page samplingLandscape{size:A4 landscape;margin:0!important}
+.sheet.sampling-template{--sample-red:#c00000;--sample-gold:#fff2cc;--sample-gold2:#fbe3a0;--sample-blue:#0070c0;--sample-ink:#1c2430;--sample-mute:#6b7280;--sample-line:#e3d6ad;--sample-zebra:#fffcf2;--bad:#c00000;page:samplingLandscape;width:var(--sample-paper-width,286mm);min-width:var(--sample-paper-width,286mm);max-width:none;margin:10px auto;background:#fff;border:1.5px solid var(--sample-red);border-radius:16px;padding:4px;box-shadow:0 6px 24px #00000022;direction:rtl;color:var(--sample-ink);font-size:11px;line-height:1.42;box-sizing:border-box}
+.sheet.sampling-template[data-sample-orientation="portrait"]{page:samplingPortrait}
 .sheet.sampling-template,.sheet.sampling-template *{-webkit-text-size-adjust:100%;text-size-adjust:100%;font-family:"B Nazanin","Vazirmatn","Tahoma",sans-serif!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}
-.sampling-template .inner{border:1px solid var(--sample-gold2);border-radius:16px;padding:7px}
-.sampling-template .frame{border:1px solid var(--sample-red);border-radius:14px;overflow:hidden;width:calc(var(--sample-table-width,187mm) + 2px);margin-inline:auto}
+.sampling-template .inner{border:1px solid var(--sample-gold2);border-radius:13px;padding:5px}
+.sampling-template .frame{border:1px solid var(--sample-red);border-radius:11px;overflow:hidden;width:calc(var(--sample-table-width,279mm) + 2px);margin-inline:auto}
 .sampling-template table{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;margin:0}
-.sampling-template th,.sampling-template td{padding:4px 5px;vertical-align:middle;text-align:center;border:0;font-size:11px;color:var(--sample-ink);white-space:normal;word-break:normal;overflow-wrap:anywhere}
+.sampling-template th,.sampling-template td{padding:2.5px 4px;vertical-align:middle;text-align:center;border:0;font-size:10.2px;color:var(--sample-ink);white-space:normal;word-break:normal;overflow-wrap:anywhere}
 .sampling-template th.sample-header-cell{padding:0;background:none;border:0;font-weight:normal}
-.sampling-template .meta{display:grid;grid-template-columns:22mm 1.7fr 1fr;align-items:center;gap:10px;padding:9px 14px;background:linear-gradient(180deg,#fffaf0,#fff2cc);text-align:right;border-bottom:1px solid var(--sample-line)}
-.sampling-template .meta div{padding:2px 0}
+.sampling-template .meta{display:grid;grid-template-columns:14mm 1.95fr .95fr;align-items:center;gap:8px;padding:4.5px 11px;background:linear-gradient(180deg,#fffaf0,#fff2cc);text-align:right;border-bottom:1px solid var(--sample-line)}
+.sampling-template .meta div{padding:1px 0}
 .sampling-template .meta .k{color:var(--sample-blue);font-weight:bold}
 .sampling-template .meta .v{font-weight:bold}
-.sampling-template .meta .big{font-size:12.5px;white-space:normal;overflow-wrap:anywhere}
-.sampling-template .meta .side{border-right:1px dashed #d8b96a;padding-right:12px;font-size:12px}
-.sampling-template .meta .refcircle{width:19mm;height:19mm;min-width:19mm;border-radius:50%;border:1.5px solid var(--sample-red);background:#fff;padding:0}
-.sampling-template .path{background:#fff;padding:7px 12px;text-align:right;border-bottom:1px solid var(--sample-line);line-height:1.7}
-.sampling-template .path .lab{color:var(--sample-red);font-weight:bold;margin-left:6px}
-.sampling-template .chip{display:inline-block;border:1px solid var(--sample-line);background:var(--sample-zebra);border-radius:999px;padding:0 9px;margin:1px 0;font-size:11.5px;overflow-wrap:anywhere;font-weight:normal}
+.sampling-template .meta .big{font-size:11.2px;line-height:1.36;white-space:normal;overflow-wrap:anywhere}
+.sampling-template .meta .side{border-right:1px dashed #d8b96a;padding-right:10px;font-size:10.5px;line-height:1.36}
+.sampling-template .meta .refcircle{width:12.5mm;height:12.5mm;min-width:12.5mm;border-radius:50%;border:1.4px solid var(--sample-red);background:#fff;padding:0}
+.sampling-template .path{background:#fff;padding:2.5px 10px;text-align:right;border-bottom:1px solid var(--sample-line);line-height:1.35}
+.sampling-template.sample-continuation-page .path{display:none}
+.sampling-template .path .lab{color:var(--sample-red);font-weight:bold;margin-left:5px;font-size:10px}
+.sampling-template .chip{display:inline-block;border:1px solid var(--sample-line);background:var(--sample-zebra);border-radius:999px;padding:0 7px;margin:0;font-size:10px;overflow-wrap:anywhere;font-weight:normal}
 .sampling-template .chip b{color:var(--sample-blue)}
-.sampling-template .arrow,.sampling-template .cp .sep{color:var(--sample-red);margin:0 4px;font-weight:bold}
-.sampling-template .cols th{padding-inline:2px;white-space:nowrap;overflow-wrap:normal;background:var(--sample-gold);color:#5a4300;font-size:11.5px;border-bottom:1px solid var(--sample-line);border-left:1px solid var(--sample-line);font-weight:bold}
+.sampling-template .arrow,.sampling-template .cp .sep{color:var(--sample-red);margin:0 3px;font-weight:bold}
+.sampling-template .cols th{position:relative;padding:2.5px 2px;white-space:nowrap;overflow-wrap:normal;background:var(--sample-gold);color:#5a4300;font-size:10.5px;line-height:1.25;border-bottom:1px solid var(--sample-line);border-left:1px solid var(--sample-line);font-weight:bold;user-select:none}
 .sampling-template .cols th:last-child{border-left:0}
-.sampling-template .cols th.n{font-size:var(--sample-control-font,10px);padding:1px;color:var(--sample-red)}
+.sampling-template .cols th.n{font-size:var(--sample-control-font,9.5px);padding:1px 0;color:var(--sample-red)}
 .sampling-template tbody{break-inside:auto;page-break-inside:auto}
-.sampling-template tbody td{border-bottom:1px solid var(--sample-line);border-left:1px solid var(--sample-line);font-size:11px}
+.sampling-template tbody td{border-bottom:1px solid var(--sample-line);border-left:1px solid var(--sample-line);font-size:10.2px;line-height:1.36}
 .sampling-template tbody td:last-child{border-left:0}
 .sampling-template tbody tr:nth-child(even) td{background:var(--sample-zebra)}
 .sampling-template tr.item{break-inside:avoid;page-break-inside:avoid}
-.sampling-template .rownum{font-weight:bold;font-size:11.5px;color:var(--sample-ink);border:0;border-radius:0;background:none}
-.sampling-template td.num{direction:ltr;font-variant-numeric:tabular-nums;font-weight:bold;white-space:nowrap;word-break:normal;overflow-wrap:normal;font-size:10.5px;text-align:center;overflow:visible}
+.sampling-template .rownum{font-weight:bold;font-size:10.5px;color:var(--sample-ink);border:0;border-radius:0;background:none}
+.sampling-template .cont-tag{display:block;font-size:8.5px;color:var(--sample-mute);font-weight:normal}
+.sampling-template td.num{direction:ltr;font-variant-numeric:tabular-nums;font-weight:bold;white-space:nowrap;word-break:normal;overflow-wrap:normal;font-size:10px;text-align:center;overflow:visible;padding-inline:2px;line-height:15px}
 .sampling-template td.num.dr{color:#0b4f8a}.sampling-template td.num.cr{color:#8a2b0b}
-.sampling-template td.date{font-size:11px;direction:ltr;unicode-bidi:isolate;white-space:nowrap;font-weight:normal;padding-inline:2px}
-.sampling-template td.desc{text-align:right;line-height:1.75}
-.sampling-template .sample-desc-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
-.sampling-template .sub{font-size:10.5px;color:var(--sample-mute);margin:2px 0 0;line-height:1.75}
-.sampling-template td.cp{text-align:right;font-size:10.5px;line-height:1.7}
-.sampling-template .cp .cp-txt{line-height:1.7;font-size:11px}
-.sampling-template .cp .p{margin-bottom:3px}
+.sampling-template td.date{font-size:10px;direction:ltr;unicode-bidi:isolate;white-space:nowrap;font-weight:normal;padding-inline:2px}
+.sampling-template td.desc{text-align:right;line-height:1.36;padding:2.5px 5px}
+.sampling-template .sample-desc-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10px;line-height:1.36}
+.sampling-template .sub{font-size:9.5px;color:var(--sample-mute);margin:1px 0 0;line-height:1.34}
+.sampling-template td.cp{text-align:right;font-size:10px;line-height:1.36;padding:2.5px 5px}
+.sampling-template .cp .cp-txt{line-height:1.36;font-size:10px}
+.sampling-template .cp .p{margin-bottom:1.5px;padding-bottom:1px;border-bottom:1px dotted #e7dbb8}
+.sampling-template .cp .p:last-child{margin-bottom:0;padding-bottom:0;border-bottom:0}
 .sampling-template td.ctl{padding:0}
-.sampling-template .box{display:inline-block;width:var(--sample-box,12px);height:var(--sample-box,12px);border:1px solid #bfa860;border-radius:3px;background:#fff;padding:0;margin:0;min-height:0}
-.sampling-template tr.total td{background:var(--sample-gold2)!important;font-weight:bold;border-top:2px solid var(--sample-red);border-bottom:0}
-.sampling-template tr.total td.lbl{text-align:right;padding-right:14px;color:#5a4300}
-.sampling-template .recap{margin-top:9px;break-inside:avoid;page-break-inside:avoid}
-.sampling-template .recap .ttl{background:linear-gradient(180deg,#fffaf0,#fff2cc);color:var(--sample-red);font-weight:bold;text-align:right;padding:5px 14px;border-bottom:1px solid var(--sample-line);font-size:13px}
+.sampling-template .box{display:inline-block;width:var(--sample-box,10.5px);height:var(--sample-box,10.5px);border:1px solid #bfa860;border-radius:2.5px;background:#fff;padding:0;margin:0;min-height:0}
+.sampling-template tr.total td{background:var(--sample-gold2)!important;font-weight:bold;border-top:1.6px solid var(--sample-red);border-bottom:0}
+.sampling-template tr.total td.lbl{text-align:right;padding-right:12px;color:#5a4300}
+.sampling-template .recap{margin-top:5px;break-inside:avoid;page-break-inside:avoid}
+.sampling-template .recap .ttl{background:linear-gradient(180deg,#fffaf0,#fff2cc);color:var(--sample-red);font-weight:bold;text-align:right;padding:3.5px 12px;border-bottom:1px solid var(--sample-line);font-size:11.5px}
 .sampling-template table.sum{margin:0;width:100%;border:0;page-break-inside:auto}
-.sampling-template .recap th{background:var(--sample-gold);font-size:11.5px;border-left:1px solid var(--sample-line);border-bottom:1px solid var(--sample-line);color:#5a4300;font-weight:bold}
-.sampling-template .recap td{border-bottom:1px solid var(--sample-line);border-left:1px solid var(--sample-line);font-size:11.5px}
+.sampling-template .recap th{background:var(--sample-gold);font-size:10.5px;padding:2.5px 4px;border-left:1px solid var(--sample-line);border-bottom:1px solid var(--sample-line);color:#5a4300;font-weight:bold}
+.sampling-template .recap td{border-bottom:1px solid var(--sample-line);border-left:1px solid var(--sample-line);font-size:10.5px;padding:2.5px 4px}
 .sampling-template .recap th:last-child,.sampling-template .recap td:last-child{border-left:0}
-.sampling-template .recap td.lab{text-align:right;padding-right:14px}
+.sampling-template .recap td.lab{text-align:right;padding-right:12px}
 .sampling-template .recap tr:last-child td{border-bottom:0}
-.sampling-template .recap tr.sumrow td{background:var(--sample-gold2);font-weight:bold;border-top:2px solid var(--sample-red)}
+.sampling-template .recap tr.sumrow td{background:var(--sample-gold2);font-weight:bold;border-top:1.6px solid var(--sample-red)}
 .sampling-template .recap tr.rest td{font-weight:bold;color:var(--sample-red);background:#fff5f5}
-.sampling-template .recap td.pct{position:relative;font-weight:bold;white-space:nowrap;padding-bottom:7px}
-.sampling-template .pct i{position:absolute;right:0;bottom:0;height:3px;width:var(--w);background:linear-gradient(90deg,#f0b429,#c00000);border-radius:2px}
-.sampling-template.sample-print-page{margin:0;break-after:page;page-break-after:always}
-.sampling-template.sample-print-page:last-child{break-after:auto;page-break-after:auto}
+.sampling-template .recap td.pct{position:relative;font-weight:bold;white-space:nowrap;padding-bottom:5px}
+.sampling-template .pct i{position:absolute;right:0;bottom:0;height:2.5px;width:var(--w);background:linear-gradient(90deg,#f0b429,#c00000);border-radius:2px}
+
+.sample-paper-box{width:var(--sample-full-width,297mm);height:var(--sample-full-height,210mm);padding:4.5mm 5.5mm;margin:0 auto 14px;background:#fff;box-sizing:border-box;display:flex;align-items:stretch;justify-content:center}
+.sheet.sampling-template.sample-print-page{height:var(--sample-paper-height,201mm);margin:0!important;padding:4px!important;min-width:var(--sample-paper-width,286mm);width:var(--sample-paper-width,286mm);line-height:1.38}
+.sampling-template.sample-print-page>.inner{height:100%;display:flex;flex-direction:column;min-height:0}
+.sampling-template.sample-print-page .sample-main-frame{display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow:hidden}
+.sampling-template.sample-print-page .sample-main-frame>table{flex:0 0 auto}
+.sampling-template.sample-print-page .sample-page-footer{margin-top:auto;border-top:1.6px solid var(--sample-red)}
+.sampling-template.sample-print-page .sample-page-footer td{border-bottom:0;background:var(--sample-gold2)!important;font-weight:bold;line-height:15px;height:22px}
+.sampling-template.sample-print-page .sample-page-footer .lbl,.sampling-template .sample-brought-forward .lbl{text-align:right;padding-right:12px;color:#5a4300}
+.sampling-template.sample-print-page .sample-recap{flex:0 0 auto}
+.sampling-template .sample-brought-forward td{background:#fff2cc!important;font-weight:bold;line-height:15px;height:21px}
+.sampling-template.sample-print-page .sample-page-footer tr.total td{border-top:0}
+.sampling-template .sample-page-num{flex:0 0 auto;text-align:center;font-weight:bold;font-size:10.5px;line-height:1.25;padding-top:3px;color:var(--sample-ink);margin-top:auto}
+.sampling-template td:first-child{padding-inline:1px}
+.sampling-template .cols th:first-child{font-size:9px}
+.sampling-template .cols th.sample-controls-title{white-space:normal;overflow-wrap:normal;font-size:9px;line-height:1.25}
+.sampling-template[data-sample-orientation="landscape"]{page:samplingLandscape}
+.sample-print-controls{display:inline-flex;align-items:center;gap:7px;font-size:13px}
+.sample-print-controls select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:7px}
+.sample-page-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:bold;background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--ink);border:1px solid var(--line)}
+.sample-col-tools{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sample-col-hint{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);padding:4px 9px;border:1px dashed var(--line);border-radius:999px;background:var(--panel)}
+.sample-col-btn{font:12px Tahoma,sans-serif;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);cursor:pointer}
+.sample-col-btn:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.sampling-template .col-resize-handle{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:6;touch-action:none;user-select:none}
+.sampling-template .col-resize-handle::after{content:"";position:absolute;left:3px;top:16%;bottom:16%;width:2px;border-radius:2px;background:#c0000038;transition:background .12s,transform .12s}
+.sampling-template thead:hover .col-resize-handle::after{background:#c0000080}
+.sampling-template .col-resize-handle:hover::after,.sampling-template .col-resize-handle.is-active::after{background:#0070c0;width:3px;left:2.5px;top:6%;bottom:6%}
+body.is-col-resizing,body.is-col-resizing *{cursor:col-resize!important;user-select:none!important}
+.col-resize-guide{position:fixed;top:0;bottom:0;width:2px;background:#0070c0;pointer-events:none;z-index:9998;box-shadow:0 0 0 1px #ffffffaa}
+.col-resize-tooltip{position:fixed;transform:translate(-50%,-125%);padding:5px 10px;border-radius:8px;background:#1c2430ee;color:#fff;font:12px/1.4 Tahoma,sans-serif;direction:rtl;white-space:nowrap;pointer-events:none;z-index:9999;box-shadow:0 4px 14px #00000040}
+.sheet.sampling-template[data-sample-density="compact"]{line-height:1.28}
+.sheet.sampling-template[data-sample-density="compact"] .meta{padding:3px 9px;gap:6px;grid-template-columns:12mm 2fr .95fr}
+.sheet.sampling-template[data-sample-density="compact"] .meta .refcircle{width:10.5mm;height:10.5mm;min-width:10.5mm}
+.sheet.sampling-template[data-sample-density="compact"] .meta .big{font-size:10.4px;line-height:1.26}
+.sheet.sampling-template[data-sample-density="compact"] .meta .side{font-size:9.8px;line-height:1.26}
+.sheet.sampling-template[data-sample-density="compact"] .cols th{padding:1.5px 2px;font-size:9.8px}
+.sheet.sampling-template[data-sample-density="compact"] tbody td{padding:1.5px 3.5px;font-size:9.5px;line-height:1.26}
+.sheet.sampling-template[data-sample-density="compact"] .sample-desc-text,.sheet.sampling-template[data-sample-density="compact"] .cp .cp-txt{font-size:9.4px;line-height:1.26}
+.sheet.sampling-template[data-sample-density="compact"] .sub{font-size:8.8px;line-height:1.24;margin-top:0}
+.sheet.sampling-template[data-sample-density="compact"] .cp .p{margin-bottom:1px;padding-bottom:.5px}
+.sheet.sampling-template[data-sample-density="compact"] td.num{font-size:9.4px;line-height:13.5px}
+.sampling-template .sample-number-overflow{outline:2px solid #c00000}
+.sampling-template.sample-print-page.sample-last-page .sample-main-frame{flex:0 0 auto}
+.sampling-template.sample-print-page.sample-last-page .sample-page-footer{margin-top:0}
+.sampling-template.sample-print-page.sample-last-page .sample-recap{margin-top:4px}
+
 @media print{
- .sheet.sampling-template{margin:0;width:var(--sample-paper-width,196mm);min-width:0;padding:5px;box-shadow:none;border:1.6px solid var(--sample-red);border-radius:20px;overflow:visible}
+ #appVersionBar,#projectMeta,.topbar,#modbar,#stepper,#globalBackBtn,.sample-print-controls,.sample-page-badge,.sample-col-tools,.col-resize-handle,.col-resize-guide,.col-resize-tooltip,.sample-pdf-progress,.direct-pdf-btn,.no-print,dialog{display:none!important}
+ body.printing>*:not(#printHost){display:none!important}
+ body.printing #printHost{display:block!important;margin:0!important;padding:0!important}
+ .sample-paper-box{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always;overflow:hidden}
+ .sample-paper-box:last-child{break-after:auto;page-break-after:auto}
+ .sheet.sampling-template{margin:0;width:var(--sample-paper-width,286mm);min-width:0;padding:4px;box-shadow:none;border:1.5px solid var(--sample-red);border-radius:16px;overflow:visible}
  .sampling-template .frame{overflow:hidden}
  .sampling-template thead{display:table-header-group}
  .sampling-template tr.sample-oversize,.sampling-template tr.sample-oversize td{break-inside:auto;page-break-inside:auto}
  .sampling-template .cp-ws-action,.sampling-template .cp-ws-status,.sampling-template .cp-ws-footnote{display:none!important}
 }
-
-/* v9.7: measured and printed pages share the same fixed physical box. No row stretching. */
-.sheet.sampling-template.sample-print-page{height:var(--sample-paper-height,282mm);margin:0!important;padding:5px!important;min-width:var(--sample-paper-width,196mm);width:var(--sample-paper-width,196mm);line-height:1.7}
-.sampling-template.sample-print-page>.inner{height:100%;display:flex;flex-direction:column;min-height:0}
-.sampling-template.sample-print-page .sample-main-frame{display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow:hidden}
-.sampling-template.sample-print-page .sample-main-frame>table{flex:0 0 auto}
-.sampling-template.sample-print-page .sample-page-footer{margin-top:auto;border-top:2px solid var(--sample-red)}
-.sampling-template.sample-print-page .sample-page-footer td{border-bottom:0;background:var(--sample-gold2)!important;font-weight:bold}
-.sampling-template.sample-print-page .sample-page-footer .lbl,.sampling-template .sample-brought-forward .lbl{text-align:right;padding-right:14px;color:#5a4300}
-.sampling-template.sample-print-page .sample-recap{flex:0 0 auto}
-.sampling-template .sample-brought-forward td{background:#fff2cc!important;font-weight:bold}
-
-.sampling-template.sample-print-page .sample-page-footer tr.total td{border-top:0}
-
-/* v9.8: A4 portrait expressly selected by the user; retain 50mm references. */
-.sampling-template td.num{padding-inline:2px}
-.sampling-template td:first-child{padding-inline:1px}
-.sampling-template .cols th:first-child{font-size:9px}
-.sampling-template .cols th.sample-controls-title{white-space:normal;overflow-wrap:normal;font-size:9px;line-height:1.35}
-
-.sampling-template[data-sample-orientation="landscape"]{page:samplingLandscape}
-.sample-print-controls{display:inline-flex;align-items:center;gap:7px;font-size:13px}
-.sample-print-controls select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:7px}
-.sampling-template td.num{line-height:18px}
-.sampling-template .sample-page-footer td,.sampling-template .sample-brought-forward td{line-height:18px;height:28px}
-.sampling-template .sample-number-overflow{outline:2px solid #c00000}
-@media print{.sample-print-controls{display:none!important}}
-
-.sample-pdf-progress{font-size:12px;color:var(--muted)}
-@media print{.sample-pdf-progress,.direct-pdf-btn{display:none!important}}
-
-/* Last-page recap follows the last record, not the paper's bottom edge. */
-.sampling-template.sample-print-page.sample-last-page .sample-main-frame{flex:0 0 auto}
-.sampling-template.sample-print-page.sample-last-page .sample-page-footer{margin-top:0}
-.sampling-template.sample-print-page.sample-last-page .sample-recap{margin-top:4px}
-
 /* SAMPLING-TEMPLATE-CSS-END */
 </style>
 </head>
 <body class="meta-stage-active">
-<div style="padding:12px 16px;background:#2f6f4f;color:#fff;font-family:Tahoma,sans-serif;font-size:18px">نرم‌افزار حسابرسی — نسخهٔ ۹٫۱۹</div>
+<div id="appVersionBar" class="no-print" style="padding:12px 16px;background:#2f6f4f;color:#fff;font-family:Tahoma,sans-serif;font-size:18px">نرم‌افزار حسابرسی — نسخهٔ ۹٫۱۹</div>
 
 <section id="projectMeta" dir="rtl" style="max-width:940px;margin:16px auto;padding:20px;background:var(--panel,#fff);border:1px solid var(--line,#ddd);border-radius:14px;font-family:Tahoma,sans-serif">
 <p style="color:var(--muted)">نسخهٔ رسمی ۹٫۱۹ + آزمایش محلی شواهد (مرحلهٔ اول)</p><h2>اطلاعات عمومی پرونده</h2><p>در ابتدای کار وارد کنید؛ این مشخصات در سربرگ همهٔ کاربرگ‌های همین پرونده استفاده می‌شوند. تاریخ تهیه پیش‌فرض امروز است و قابل ویرایش است. اطلاعات در این صفحه نگهداری می‌شوند؛ با تازه‌سازی صفحه از بین می‌روند.</p>
@@ -2897,7 +2976,7 @@ const METHODS = {
   rand:'انتخاب تصادفی ساده',
   sys:'انتخاب سیستماتیک (فاصله‌ی ثابت با شروع تصادفی)'
 };
-const SHEET_CFG = {company:'', year:'', prep:'', rev:'', date:'', ctrl:10};
+const SHEET_CFG = {company:'', year:'', prep:'', rev:'', date:'', ctrl:10, orientation:'landscape', density:'normal', customCols:{}};
 let DOC_IDX=null, DOC_SRC=null;
 function docIndex(){
   if(DOC_SRC!==ACCOUNT_ROWS){
@@ -3077,10 +3156,10 @@ function helpHtml(m){
   return `<b>${h.head}</b><ol>${h.li.map(x=>`<li>${x}</li>`).join('')}</ol><div class="warn">${h.warn}</div>`;
 }
 function printHint(){
-  return '<p class="hint" style="margin:0 0 10px;">برای حذف تاریخ و نشانی بالای پیش‌نمایش چاپ، در پنجره‌ی چاپ مرورگر گزینه‌ی «سرصفحه و پادصفحه» (Headers and footers) را <b>غیرفعال</b> کنید.</p>';
+  return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند.</p>';
 }
 function sheetHTML(w, sel){
-  const layout=samplePrintLayout(),c=SHEET_CFG,n=Math.max(1,Math.min(15,Math.round(Number(c.ctrl)||10))),cpCtx=cpWorksheetContext(),SPAN=8+n;
+  const layout=samplePrintLayout(w),c=SHEET_CFG,n=Math.max(1,Math.min(15,Math.round(Number(c.ctrl)||10))),cpCtx=cpWorksheetContext(),SPAN=8+n;
   CP_REPORT.filled=0;CP_REPORT.blank=0;CP_REPORT.reasons={};
   const order=sel.slice().sort((a,b)=>Number(a.doc)-Number(b.doc)||String(a.doc).localeCompare(String(b.doc)));
   let sd=0,sc=0,k=0;
@@ -3100,39 +3179,39 @@ function sheetHTML(w, sel){
   const othD=sum(cur,'بدهکار')-sd,othC=sum(cur,'بستانکار')-sc;
   const totD=opD+sd+othD,totC=opC+sc+othC,end=totD-totC;
   const R=(label,d,cr,kind='')=>`<tr class="${kind}"><td class="lab">${label}</td><td class="num dr">${fmt(d)}</td>${samplePercentCell(d,totD)}<td class="num cr">${fmt(cr)}</td>${samplePercentCell(cr,totC)}</tr>`;
-  const path=w.keyPath.map((kp,i)=>{const at=kp.indexOf('|'),code=at<0?kp:kp.slice(0,at),title=at<0?'':kp.slice(at+1);return `<span class="chip">${esc(ACCOUNT_LEVELS[i].label)}: <b>${esc(sampleDisplayDigits(code))}</b> - ${esc(title)}</span>`;}).join('<span class="arrow">←</span>');
+  const fullSubjectPath=w.keyPath.map(kp=>{const at=kp.indexOf('|'),code=at<0?kp:kp.slice(0,at),title=at<0?'':kp.slice(at+1);return code?`${title} (${sampleDisplayDigits(code)})`:title;}).filter(Boolean).join(' ← ');
   const lastKey=w.keyPath[w.keyPath.length-1],lastTitle=lastKey.slice(lastKey.indexOf('|')+1);
+  const subjectText=fullSubjectPath||lastTitle;
   const widths=layout.columns,roles=['serial','voucher','date','description','counterparty','reference','debit','credit'];
-  const cols=widths.map((mm,i)=>`<col class="sample-col-${roles[i]}" style="width:${mm}mm">`).join('')+Array.from({length:n},()=>`<col class="sample-col-control" style="width:${(layout.controls/n).toFixed(6)}mm">`).join('');
+  const perCtrlMm=layout.controls/n;
+  const cols=widths.map((mm,i)=>`<col class="sample-col-${roles[i]}" style="width:${mm}mm">`).join('')+Array.from({length:n},()=>`<col class="sample-col-control" style="width:${perCtrlMm.toFixed(6)}mm">`).join('');
   const nums=Array.from({length:n},(_,i)=>`<th class="n cn">${faNum(i+1)}</th>`).join('');
-  const boxSize=2.8*96/25.4;
-  return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" style="--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-box:${boxSize.toFixed(2)}px;--sample-control-font:${Math.min(10,(layout.controls/n*96/25.4-2)/1.25).toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
-  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="refcircle" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(lastTitle)}</span></div><div class="big"><span class="k">تاریخ ترازنامه :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
-  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="path"><span class="lab">مسیر حساب :</span>${path}</div></th></tr>
-  <tr class="cols"><th rowspan="2">ردیف</th><th rowspan="2">سند</th><th rowspan="2">تاریخ</th><th rowspan="2">شرح</th><th rowspan="2">طرف حساب</th><th rowspan="2">عطف</th><th rowspan="2">بدهکار</th><th rowspan="2">بستانکار</th><th class="sample-controls-title" colspan="${n}">کنترل‌های حسابرسی</th></tr><tr class="cols">${nums}</tr></thead><tbody>${body}${total}</tbody></table></div>
+  const boxSize=Math.max(5.5,Math.min(2.55,perCtrlMm-0.55)*96/25.4);
+  const controlFont=Math.max(7.2,Math.min(9.5,(perCtrlMm*96/25.4-1.5)/1.2));
+  const headLabels=['ردیف','سند','تاریخ','شرح','طرف حساب','عطف','بدهکار','بستانکار'];
+  const resizableHeads=headLabels.map((lbl,i)=>`<th rowspan="2">${lbl}<span class="col-resize-handle no-print" data-col-resize="${i}" title="برای تغییر عرض ستون بکشید (دوبار کلیک: بازنشانی)"></span></th>`).join('');
+  return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" data-sample-density="${layout.density||'normal'}" style="--sample-full-width:${layout.paperWidth}mm;--sample-full-height:${layout.paperHeight}mm;--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-box:${boxSize.toFixed(2)}px;--sample-control-font:${controlFont.toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
+  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="refcircle" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(subjectText)}</span></div><div class="big"><span class="k">تاریخ ترازنامه :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
+  <tr class="cols">${resizableHeads}<th class="sample-controls-title" colspan="${n}">کنترل‌های حسابرسی</th></tr><tr class="cols">${nums}</tr></thead><tbody>${body}${total}</tbody></table></div>
   <div class="recap frame sample-recap"><div class="ttl">تفکیک گردش و مانده</div><table class="sum"><thead><tr><th style="width:34%">تفکیک</th><th>بدهکار</th><th style="width:11%">درصد</th><th>بستانکار</th><th style="width:11%">درصد</th></tr></thead><tbody>${R('افتتاحیه (مانده ابتدای سال)',opD,opC)}${R('اقلام رسیدگی‌شده',sd,sc)}${R('سایر اقلام (رسیدگی‌نشده)',othD,othC)}${R('جمع',totD,totC,'sumrow')}<tr class="rest"><td class="lab">مانده در پایان سال مالی</td><td class="num" colspan="4" style="text-align:right;padding-right:14px;direction:rtl">${fmtSignedBalance(end)}</td></tr></tbody></table></div></div></div>`;
 }
 // متن‌های واردشده از فایل اکسل نباید HTML را بشکنند
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-// اندازه‌ی قلم ستون شرح متناسب با طول متن: شرح بلند ⇒ قلم کوچک‌تر تا سلول بیش از حد قد نکشد
+// اندازه‌ی قلم ستون شرح و طرف حساب متناسب با حجم متن تنظیم می‌شود تا اسناد بیشتری در هر صفحه جا بگیرند
 function shrinkDesc(root){
-  // [انتخابگر، اندازه‌ی اولیه، سقف ارتفاع بر حسب «خط»، کمینه‌ی مجاز]
-  // شرح و طرف حساب هر دو از ۱۰ پیکسل شروع می‌شوند و متناسب با طولشان کوچک می‌شوند.
-  const rules=[['.desc-txt',10,3.6,6.5], ['.cp-txt',11,4.2,11]];
+  const rules=[['.sample-desc-text, .desc-txt',10,4.2,8], ['.cp-txt',10,5.6,8.2]];
   rules.forEach(r=>{
     const [sel,top,lim,min]=r;
     root.querySelectorAll(sel).forEach(el=>{
       el.style.fontSize=top+'px';
       let s=top, guard=0;
-      while(el.scrollHeight > s*lim && s>min && guard++<40){ s-=0.5; el.style.fontSize=s+'px'; }
+      while(el.scrollHeight > s*1.38*lim && s>min && guard++<32){
+        s=Math.max(min, +(s-0.4).toFixed(2));
+        el.style.fontSize=s+'px';
+      }
       el.style.fontSize=s+'px';
     });
   });
-  // مبالغ نباید از کادر بیرون بزنند: تا جا شدن در عرض سلول کوچک می‌شوند.
-  // چون سلول overflow:hidden دارد، scrollWidth اندازه‌ی واقعی متن را نمی‌دهد؛
-  // پس متن را با یک عنصر نامرئی و دقیقاً با همان فونت اندازه می‌گیریم.
-  // اگر کاربرگ هنوز پنهان باشد عرض صفر است؛ آن‌وقت اندازه‌گیری بی‌معنی است و
-  // باید به تعویق بیفتد تا کاربرگ واقعاً نمایان شود (shrinkWhenVisible).
   const meas=document.createElement('span');
   meas.setAttribute('aria-hidden','true');
   meas.style.cssText='position:absolute;visibility:hidden;white-space:nowrap;top:-9999px;left:0';
@@ -3141,14 +3220,14 @@ function shrinkDesc(root){
   root.querySelectorAll('.sheet td.num').forEach(el=>{
     const txt=el.textContent; if(!txt.trim()) return;
     const fam=getComputedStyle(el).fontFamily;
-    const avail=el.clientWidth-8;               // کمی حاشیه‌ی امن
-    if(avail<=20){ pending++; return; }        // هنوز قابل اندازه‌گیری نیست
+    const avail=el.clientWidth-6;
+    if(avail<=18){ pending++; return; }
     let s=10, guard=0;
     el.style.fontSize=s+'px';
-    while(s>8 && guard++<40){
+    while(s>7.5 && guard++<32){
       meas.style.fontFamily=fam; meas.style.fontSize=s+'px'; meas.textContent=txt;
       if(meas.offsetWidth<=avail) break;
-      s-=0.5; el.style.fontSize=s+'px';
+      s=+(s-0.4).toFixed(2); el.style.fontSize=s+'px';
     }
     el.style.fontSize=s+'px';
   });
@@ -3160,28 +3239,34 @@ function shrinkDesc(root){
 }
 function printSheet(host){
   const ph=document.getElementById('printHost');
-  const isWorkpaper=!!host.querySelector('.wp-paper'),isSampling=!!host.querySelector('.sampling-template');
+  const viewIdx=host&&host.dataset&&host.dataset.view!==undefined?Number(host.dataset.view):-1;
+  const sheetItem=viewIdx>=0&&SHEET_OUT[viewIdx]?SHEET_OUT[viewIdx]:null;
+  const isWorkpaper=!sheetItem&&!!host?.querySelector('.wp-paper');
+  const isSampling=!!sheetItem||!!host?.querySelector('.sampling-template');
   let pageRule=null;const oldTitle=document.title;
   const restore=()=>{document.title=oldTitle;document.body.classList.remove('printing');ph.innerHTML='';if(pageRule)pageRule.remove();window.removeEventListener('afterprint',restore);};
   try{
-  ph.innerHTML=host.querySelector('.sheet').outerHTML;
+  ph.innerHTML=sheetItem?sheetHTML(sheetItem.w,sheetItem.sel):host.querySelector('.sheet').outerHTML;
+  ph.querySelectorAll('.col-resize-handle').forEach(el=>el.remove());
 // <<<CP-WS-PRINT-BEGIN>>>
   if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(ph);
 // <<<CP-WS-PRINT-END>>>
 
   if(isSampling||isWorkpaper){
     pageRule=document.createElement('style');pageRule.dataset.temporaryPrint='true';
-    const layout=isSampling?samplePrintLayout():null;
-    pageRule.textContent=isSampling?'@page{size:A4 '+layout.orientation+';margin:7mm}@media print{html,body{width:'+layout.width+'mm!important;margin:0!important}body.printing #printHost{width:'+layout.width+'mm!important;max-width:none!important}}':'@page{size:8.5in 11in;margin:0}';
+    const layout=isSampling?samplePrintLayout(sheetItem?.w):null;
+    pageRule.textContent=isSampling
+      ?`@page{size:A4 ${layout.orientation};margin:0!important}@media print{html,body{width:${layout.paperWidth}mm!important;margin:0!important;padding:0!important;background:#fff!important}body.printing #printHost{width:${layout.paperWidth}mm!important;max-width:none!important;margin:0!important;padding:0!important}}`
+      :'@page{size:8.5in 11in;margin:0!important}';
     document.head.appendChild(pageRule);
   }
   document.body.classList.add('printing');
   shrinkDesc(ph);
 // <<<SAMPLE-TEMPLATE-PRINT-BEGIN>>>
-  if(typeof sampleTemplatePreparePrint==='function')sampleTemplatePreparePrint(ph);
+  if(typeof sampleTemplatePreparePrint==='function')sampleTemplatePreparePrint(ph,{worksheet:sheetItem?.w});
 // <<<SAMPLE-TEMPLATE-PRINT-END>>>
 
-  document.title='';window.addEventListener('afterprint',restore);window.print();
+  document.title=' ';window.addEventListener('afterprint',restore);window.print();
   }catch(error){window.alert(error.message||'چاپ انجام نشد؛ هیچ اطلاعاتی حذف نشد.');}finally{restore();}
 }
 
@@ -3212,7 +3297,7 @@ function renderOutputStep(){
   area.querySelectorAll('[data-cfg]').forEach(el=>el.addEventListener('input',()=>{
     const k=el.dataset.cfg;
     SHEET_CFG[k]= k==='ctrl' ? Math.max(1,Math.min(15,Number(el.value)||10)) : el.value;
-    drawSheets();
+    drawSheets(true);
   }));
   drawSheets();
 }
@@ -3224,7 +3309,9 @@ function checkStale(){
     ? `<div class="err" style="margin-bottom:12px">تنظیمات نمونه‌گیری را بعد از ساخت این کاربرگ‌ها تغییر داده‌اید، پس این کاربرگ‌ها با معیار قبلی ساخته شده‌اند و با انتخاب فعلی هم‌خوان نیستند. به مرحله «نمونه‌گیری» برگردید و «ساخت کاربرگ برای همه حساب‌ها» را بزنید.</div>`
     : '';
 }
-function drawSheets(){
+function drawSheets(preserveScroll){
+  const prevY=preserveScroll?window.scrollY:null;
+  const prevX=preserveScroll?(document.querySelector('#sheetViews .sheetwrap:not(.hide) [data-sheet-canvas]')?.scrollLeft||0):0;
 // <<<CP-WS-RENDER-BEGIN>>>
   if(typeof cpWorksheetBeginRender==='function')cpWorksheetBeginRender();
 // <<<CP-WS-RENDER-END>>>
@@ -3236,19 +3323,47 @@ function drawSheets(){
     `<button class="${k===ACTIVE_SHEET?'active':''}" data-tab="${k}" title="${x.w.pathLabel}">${accLabel(x.w)}</button>`).join('');
   document.getElementById('sheetViews').innerHTML=SHEET_OUT.map((x,k)=>
     `<div class="sheetwrap ${k===ACTIVE_SHEET?'':'hide'}" data-view="${k}">
-      <div class="btnrow" style="justify-content:flex-start;margin:0 0 10px">${samplePrintControls()}<button class="confirm print-btn native-print-btn">چاپ / ذخیره PDF</button></div>
+      <div class="btnrow no-print" style="justify-content:flex-start;margin:0 0 10px">${samplePrintControls(x.w)}<span class="sample-page-badge" data-page-badge="${k}"></span>${typeof sampleColumnToolsHTML==='function'?sampleColumnToolsHTML(x.w,k):''}<button class="confirm print-btn native-print-btn">چاپ / ذخیره PDF</button></div>
       ${printHint()}
-      <div class="scrollx">${sheetHTML(x.w,x.sel)}</div>
+      <div class="scrollx" data-sheet-canvas="${k}">${sheetHTML(x.w,x.sel)}</div>
     </div>`).join('');
-  document.querySelectorAll('select[data-sample-orientation]').forEach(el=>el.addEventListener('change',()=>{SHEET_CFG.orientation=el.value;drawSheets();}));
+  document.querySelectorAll('select[data-sample-orientation]').forEach(el=>el.addEventListener('change',()=>{SHEET_CFG.orientation=el.value;drawSheets(true);}));
+  document.querySelectorAll('select[data-sample-density]').forEach(el=>el.addEventListener('change',()=>{SHEET_CFG.density=el.value;drawSheets(true);}));
+  document.querySelectorAll('[data-col-auto]').forEach(b=>b.addEventListener('click',()=>{
+    const idx=Number(b.dataset.colAuto);
+    if(typeof sampleAutoOptimizeColumns==='function')sampleAutoOptimizeColumns(idx);
+  }));
+  document.querySelectorAll('[data-col-reset]').forEach(b=>b.addEventListener('click',()=>{
+    const idx=Number(b.dataset.colReset);
+    if(typeof sampleResetColumns==='function')sampleResetColumns(idx);
+  }));
+  document.querySelectorAll('[data-col-apply-all]').forEach(b=>b.addEventListener('click',()=>{
+    const idx=Number(b.dataset.colApplyAll);
+    if(typeof sampleApplyColumnsToAll==='function')sampleApplyColumnsToAll(idx);
+  }));
   tabs.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{
     ACTIVE_SHEET=+b.dataset.tab;
     tabs.querySelectorAll('[data-tab]').forEach(y=>y.classList.toggle('active', +y.dataset.tab===ACTIVE_SHEET));
-    document.querySelectorAll('.sheetwrap').forEach(v=>{v.classList.toggle('hide', +v.dataset.view!==ACTIVE_SHEET);if(!v.classList.contains('hide')){shrinkDesc(v);sampleFitNumbers(v);sampleUniformRows(v.querySelector('.sampling-template'));}});
+    document.querySelectorAll('.sheetwrap').forEach(v=>{
+      v.classList.toggle('hide', +v.dataset.view!==ACTIVE_SHEET);
+      if(!v.classList.contains('hide')){
+        if(typeof sampleRenderOnScreenPages==='function')sampleRenderOnScreenPages(v);
+        else{shrinkDesc(v);sampleFitNumbers(v);sampleUniformRows(v.querySelector('.sampling-template'));}
+      }
+    });
   }));
   document.querySelectorAll('.sheetwrap .print-btn').forEach(b=>b.addEventListener('click',()=>printSheet(b.closest('.sheetwrap'))));
-  // قلم ستون شرح متناسب با طول متن تنظیم می‌شود (شرح بلند ⇒ قلم کوچک‌تر)
-  document.querySelectorAll('.sheetwrap').forEach(v=>{ if(!v.classList.contains('hide')){shrinkDesc(v);sampleFitNumbers(v);sampleUniformRows(v.querySelector('.sampling-template'));} });
+  document.querySelectorAll('.sheetwrap').forEach(v=>{
+    if(!v.classList.contains('hide')){
+      if(typeof sampleRenderOnScreenPages==='function')sampleRenderOnScreenPages(v);
+      else{shrinkDesc(v);sampleFitNumbers(v);sampleUniformRows(v.querySelector('.sampling-template'));}
+    }
+  });
+  if(prevY!==null){
+    const activeCanvas=document.querySelector('#sheetViews .sheetwrap:not(.hide) [data-sheet-canvas]');
+    if(activeCanvas)activeCanvas.scrollLeft=prevX;
+    window.scrollTo(0,prevY);
+  }
 }
 // ---------- تنظیمات مشترک نمونه‌گیری ----------
 let SAMP_CFG={m:'top', base:'d', tmode:'p'};
@@ -5936,7 +6051,7 @@ function auditTemplatePrintPages(o,source,target){
 function auditTemplatePrint(host){
   const o=ANA.out[ANA.active],source=host.querySelector('.audit-template'),target=document.getElementById('printHost');if(!o||!source)return;
   let rule;const title=document.title;const restore=()=>{document.title=title;document.body.classList.remove('printing');target.classList.remove('template-measuring');target.innerHTML='';if(rule)rule.remove();window.removeEventListener('afterprint',restore);};
-  try{auditTemplatePrintPages(o,source,target);rule=document.createElement('style');rule.textContent='@page{size:A4 portrait;margin:6mm}';document.head.appendChild(rule);document.body.classList.add('printing');document.title='';window.addEventListener('afterprint',restore);window.print();restore();}catch(error){restore();alert(error.message);}
+  try{auditTemplatePrintPages(o,source,target);rule=document.createElement('style');rule.textContent='@page{size:A4 portrait;margin:0!important}@media print{body.printing #printHost{padding:6mm!important;box-sizing:border-box!important}}';document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';window.addEventListener('afterprint',restore);window.print();restore();}catch(error){restore();alert(error.message);}
 }
 // <<<WORKSHEET-VIEW-END>>>
 
@@ -6044,7 +6159,7 @@ function cpLabOpen(index){
 // <<<COUNTERPARTY-LAB-END>>>
 
 // <<<SAMPLING-TEMPLATE-BEGIN>>>
-// Presentation helpers only. No sampling, source-row or counterpart decisions.
+// Presentation & pagination helpers only. No sampling, source-row or counterpart decisions.
 function sampleDisplayDigits(value){
  return String(value??'').replace(/[0-9٠-٩]/g,c=>'۰۱۲۳۴۵۶۷۸۹'[/[0-9]/.test(c)?Number(c):'٠١٢٣٤٥٦٧٨٩'.indexOf(c)]);
 }
@@ -6053,77 +6168,319 @@ function samplePercentCell(amount,total){
  const valid=Number.isFinite(amount)&&Number.isFinite(total)&&total>0;
  const value=valid?Math.round(amount/total*1000)/10:null;
  const drawable=value!==null&&value>=0&&value<=100;
- // Same rounding as pctTxt; out-of-range/undefined ratios are not drawn as false bars.
  return `<td class="pct" data-pct-value="${value===null?'':value}"><span>${pctTxt(amount,total)}</span><i aria-hidden="true" style="--w:${value===null?0:value}%;${drawable?'':'display:none'}"></i></td>`;
 }
-function samplePrintLayout(){
- const orientation=SHEET_CFG.orientation==='landscape'?'landscape':'portrait',n=Math.max(1,Math.min(15,Math.round(Number(SHEET_CFG.ctrl)||10)));
- const l=orientation==='landscape'?{orientation,width:283,height:195,table:274,columns:[8,14,21,65,55,15,28,28],controls:40,minControl:4}:{orientation,width:196,height:282,table:187,columns:[6,10,18,39,37,12,25,25],controls:15,minControl:4};
- const extra=n*l.minControl-l.controls;l.controls=n*l.minControl;l.columns[3]-=extra/2;l.columns[4]-=extra/2;return l;
+const SAMPLE_COL_NAMES=['ردیف','سند','تاریخ','شرح','طرف حساب','عطف','بدهکار','بستانکار','کنترل‌های حسابرسی'];
+function sampleMinColumnVector(orientation,n){
+ return orientation==='landscape'
+  ?[5,8.5,13.5,22,30,5.5,18.5,18.5,+(n*2.2).toFixed(3)]
+  :[4.8,8,13,18,24,5,17,17,+(n*2.1).toFixed(3)];
 }
-function samplePrintControls(){
- const o=samplePrintLayout().orientation;
- return `<label class="sample-print-controls">جهت کاغذ <select data-sample-orientation aria-label="جهت کاغذ"><option value="portrait" ${o==='portrait'?'selected':''}>عمودی — Portrait</option><option value="landscape" ${o==='landscape'?'selected':''}>افقی — Landscape</option></select><small>عرض هر کنترل: ۴ میلی‌متر — ثابت</small></label>`;
+function sampleBasePrintMetrics(){
+ const orientation=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
+ const density=SHEET_CFG.density==='compact'?'compact':'normal';
+ const n=Math.max(1,Math.min(15,Math.round(Number(SHEET_CFG.ctrl)||10)));
+ return orientation==='landscape'
+  ?{orientation,density,n,paperWidth:297,paperHeight:210,width:286,height:201,table:279,baseCols:[7,11,17.5,46,108.5,9,23,23],baseControls:34,minControl:3.4}
+  :{orientation,density,n,paperWidth:210,paperHeight:297,width:199,height:288,table:192,baseCols:[6,10,16.5,34,53.5,8,21,21],baseControls:22,minControl:3.3};
 }
-function sampleUniformRows(p,fill=false){
+function sampleDefaultColumnVector(m){
+ const cols=m.baseCols.slice();
+ const targetControls=+(m.n*m.minControl).toFixed(3);
+ const extra=targetControls-m.baseControls;
+ cols[3]=Math.max(m.orientation==='landscape'?34:26,+(cols[3]-extra*0.35).toFixed(3));
+ cols[4]=Math.max(m.orientation==='landscape'?74:38,+(m.table-targetControls-cols.reduce((s,v,i)=>i===4?s:s+v,0)).toFixed(3));
+ return [...cols,targetControls];
+}
+function sampleNormalizeColumnVector(vec,m){
+ if(!Array.isArray(vec)||vec.length!==9||vec.some(v=>!Number.isFinite(Number(v))))return sampleDefaultColumnVector(m);
+ const minV=sampleMinColumnVector(m.orientation,m.n);
+ const out=vec.map((v,i)=>Math.max(minV[i],Number(v)));
+ const sum=out.reduce((a,b)=>a+b,0);
+ let diff=+(m.table-sum).toFixed(3);
+ // Adjust flexible columns (طرف حساب, شرح, کنترل‌ها, ...) to guarantee exact sum === m.table
+ const order=[4,3,8,7,6,5,2,1,0];
+ for(const idx of order){
+  if(Math.abs(diff)<1e-4)break;
+  if(diff>0){out[idx]=+(out[idx]+diff).toFixed(3);diff=0;}
+  else{
+   const give=Math.min(Math.max(0,out[idx]-minV[idx]),-diff);
+   out[idx]=+(out[idx]-give).toFixed(3);
+   diff=+(diff+give).toFixed(3);
+  }
+ }
+ return out;
+}
+function sampleComputeResizedVector(startVec,dividerIdx,dxMm,minVec){
+ const next=startVec.map(Number);
+ if(!Number.isFinite(dxMm)||Math.abs(dxMm)<0.02||dividerIdx<0||dividerIdx>=next.length-1)return next;
+ if(dxMm>0){
+  // In RTL, moving divider RIGHT shrinks right-side columns (dividerIdx..0) and grows left neighbor (dividerIdx+1)
+  let rem=dxMm,gained=0;
+  for(let j=dividerIdx;j>=0&&rem>1e-6;j--){
+   const room=Math.max(0,next[j]-minVec[j]);
+   const take=Math.min(room,rem);
+   next[j]=+(next[j]-take).toFixed(3);rem-=take;gained+=take;
+  }
+  next[dividerIdx+1]=+(next[dividerIdx+1]+gained).toFixed(3);
+ }else{
+  // Moving divider LEFT shrinks left-side columns (dividerIdx+1..8) and grows right neighbor (dividerIdx)
+  let rem=-dxMm,gained=0;
+  for(let j=dividerIdx+1;j<next.length&&rem>1e-6;j++){
+   const room=Math.max(0,next[j]-minVec[j]);
+   const take=Math.min(room,rem);
+   next[j]=+(next[j]-take).toFixed(3);rem-=take;gained+=take;
+  }
+  next[dividerIdx]=+(next[dividerIdx]+gained).toFixed(3);
+ }
+ const targetSum=startVec.reduce((a,b)=>a+b,0),curSum=next.reduce((a,b)=>a+b,0),fix=+(targetSum-curSum).toFixed(3);
+ if(Math.abs(fix)>0){const fi=dividerIdx===3||dividerIdx===4?4:dividerIdx;next[fi]=+(next[fi]+fix).toFixed(3);}
+ return next;
+}
+function sampleHasCustomColumns(w){
+ const o=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
+ const target=w||(SHEET_OUT[ACTIVE_SHEET]?.w);
+ return !!(target?._customCols?.[o]||SHEET_CFG.customCols?.[o]);
+}
+function samplePrintLayout(w){
+ const m=sampleBasePrintMetrics();
+ const target=w||(SHEET_OUT[ACTIVE_SHEET]?.w)||null;
+ const rawVec=target?._customCols?.[m.orientation]||SHEET_CFG.customCols?.[m.orientation]||null;
+ const vec=rawVec?sampleNormalizeColumnVector(rawVec,m):sampleDefaultColumnVector(m);
+ return {
+  orientation:m.orientation,
+  density:m.density,
+  paperWidth:m.paperWidth,
+  paperHeight:m.paperHeight,
+  width:m.width,
+  height:m.height,
+  table:m.table,
+  columns:vec.slice(0,8),
+  controls:vec[8],
+  vector:vec,
+  minControl:m.minControl
+ };
+}
+function samplePrintControls(w){
+ const l=samplePrintLayout(w);
+ return `<label class="sample-print-controls">جهت کاغذ <select data-sample-orientation aria-label="جهت کاغذ"><option value="landscape" ${l.orientation==='landscape'?'selected':''}>افقی — Landscape (پیشنهادی)</option><option value="portrait" ${l.orientation==='portrait'?'selected':''}>عمودی — Portrait</option></select></label><label class="sample-print-controls">تراکم سطرها <select data-sample-density aria-label="تراکم سطرها"><option value="normal" ${l.density==='normal'?'selected':''}>استاندارد</option><option value="compact" ${l.density==='compact'?'selected':''}>فشرده (اسناد بیشتر در هر صفحه)</option></select></label>`;
+}
+function sampleColumnToolsHTML(w,viewIdx){
+ const customized=sampleHasCustomColumns(w);
+ return `<span class="sample-col-tools"><span class="sample-col-hint">↔ تغییر دستی عرض ستون‌ها با کشیدن مرز عناوین جدول</span><button type="button" class="sample-col-btn" data-col-auto="${viewIdx}" title="تنظیم هوشمند نسبت ستون شرح و طرف حساب بر اساس طول واقعی متن‌های همین حساب">چیدمان هوشمند ستون‌ها</button>${customized?`${SHEET_OUT.length>1?`<button type="button" class="sample-col-btn" data-col-apply-all="${viewIdx}">اعمال به همه تب‌ها</button>`:''}<button type="button" class="sample-col-btn" data-col-reset="${viewIdx}">بازنشانی ستون‌ها</button>`:''}</span>`;
+}
+function sampleSetWorksheetColumns(viewIdx,vec){
+ const item=SHEET_OUT[viewIdx];if(!item)return;
+ const m=sampleBasePrintMetrics();
+ const clean=sampleNormalizeColumnVector(vec,m);
+ if(!item.w._customCols)item.w._customCols={};
+ item.w._customCols[m.orientation]=clean;
+ drawSheets(true);
+}
+function sampleResetColumns(viewIdx){
+ const item=SHEET_OUT[viewIdx];
+ const o=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
+ if(item?.w?._customCols)delete item.w._customCols[o];
+ if(SHEET_CFG.customCols)delete SHEET_CFG.customCols[o];
+ drawSheets(true);
+}
+function sampleApplyColumnsToAll(viewIdx){
+ const item=SHEET_OUT[viewIdx];if(!item)return;
+ const l=samplePrintLayout(item.w);
+ if(!SHEET_CFG.customCols)SHEET_CFG.customCols={};
+ SHEET_CFG.customCols[l.orientation]=l.vector.slice();
+ SHEET_OUT.forEach(x=>{if(!x.w._customCols)x.w._customCols={};x.w._customCols[l.orientation]=l.vector.slice();});
+ drawSheets(true);
+}
+function sampleAutoOptimizeColumns(viewIdx){
+ const item=SHEET_OUT[viewIdx];if(!item)return;
+ const m=sampleBasePrintMetrics(),minV=sampleMinColumnVector(m.orientation,m.n),def=sampleDefaultColumnVector(m);
+ // Measure real text lengths of شرح vs طرف حساب in this account's sample
+ const cpCtx=cpWorksheetContext();
+ const descLengths=[],cpLengths=[];
+ (item.sel||[]).forEach(d=>(d.rows||[]).forEach(r=>{
+  const d1=String(r['شرح سند']||r['شرح ردیف']||'').trim(),d2=String(r['شرح ردیف']||'').trim();
+  descLengths.push(Math.max(d1.length,d2&&d2!==d1?d2.length:0));
+  const model=cpWorksheetModel(r,cpCtx);
+  const longestCp=(model.names||[]).reduce((mx,nm)=>Math.max(mx,String(nm||'').length),0);
+  const countBoost=Math.min(1.6,1+Math.max(0,(model.names?.length||1)-1)*0.12);
+  cpLengths.push(Math.round((longestCp||35)*countBoost));
+ }));
+ const pct90=arr=>{if(!arr.length)return 40;const s=arr.slice().sort((a,b)=>a-b);return s[Math.min(s.length-1,Math.floor(s.length*0.88))]||40;};
+ const dNeed=Math.max(20,pct90(descLengths)),cNeed=Math.max(30,pct90(cpLengths));
+ // Compact auxiliary columns slightly to give maximum room to شرح + طرف حساب
+ const vec=def.slice();
+ if(m.orientation==='landscape'){vec[0]=6.2;vec[1]=10;vec[2]=16;vec[5]=7.5;vec[6]=21.5;vec[7]=21.5;vec[8]=Math.max(minV[8],+(m.n*2.9).toFixed(3));}
+ const fixedSum=vec.reduce((s,v,i)=>(i===3||i===4)?s:s+v,0);
+ const pool=Math.max(minV[3]+minV[4],+(m.table-fixedSum).toFixed(3));
+ const ratioD=Math.min(0.62,Math.max(0.20,dNeed/(dNeed+cNeed)));
+ vec[3]=Math.max(minV[3],+(pool*ratioD).toFixed(3));
+ vec[4]=Math.max(minV[4],+(pool-vec[3]).toFixed(3));
+ sampleSetWorksheetColumns(viewIdx,vec);
+}
+function sampleUniformRows(p){
  if(!p||p.getBoundingClientRect().width<1)return;
- const table=p.querySelector('table.main'),rows=[...table.querySelectorAll(':scope>tbody>tr.item,:scope>tbody>tr.sample-continuation')];
- if(!rows.length)return;rows.forEach(r=>r.style.height='auto');
- // Natural row height only: retain cell padding, never spread unused paper
- // space across rows. The cumulative footer remains at the page bottom.
-
+ const table=p.querySelector('table.main');if(!table)return;
+ const rows=[...table.querySelectorAll(':scope>tbody>tr.item,:scope>tbody>tr.sample-continuation')];
+ rows.forEach(r=>{r.style.height='auto';});
 }
 function sampleFitNumbers(root){
  let fits=true;
  root.querySelectorAll('.sampling-template td.num').forEach(td=>{
   if(!td.textContent.trim()||td.clientWidth<1)return;
   const cs=getComputedStyle(td),available=td.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-1;
-  const r=document.createRange();r.selectNodeContents(td);let size=10.5;td.style.fontSize=size+'px';
-  while(r.getBoundingClientRect().width>available&&size>7.5){size-=0.25;td.style.fontSize=size+'px';}
-  const ok=r.getBoundingClientRect().width<=available+0.5;td.classList.toggle('sample-number-overflow',!ok);fits=fits&&ok;
+  const r=document.createRange();r.selectNodeContents(td);let size=10;td.style.fontSize=size+'px';
+  while(r.getBoundingClientRect().width>available&&size>7.25){size-=0.25;td.style.fontSize=size+'px';}
+  const ok=r.getBoundingClientRect().width<=available+0.75;td.classList.toggle('sample-number-overflow',!ok);fits=fits&&ok;
  });return fits;
 }
-// Print-only layout: preserve every selected accounting row and repeat the supplied
-// header even when the separate recap needs its own continuation page.
-function sampleTemplatePreparePrint(host){
- const source=host.querySelector('.sampling-template');if(!source)return;
- const layout=samplePrintLayout(),savedStyle=host.getAttribute('style');
- host.style.cssText+=';display:block!important;position:absolute;left:-100000px;top:0;width:'+layout.width+'mm;visibility:hidden;';
+// Build fixed-height A4 pages with explicit «صفحهٔ X از Y», running cumulative footers,
+// zero browser URL/folder headers (@page margin:0 + .sample-paper-box internal padding),
+// and clean item-boundary splitting for tall multi-counterparty rows so pages never stay half-empty.
+function sampleTemplatePreparePrint(host,opts){
+ const source=host.querySelector('.sampling-template');if(!source)return [];
+ const options=opts||{};
+ const layout=samplePrintLayout(options.worksheet),savedStyle=host.getAttribute('style');
+ host.style.cssText+=';display:block!important;position:absolute;left:-100000px;top:0;width:'+layout.paperWidth+'mm;visibility:hidden;';
+ let pages=[];
  try{
   if(typeof shrinkDesc==='function')shrinkDesc(host);
   const rows=[...source.querySelectorAll('table.main>tbody>tr.item')],total=source.querySelector('tr.total');
   const recap=source.querySelector('.sample-recap');
   const base=source.cloneNode(true);base.classList.add('sample-print-page');
-  base.querySelector('table.main>tbody').replaceChildren();base.querySelector('.sample-recap').remove();
+  base.querySelector('table.main>tbody').replaceChildren();
+  const baseRecap=base.querySelector('.sample-recap');if(baseRecap)baseRecap.remove();
   host.replaceChildren();
-  const pages=[];
+  const wrappers=[];
   const totalRow=(className,label)=>{const tr=total.cloneNode(true);tr.className=className;tr.cells[0].textContent=label;tr.querySelector('.dr').textContent=fmt(0);tr.querySelector('.cr').textContent=fmt(0);return tr;};
   const makePage=()=>{
-   const p=base.cloneNode(true);host.appendChild(p);
+   const box=document.createElement('div');
+   box.className='sample-paper-box';
+   box.style.setProperty('--sample-full-width',layout.paperWidth+'mm');
+   box.style.setProperty('--sample-full-height',layout.paperHeight+'mm');
+   const p=base.cloneNode(true);
+   if(pages.length)p.classList.add('sample-continuation-page');
+   box.appendChild(p);host.appendChild(box);
    if(pages.length)p.querySelector('table.main>tbody').appendChild(totalRow('sample-brought-forward','انتقال از صفحات قبل'));
    const footer=document.createElement('table');footer.className='main sample-page-footer';footer.appendChild(p.querySelector('colgroup').cloneNode(true));
-   const tb=document.createElement('tbody');tb.appendChild(totalRow('sample-page-total','جمع تا پایان این صفحه'));footer.appendChild(tb);p.querySelector('.sample-main-frame').appendChild(footer);pages.push(p);return p;
+   const tb=document.createElement('tbody');tb.appendChild(totalRow('sample-page-total','جمع تا پایان این صفحه'));footer.appendChild(tb);
+   p.querySelector('.sample-main-frame').appendChild(footer);
+   const pgNum=document.createElement('div');pgNum.className='sample-page-num';pgNum.textContent='صفحهٔ ۱ از ۱';
+   p.querySelector('.inner').appendChild(pgNum);
+   pages.push(p);wrappers.push(box);return p;
   };
-  const overflow=p=>{sampleUniformRows(p);const m=p.querySelector('.sample-main-frame'),inner=p.querySelector('.inner');return m.scrollHeight>m.clientHeight+1||inner.scrollHeight>inner.clientHeight+1;};
+  const estimatePx=p=>{
+   // Deterministic height estimator used in headless DOMs (e.g. JSDOM) where clientHeight === 0;
+   // dynamically reflects custom column widths (شرح / طرف حساب) and row density!
+   const isCompact=layout.density==='compact';
+   const limitPx=layout.height*96/25.4;
+   let used=isCompact?78:92;
+   if(p.querySelector('.sample-brought-forward'))used+=isCompact?18:22;
+   const glyphW=isCompact?3.95:4.2;
+   const charPerLineDesc=Math.max(12,Math.floor((layout.columns[3]*96/25.4-10)/(glyphW+0.05)));
+   const charPerLineCp=Math.max(16,Math.floor((layout.columns[4]*96/25.4-10)/glyphW));
+   const lineH=isCompact?12.8:15.5,rowPad=isCompact?4.5:7;
+   p.querySelectorAll('table.main>tbody>tr.item,table.main>tbody>tr.sample-continuation').forEach(tr=>{
+    const descTxt=(tr.cells[3]?.textContent||'').trim();
+    const descLines=Math.max(1,Math.ceil(descTxt.length/charPerLineDesc));
+    const pEls=tr.cells[4]?[...tr.cells[4].querySelectorAll('.p')]:[];
+    let cpLines=0;
+    if(pEls.length){pEls.forEach(pe=>{cpLines+=Math.max(1,Math.ceil((pe.textContent||'').trim().length/charPerLineCp));});}
+    else{const raw=(tr.cells[4]?.textContent||'').trim();cpLines=raw?Math.max(1,Math.ceil(raw.length/charPerLineCp)):1;}
+    used+=Math.max(descLines,cpLines)*lineH+rowPad;
+   });
+   if(p.querySelector('.sample-recap'))used+=isCompact?122:138;
+   return {used,limitPx};
+  };
+  const overflow=p=>{
+   sampleUniformRows(p);
+   const m=p.querySelector('.sample-main-frame'),inner=p.querySelector('.inner');
+   if(!m||!inner)return false;
+   if(m.clientHeight<10&&inner.clientHeight<10){const est=estimatePx(p);return est.used>est.limitPx;}
+   return m.scrollHeight>m.clientHeight+1||inner.scrollHeight>inner.clientHeight+1;
+  };
+  const freeSpacePx=p=>{
+   const m=p.querySelector('.sample-main-frame');
+   if(!m)return 0;
+   if(m.clientHeight<10){const est=estimatePx(p);return Math.max(0,est.limitPx-est.used);}
+   const tbl=m.querySelector('table.main'),ftr=m.querySelector('.sample-page-footer');
+   return Math.max(0,m.clientHeight-(tbl?tbl.offsetHeight:0)-(ftr?ftr.offsetHeight:0));
+  };
   const limit=layout.height*96/25.4;
 
   let page=makePage(),body=page.querySelector('table.main>tbody');
-  // Slice DOM text, not source records. Preserve whitespace, inline path markup and
-  // surrogate pairs; continuation fragments never repeat monetary values or checks.
   const sliceCell=(cell,start,end)=>{
    const copy=cell.cloneNode(true);
    const point=offset=>{const w=document.createTreeWalker(copy,NodeFilter.SHOW_TEXT);let t,last=null;while(t=w.nextNode()){last=t;if(offset<=t.length)return [t,offset];offset-=t.length;}return last?[last,last.length]:[copy,0];};
    let [node,offset]=point(end),range=document.createRange();range.selectNodeContents(copy);range.setStart(node,offset);range.deleteContents();
    [node,offset]=point(start);range=document.createRange();range.selectNodeContents(copy);range.setEnd(node,offset);range.deleteContents();return copy;
   };
+  // Split cleanly between <div class="p"> contra-account items first so account names are never cut mid-word
+  const splitByContraItems=row=>{
+   const cpCell=row.cells[4];
+   const cpWrap=cpCell?.querySelector('.cp-txt');
+   const pItems=cpWrap?[...cpWrap.querySelectorAll(':scope>.p')]:[];
+   if(pItems.length<2)return false;
+   let idx=0,first=true;
+   while(idx<pItems.length){
+    const piece=row.cloneNode(true);piece.classList.remove('sample-oversize');
+    if(!first){
+     piece.classList.remove('item');piece.classList.add('sample-continuation');
+     piece.setAttribute('data-sample-continuation',row.dataset.sampleRow||'');
+     piece.cells[0].innerHTML=`<span class="rownum">${faNum(row.dataset.sampleRow||'')}</span><span class="cont-tag">(ادامه)</span>`;
+     piece.cells[3].innerHTML=`<div class="sub sample-desc-text">ادامه طرف‌حساب‌های ردیف ${faNum(row.dataset.sampleRow||'')}</div>`;
+     [5,6,7,...[...piece.cells].map((_,i)=>i).filter(i=>i>=8)].forEach(i=>piece.cells[i].replaceChildren());
+     piece.cells[4].innerHTML='<div class="cp-txt"></div>';
+    }else{
+     const targetWrap=piece.cells[4].querySelector('.cp-txt');
+     if(targetWrap)targetWrap.querySelectorAll(':scope>.p').forEach(el=>el.remove());
+    }
+    const targetWrap=piece.cells[4].querySelector('.cp-txt');
+    if(!targetWrap)return false;
+    body.appendChild(piece);
+    if(overflow(page)){
+     piece.remove();
+     if(body.querySelector('tr.item,tr.sample-continuation')){page=makePage();body=page.querySelector('table.main>tbody');continue;}
+     return false;
+    }
+    let added=0;
+    while(idx<pItems.length){
+     const itemClone=pItems[idx].cloneNode(true);
+     targetWrap.appendChild(itemClone);
+     if(overflow(page)){
+      itemClone.remove();
+      break;
+     }
+     idx++;added++;
+    }
+    if(added===0){
+     piece.remove();
+     if(body.querySelector('tr.item,tr.sample-continuation')){page=makePage();body=page.querySelector('table.main>tbody');continue;}
+     return false;
+    }
+    first=false;
+    if(idx<pItems.length){page=makePage();body=page.querySelector('table.main>tbody');}
+   }
+   return true;
+  };
   const splitLargeRow=row=>{
+   if(splitByContraItems(row))return true;
    const originals=[...row.cells],fields=[3,4],texts=fields.map(i=>originals[i].textContent),offsets=[0,0];let first=true;
-   if(!texts.some(t=>t.length)||page.querySelector('thead').getBoundingClientRect().height+50>limit)return false;
+   if(!texts.some(t=>t.length)||(page.querySelector('thead')?.getBoundingClientRect().height||0)+50>limit)return false;
    while(offsets.some((v,j)=>v<texts[j].length)){
     const piece=row.cloneNode(true);piece.classList.remove('sample-oversize');
-    if(!first){piece.classList.remove('item');piece.classList.add('sample-continuation');piece.setAttribute('data-sample-continuation',row.dataset.sampleRow||'');[5,6,7,...originals.map((_,i)=>i).filter(i=>i>=8)].forEach(i=>piece.cells[i].replaceChildren());}
+    if(!first){
+     piece.classList.remove('item');piece.classList.add('sample-continuation');
+     piece.setAttribute('data-sample-continuation',row.dataset.sampleRow||'');
+     piece.cells[0].innerHTML=`<span class="rownum">${faNum(row.dataset.sampleRow||'')}</span><span class="cont-tag">(ادامه)</span>`;
+     [5,6,7,...originals.map((_,i)=>i).filter(i=>i>=8)].forEach(i=>piece.cells[i].replaceChildren());
+    }
     fields.forEach(i=>piece.cells[i].replaceChildren());body.appendChild(piece);
-    if(overflow(page)){piece.remove();return false;}
+    if(overflow(page)){
+     piece.remove();
+     if(body.querySelector('tr.item,tr.sample-continuation')){page=makePage();body=page.querySelector('table.main>tbody');continue;}
+     return false;
+    }
     fields.forEach((i,j)=>{
      const start=offsets[j],text=texts[j];if(start===text.length)return;
      const apply=end=>piece.replaceChild(sliceCell(originals[i],start,end),piece.cells[i]);
@@ -6139,10 +6496,18 @@ function sampleTemplatePreparePrint(host){
    return true;
   };
   for(const row of rows){
+   const freeBefore=freeSpacePx(page);
+   const hadRows=!!body.querySelector('tr.item,tr.sample-continuation');
    body.appendChild(row);
    if(overflow(page)){
     row.remove();
-    if(body.querySelector('tr.item,tr.sample-continuation')){page=makePage();body=page.querySelector('table.main>tbody');}
+    // If >= ~23mm (86px) of free space remains at the bottom of the current page and this row has multiple contra items,
+    // split cleanly across contra items right here so the bottom of the page is never left blank!
+    const multiContraCount=row.cells[4]?.querySelectorAll('.cp-txt>.p').length||0;
+    if(hadRows&&freeBefore>=86&&multiContraCount>=3&&splitByContraItems(row)){
+     continue;
+    }
+    if(hadRows){page=makePage();body=page.querySelector('table.main>tbody');}
     body.appendChild(row);
     if(overflow(page)){
      row.remove();
@@ -6150,11 +6515,15 @@ function sampleTemplatePreparePrint(host){
     }
    }
   }
-  page.querySelector('.inner').appendChild(recap);
-  if(overflow(page)){
-   recap.remove();page=makePage();
-   page.querySelectorAll('thead tr.cols').forEach(r=>r.remove());
-   page.querySelector('.inner').appendChild(recap);
+  if(recap){
+   const pageNumEl=page.querySelector('.sample-page-num');
+   page.querySelector('.inner').insertBefore(recap,pageNumEl);
+   if(overflow(page)){
+    recap.remove();page=makePage();
+    page.querySelectorAll('thead tr.cols').forEach(r=>r.remove());
+    const nextNumEl=page.querySelector('.sample-page-num');
+    page.querySelector('.inner').insertBefore(recap,nextNumEl);
+   }
   }
   let debit=0,credit=0;
   pages.forEach((p,i)=>{
@@ -6172,12 +6541,160 @@ function sampleTemplatePreparePrint(host){
    footer.dataset.debit=debit;footer.dataset.credit=credit;
    if(last)footer.classList.add('total','tot','sample-final-total');
    p.dataset.pageIndex=i+1;p.dataset.pageCount=pages.length;
+   const pgNum=p.querySelector('.sample-page-num');
+   if(pgNum)pgNum.textContent=`صفحهٔ ${faNum(i+1)} از ${faNum(pages.length)}`;
   });
   if(typeof shrinkDesc==='function')shrinkDesc(host);
-  if(!sampleFitNumbers(host))throw new Error('مبلغ در ستون جا نمی‌گیرد؛ حالت افقی را انتخاب کنید. هیچ مبلغی بریده یا خلاصه نشد.');
-  if(pages.some(overflow))throw new Error('محتوای صفحه از کادر چاپ بیرون می‌زند؛ چاپ متوقف شد تا اطلاعات حذف نشود.');
-  pages.forEach(p=>sampleUniformRows(p,true));
+  if(!options.screenMode&&!sampleFitNumbers(host))throw new Error('مبلغ در ستون جا نمی‌گیرد؛ حالت افقی را انتخاب کنید. هیچ مبلغی بریده یا خلاصه نشد.');
+  if(options.screenMode)sampleFitNumbers(host);
+  if(!options.screenMode&&pages.some(overflow))throw new Error('محتوای صفحه از کادر چاپ بیرون می‌زند؛ چاپ متوقف شد تا اطلاعات حذف نشود.');
+  pages.forEach(p=>sampleUniformRows(p));
  }finally{if(savedStyle===null)host.removeAttribute('style');else host.setAttribute('style',savedStyle);}
+ return pages;
+}
+function sampleRenderOnScreenPages(viewEl){
+ if(!viewEl)return;
+ const canvas=viewEl.querySelector('[data-sheet-canvas]');if(!canvas)return;
+ const viewIdx=Number(viewEl.dataset.view);
+ const ws=Number.isFinite(viewIdx)&&SHEET_OUT[viewIdx]?SHEET_OUT[viewIdx].w:null;
+ const lay=samplePrintLayout(ws);
+ if(canvas.dataset.paginated==='1'){
+  const count=canvas.querySelectorAll('.sample-print-page').length;
+  const badge=viewEl.querySelector('[data-page-badge]');
+  if(badge&&count)badge.textContent=`صفحه‌بندی خودکار: ${faNum(count)} صفحه (${lay.orientation==='landscape'?'افقی':'عمودی'}${lay.density==='compact'?' · فشرده':''})`;
+  return;
+ }
+ try{
+  const pages=sampleTemplatePreparePrint(canvas,{screenMode:true,worksheet:ws});
+  canvas.dataset.paginated='1';
+  const badge=viewEl.querySelector('[data-page-badge]');
+  if(badge)badge.textContent=`صفحه‌بندی خودکار: ${faNum(pages.length||1)} صفحه (${lay.orientation==='landscape'?'افقی':'عمودی'}${lay.density==='compact'?' · فشرده':''})`;
+ }catch(e){
+  shrinkDesc(viewEl);sampleFitNumbers(viewEl);sampleUniformRows(viewEl.querySelector('.sampling-template'));
+ }
+}
+// Live interactive column drag-to-resize on preview headers + automatic re-pagination on release
+function sampleApplyLiveVectorToDOM(wrapEl,vec,n){
+ if(!wrapEl||!Array.isArray(vec)||vec.length<9)return;
+ const perCtrl=vec[8]/n;
+ const boxSize=Math.max(5.5,Math.min(2.55,perCtrl-0.55)*96/25.4);
+ const controlFont=Math.max(7.2,Math.min(9.5,(perCtrl*96/25.4-1.5)/1.2));
+ wrapEl.querySelectorAll('.sheet.sampling-template').forEach(sh=>{
+  sh.style.setProperty('--sample-box',boxSize.toFixed(2)+'px');
+  sh.style.setProperty('--sample-control-font',controlFont.toFixed(2)+'px');
+ });
+ wrapEl.querySelectorAll('table.main colgroup,table.sample-page-footer colgroup').forEach(cg=>{
+  const cols=cg.children;
+  for(let i=0;i<8&&i<cols.length;i++)cols[i].style.width=vec[i]+'mm';
+  for(let i=8;i<cols.length;i++)cols[i].style.width=perCtrl.toFixed(6)+'mm';
+ });
+}
+if(typeof window!=='undefined'&&!window.__sampleColResizeBound){
+ window.__sampleColResizeBound=true;
+ let drag=null;
+ const cleanupDrag=()=>{
+  if(!drag)return;
+  document.body.classList.remove('is-col-resizing');
+  if(drag.handle)drag.handle.classList.remove('is-active');
+  if(drag.guide)drag.guide.remove();
+  if(drag.tip)drag.tip.remove();
+  drag=null;
+ };
+ document.addEventListener('dblclick',ev=>{
+  const h=ev.target.closest?.('[data-col-resize]');
+  if(!h)return;
+  const wrap=h.closest('.sheetwrap');
+  if(!wrap)return;
+  ev.preventDefault();
+  sampleResetColumns(Number(wrap.dataset.view));
+ });
+ document.addEventListener('pointerdown',ev=>{
+  const h=ev.target.closest?.('[data-col-resize]');
+  if(!h||(ev.button!==undefined&&ev.button!==0))return;
+  const wrap=h.closest('.sheetwrap');
+  if(!wrap)return;
+  const viewIdx=Number(wrap.dataset.view);
+  const item=SHEET_OUT[viewIdx];
+  if(!item)return;
+  ev.preventDefault();ev.stopPropagation();
+  const m=sampleBasePrintMetrics();
+  const minVec=sampleMinColumnVector(m.orientation,m.n);
+  const layout=samplePrintLayout(item.w);
+  const tbl=h.closest('table.main');
+  const rect=tbl?tbl.getBoundingClientRect():{width:0,top:60,bottom:500};
+  const pxPerMm=rect.width>20?rect.width/layout.table:(96/25.4);
+  const dividerIdx=Number(h.dataset.colResize);
+  const guide=document.createElement('div');guide.className='col-resize-guide no-print';
+  guide.style.left=ev.clientX+'px';
+  if(rect.width>20){guide.style.top=Math.max(0,rect.top)+'px';guide.style.bottom=Math.max(0,window.innerHeight-rect.bottom)+'px';}
+  const tip=document.createElement('div');tip.className='col-resize-tooltip no-print';
+  const setTip=vec=>{
+   tip.textContent=`${SAMPLE_COL_NAMES[dividerIdx]}: ${faNum(vec[dividerIdx].toFixed(1))} م‌م  ⇄  ${SAMPLE_COL_NAMES[dividerIdx+1]}: ${faNum(vec[dividerIdx+1].toFixed(1))} م‌م`;
+  };
+  setTip(layout.vector);
+  tip.style.left=ev.clientX+'px';
+  tip.style.top=Math.max(36,(rect.top||ev.clientY))+'px';
+  document.body.appendChild(guide);document.body.appendChild(tip);
+  document.body.classList.add('is-col-resizing');
+  h.classList.add('is-active');
+  try{if(h.setPointerCapture&&ev.pointerId!==undefined)h.setPointerCapture(ev.pointerId);}catch(_){}
+  drag={handle:h,wrap,viewIdx,dividerIdx,startX:ev.clientX,pxPerMm,startVec:layout.vector.slice(),curVec:layout.vector.slice(),minVec,n:m.n,guide,tip,setTip,moved:false};
+ });
+ document.addEventListener('pointermove',ev=>{
+  if(!drag)return;
+  const dxPx=ev.clientX-drag.startX;
+  if(Math.abs(dxPx)>1)drag.moved=true;
+  const dxMm=dxPx/drag.pxPerMm;
+  const nextVec=sampleComputeResizedVector(drag.startVec,drag.dividerIdx,dxMm,drag.minVec);
+  drag.curVec=nextVec;
+  sampleApplyLiveVectorToDOM(drag.wrap,nextVec,drag.n);
+  drag.guide.style.left=ev.clientX+'px';
+  drag.tip.style.left=Math.min(window.innerWidth-120,Math.max(120,ev.clientX))+'px';
+  drag.setTip(nextVec);
+ });
+ const finishDrag=ev=>{
+  if(!drag)return;
+  const {viewIdx,curVec,moved}=drag;
+  cleanupDrag();
+  if(moved)sampleSetWorksheetColumns(viewIdx,curVec);
+ };
+ document.addEventListener('pointerup',finishDrag);
+ document.addEventListener('pointercancel',()=>cleanupDrag());
+}
+// Direct Ctrl+P support on Stage 6 so pressing Ctrl+P without clicking the button also prints cleanly
+if(typeof window!=='undefined'&&!window.__sampleDirectPrintBound){
+ window.__sampleDirectPrintBound=true;
+ let directRule=null,directTitle='';
+ window.addEventListener('beforeprint',()=>{
+  if(document.body.classList.contains('printing'))return;
+  const activeWrap=document.querySelector('#s6:not(.hide) .sheetwrap:not(.hide)');
+  const ph=document.getElementById('printHost');
+  if(!activeWrap||!ph)return;
+  const idx=Number(activeWrap.dataset.view);
+  const item=Number.isFinite(idx)&&SHEET_OUT[idx]?SHEET_OUT[idx]:null;
+  if(!item)return;
+  try{
+   directTitle=document.title;
+   ph.innerHTML=sheetHTML(item.w,item.sel);
+   ph.querySelectorAll('.col-resize-handle').forEach(el=>el.remove());
+   if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(ph);
+   const layout=samplePrintLayout(item.w);
+   directRule=document.createElement('style');directRule.dataset.temporaryPrint='direct';
+   directRule.textContent=`@page{size:A4 ${layout.orientation};margin:0!important}@media print{html,body{width:${layout.paperWidth}mm!important;margin:0!important;padding:0!important;background:#fff!important}body.printing #printHost{width:${layout.paperWidth}mm!important;max-width:none!important;margin:0!important;padding:0!important}}`;
+   document.head.appendChild(directRule);
+   document.body.classList.add('printing');
+   shrinkDesc(ph);
+   sampleTemplatePreparePrint(ph,{worksheet:item.w});
+   document.title=' ';
+  }catch(_){}
+ });
+ window.addEventListener('afterprint',()=>{
+  if(!directRule)return;
+  document.title=directTitle;
+  document.body.classList.remove('printing');
+  const ph=document.getElementById('printHost');if(ph)ph.innerHTML='';
+  directRule.remove();directRule=null;
+ });
 }
 // <<<SAMPLING-TEMPLATE-END>>>
 
@@ -7319,6 +7836,1586 @@ el('routerForget').onclick=()=>{
  ROUTER_KEY='';el('routerKey').value='';el('routerConsent').checked=false;resetResults();status.textContent='کلید و خروجی‌های AI از این صفحه پاک شدند.';
 };
 })();
+
+// <<<SHARED-COUNTERPARTY-BEGIN>>>
+// Multi-layer upfront ledger counterparty & account intelligence engine.
+// Runs once across FULL_ROWS on Excel column-mapping confirmation and serves
+// strictly account-scoped data (turnover, contra-accounts, extracted entities,
+// cross-voucher chains, and doubtful candidate options) on demand to Sampling,
+// Analysis/Nature, and future modules without altering Sampling's UI or print layout.
+(()=>{
+ const baseCpLabDate=cpLabDate;
+ const baseCpLabAmount=cpLabAmount;
+ const baseCpLabContext=cpLabContext;
+ const baseCpLabExamine=cpLabExamine;
+ const baseCpReferenceTokens=cpReferenceTokens;
+ const baseCpWorksheetReset=cpWorksheetReset;
+ const baseCpWorksheetBeginRender=cpWorksheetBeginRender;
+ const baseCpWorksheetContext=cpWorksheetContext;
+ const baseCpWorksheetSide=cpWorksheetSide;
+ const baseCpWorksheetGroupTotal=cpWorksheetGroupTotal;
+ const baseCpWorksheetModel=cpWorksheetModel;
+ const baseCpWorksheetCell=cpWorksheetCell;
+ const baseCpWorksheetDecision=cpWorksheetDecision;
+ const baseCpWorksheetClearDecision=cpWorksheetClearDecision;
+ const baseCpWorksheetOpen=cpWorksheetOpen;
+ const baseCpEventEvidence=typeof cpEventEvidence==='function'?cpEventEvidence:null;
+ const baseCpEventMatch=typeof cpEventMatch==='function'?cpEventMatch:null;
+ const baseAnaCounterpartyValidate=typeof anaCounterpartyValidate==='function'?anaCounterpartyValidate:null;
+ const baseSampleForgetRemovedRows=sampleForgetRemovedRows;
+ const baseRenderAccountStep=renderAccountStep;
+ const baseAnaAnalyze=anaAnalyze;
+ const baseRenderAnalysisOutput=renderAnalysisOutput;
+ const baseReportOpenReference=reportOpenReference;
+ const baseAnaAIRun=anaAIRun;
+ const baseReportRun=reportRun;
+
+ const MEMORY_STORAGE_KEY='hesabrasi.cpMemory.v1';
+ const CP_STOPWORDS=new Set([
+  'پرداخت','دریافت','واریز','برداشت','تسویه','بابت','اصلاح','اصلاحی','انتقال',
+  'مانده','سند','طی','وجه','وجوه','حساب','ریال','تومان','نقدی','بانکی','روزنامه',
+  'گردش','ثبت','بدهکار','بستانکار','مورخ','شماره','ردیف','سال','ماه','دوره',
+  'کد','شرح','جمع','کل','معین','تفصیلی','عملیات','مالی','اداری','جاری','عمومی'
+ ]);
+ const ENTITY_STRIP_RE=/(?:^|\s)(?:شرکت|موسسه|مؤسسه|فروشگاه|مجتمع|گروه\s+صنعتی|گروه|بازرگانی|تولیدی|خدماتی|مهندسی|پیمانکاری|تعاونی|سهامی\s+خاص|سهامی\s+عام|با\s+مسئولیت\s+محدود|مسئولیت\s+محدود|جناب\s+آقای|سرکار\s+خانم|آقای|خانم|مهندس|دکتر|حاج)(?=\s|$)/gu;
+ const ANCILLARY_ACCT_RE=/کارمزد|مالیات|ارزش\s*افزوده|عوارض|کسور|بیمه|سپرده\s*حسن|تخفیف|روند|گرد\s*کردن/u;
+ const INTERMEDIARY_ACCT_RE=/واسط|در\s*جریان\s*وصول|چک\s*های\s*در\s*راه|اسناد\s*در\s*راه|انتقالی|موقت|بین\s*راهی|تنخواه/u;
+ const PERSON_OR_PARTY_ACCT_RE=/دریافتنی|پرداختنی|مشتری|تامین|تأمین|فروشندگان|بستانکاران|بدهکاران|اشخاص|شرکا|جاری\s*شرکا|پرسنل|کارکنان/u;
+
+ const SHARED_CP={
+  ctx:null,
+  levelsSig:'',
+  config:{tolerance:0.01},
+  decisionRev:0,
+  dirtyRows:new Set(),
+  uiState:new Map(),
+  listeners:new Set(),
+  lastEvidenceRef:null,
+  memory:loadAuditorMemory()
+ };
+
+ // --- 1. Core Refinenements: Official Iranian Calendar Dates, Storno Amounts, Stopwords ---
+ function isJalaliLeap(jy){
+  const breaks=[-61,9,38,199,426,686,756,818,1111,1181,1210,1635,2060,2097,2192,2262,2324,2394,2456,3178];
+  let jp=breaks[0],jump=0;
+  for(let i=1;i<breaks.length;i++){
+   const jm=breaks[i];jump=jm-jp;
+   if(jy<jm)break;
+   jp=jm;
+  }
+  let n=jy-jp;
+  if(jump-n<6)n=n-jump+Math.trunc((jump+4)/33)*33;
+  let leapJ=(((n+1)%33)-1)%4;
+  if(leapJ===-1)leapJ=4;
+  return leapJ===0;
+ }
+ function isGregorianLeap(gy){
+  return (gy%4===0&&gy%100!==0)||(gy%400===0);
+ }
+ function validateYMD(y,m,d){
+  if(!Number.isInteger(y)||!Number.isInteger(m)||!Number.isInteger(d))return null;
+  if(m<1||m>12||d<1)return null;
+  if(y>=1300&&y<=1499){
+   const maxD=m<=6?31:m<=11?30:(isJalaliLeap(y)?30:29);
+   if(d>maxD)return null;
+  }else if(y>=1900&&y<=2199){
+   const days=[31,isGregorianLeap(y)?29:28,31,30,31,30,31,31,30,31,30,31];
+   if(d>days[m-1])return null;
+  }else if(d>31){
+   return null;
+  }
+  return String(y).padStart(4,'0')+'/'+String(m).padStart(2,'0')+'/'+String(d).padStart(2,'0');
+ }
+
+ cpLabDate=function(v){
+  if(v===null||v===undefined)return null;
+  if(typeof v==='number'&&Number.isFinite(v)){
+   const serial=Math.floor(v);
+   if(serial>=20000&&serial<=80000){
+    const dt=new Date(Math.round((serial-25569)*86400000));
+    if(!Number.isNaN(dt.getTime()))return validateYMD(dt.getUTCFullYear(),dt.getUTCMonth()+1,dt.getUTCDate());
+   }
+  }
+  const s=cpLabText(v);
+  if(!s)return null;
+  if(/^\d{5}(?:\.\d+)?$/.test(s)){
+   const serial=Math.floor(Number(s));
+   if(serial>=20000&&serial<=80000){
+    const dt=new Date(Math.round((serial-25569)*86400000));
+    if(!Number.isNaN(dt.getTime()))return validateYMD(dt.getUTCFullYear(),dt.getUTCMonth()+1,dt.getUTCDate());
+   }
+  }
+  const compact=s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(compact)return validateYMD(+compact[1],+compact[2],+compact[3]);
+  const sep=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[T\s].*)?$/);
+  if(sep)return validateYMD(+sep[1],+sep[2],+sep[3]);
+  return baseCpLabDate(v);
+ };
+
+ cpLabAmount=function(v){
+  if(v===null||v===undefined)return 0;
+  if(typeof v==='number')return Number.isFinite(v)?v:null;
+  let s=cpLabText(v);
+  if(s===''||s==='-'||s==='—'||s==='–')return 0;
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1).trim();}
+  else if(s.endsWith('-')&&!s.startsWith('-')){neg=true;s=s.slice(0,-1).trim();}
+  s=s.replace(/[,٬\s]/g,'').replace(/٫/g,'.');
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s))return null;
+  const n=Number(s);
+  if(!Number.isFinite(n))return null;
+  return neg?-Math.abs(n):n;
+ };
+
+ cpWorksheetSide=function(row){
+  const d=cpLabAmount(row['بدهکار']),c=cpLabAmount(row['بستانکار']);
+  if(d!==null&&c!==null){
+   if(d!==0&&c===0)return 'debit';
+   if(c!==0&&d===0)return 'credit';
+  }
+  return baseCpWorksheetSide(row);
+ };
+
+ cpWorksheetGroupTotal=function(group,side){
+  return group.rows.reduce((sum,r)=>sum+Math.abs(cpLabAmount(r[side==='debit'?'بدهکار':'بستانکار'])||0),0);
+ };
+
+ const CP_SHARED_TOKENS=new WeakMap();
+ cpReferenceTokens=function(row){
+  if(row&&typeof row==='object'){
+   if(!CP_SHARED_TOKENS.has(row))CP_SHARED_TOKENS.set(row,baseCpReferenceTokens(row));
+   return CP_SHARED_TOKENS.get(row);
+  }
+  return baseCpReferenceTokens(row);
+ };
+
+ function cpMeaningfulEventText(value){
+  const normText=cpReferenceText(value)
+   .replace(/[0-9]+(?:[\/\-.,][0-9]+)*/g,' ')
+   .replace(/[^\p{L}\s]/gu,' ')
+   .replace(/\s+/g,' ')
+   .trim();
+  if(!normText)return '';
+  const words=normText.split(' ').filter(w=>w.length>=2&&!CP_STOPWORDS.has(w));
+  return words.join(' ');
+ }
+
+ function cpDateIndex(ymd){
+  if(!ymd)return null;
+  const m=String(ymd).match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if(!m)return null;
+  return (+m[1])*372+(+m[2])*31+(+m[3]);
+ }
+
+ // --- 2. Enhanced Composite Key & Storno-Aware Voucher Context ---
+ function buildEnhancedLabContext(source){
+  const tol=Number(SHARED_CP.config.tolerance)||0.01;
+  const dimCandidates=['کد شرکت','شرکت','کد شعبه','شعبه','کد دفتر','دفتر','سال مالی','کد واحد','واحد'];
+  const dimensions=dimCandidates.filter(k=>source.some(r=>cpLabText(r[k])!==''));
+  const rowIds=new Map(source.map((r,i)=>[r,'R'+(i+1)]));
+  const fields=new Map();
+  const byNumDate=new Map();
+
+  for(const r of source){
+   for(const k of Object.keys(r)){
+    if(!fields.has(k))fields.set(k,{name:k,present:0,nonblank:0});
+    const f=fields.get(k);f.present++;if(cpLabText(r[k])!=='')f.nonblank++;
+   }
+   const n=cpLabText(r['شماره سند']),date=cpLabDate(r['تاریخ']);
+   if(!n||!date)continue;
+   const ndKey=n+'\u0000'+date;
+   if(!byNumDate.has(ndKey))byNumDate.set(ndKey,[]);
+   byNumDate.get(ndKey).push(r);
+  }
+
+  // Controlled organizational dimension resolution:
+  // Uniformly blank dimensions on a voucher are valid; mixed blank+populated rows on the
+  // same (number, date) are accepted ONLY if each sub-group balances independently,
+  // never merged by guessing.
+  const taintedBlankRows=new WeakSet();
+  if(dimensions.length){
+   for(const groupRows of byNumDate.values()){
+    for(const dim of dimensions){
+     let hasPop=false,hasBlank=false;
+     for(const r of groupRows){if(cpLabText(r[dim])!=='')hasPop=true;else hasBlank=true;}
+     if(hasPop&&hasBlank){
+      const sub=new Map();
+      for(const r of groupRows){
+       const v=cpLabText(r[dim]);
+       if(!sub.has(v))sub.set(v,[]);
+       sub.get(v).push(r);
+      }
+      let allBalanced=true;
+      for(const srows of sub.values()){
+       let sd=0,sc=0,ok=true;
+       for(const r of srows){
+        const d=cpLabAmount(r['بدهکار']),c=cpLabAmount(r['بستانکار']);
+        if(d===null||c===null||(d!==0&&c!==0)){ok=false;break;}
+        sd+=d;sc+=c;
+       }
+       if(!ok||Math.abs(sd-sc)>tol){allBalanced=false;break;}
+      }
+      if(!allBalanced){
+       for(const r of groupRows)if(cpLabText(r[dim])==='')taintedBlankRows.add(r);
+      }
+     }
+    }
+   }
+  }
+
+  const key=r=>{
+   const n=cpLabText(r['شماره سند']),date=cpLabDate(r['تاریخ']);
+   if(!n||!date||taintedBlankRows.has(r))return null;
+   return JSON.stringify([n,date,...dimensions.map(k=>cpLabText(r[k]))]);
+  };
+
+  const documents=new Map(),summaries=new Map(),numbers=new Map();
+  let missingKeys=0;
+  for(const r of source){
+   const k=key(r),n=typeof norm==='function'?norm(r['شماره سند']):cpLabText(r['شماره سند']);
+   if(n){if(!numbers.has(n))numbers.set(n,new Set());numbers.get(n).add(k||'INCOMPLETE_KEY');}
+   if(!k){missingKeys++;continue;}
+   if(!documents.has(k))documents.set(k,[]);
+   documents.get(k).push(r);
+  }
+
+  for(const [k,rows] of documents){
+   const amounts=new Map(),debit=[],credit=[];
+   let d=0,c=0,valid=true,hasStorno=false;
+   for(const r of rows){
+    const rawD=cpLabAmount(r['بدهکار']),rawC=cpLabAmount(r['بستانکار']);
+    if(rawD===null||rawC===null||(rawD!==0&&rawC!==0)){
+     valid=false;
+     amounts.set(r,{r,d:rawD,c:rawC,rawD,rawC});
+     continue;
+    }
+    if(rawD<0||rawC<0)hasStorno=true;
+    // Keep positive magnitude in .d/.c for downstream display/group totals while
+    // tracking exact signed sums for voucher balance & storno awareness.
+    amounts.set(r,{r,d:rawD!==0?Math.abs(rawD):0,c:rawC!==0?Math.abs(rawC):0,signedD:rawD,signedC:rawC});
+    d+=rawD;c+=rawC;
+    if(rawD!==0)debit.push(r);
+    if(rawC!==0)credit.push(r);
+   }
+   const balanced=valid&&debit.length>0&&credit.length>0&&Math.abs(d-c)<=tol;
+   summaries.set(k,{rows,amounts,debit,credit,d:Math.abs(d),c:Math.abs(c),signedD:d,signedC:c,hasStorno,valid,balanced,tolerance:tol,completeness:'unknown'});
+  }
+
+  const collisions=[...numbers].filter(([,keys])=>[...keys].filter(k=>k!=='INCOMPLETE_KEY').length>1).map(([number,keys])=>({number,groups:[...keys].filter(k=>k!=='INCOMPLETE_KEY').length}));
+  const meta=CP_LAB_META.source===source?CP_LAB_META:null;
+  return {source,dimensions,rowIds,documents,summaries,key,fields:[...fields.values()],missingKeys,collisions,meta,tolerance:tol};
+ }
+
+ cpLabExamine=function(row,ctx){
+  const res=baseCpLabExamine(row,ctx);
+  if(res.status!=='unresolved'){
+   const key=ctx?.key?.(row),s=key?ctx.summaries.get(key):null;
+   if(s?.hasStorno){
+    res.hasStorno=true;
+    res.reason='شامل آرتیکل اصلاحی/برگشتی منفی متوازن در دادهٔ موجود؛ '+res.reason;
+   }
+  }
+  return res;
+ };
+
+ // --- 3. Entity Lexicon (فرهنگ اسامی خودکار از تفصیلی‌ها و شرح‌ها) ---
+ function cpNormalizeEntityCore(raw){
+  if(!raw)return '';
+  let s=cpReferenceText(raw)
+   .replace(/\([^)]*\)/g,' ')
+   .replace(/\[[^\]]*\]/g,' ')
+   .replace(/[«»"'،؛:._\-–—\/\\|]/g,' ')
+   .replace(/\b[0-9]+\b/g,' ');
+  let prev='';
+  while(s!==prev){prev=s;s=s.replace(ENTITY_STRIP_RE,' ').replace(/\s+/g,' ').trim();}
+  if(s.length<4||CP_STOPWORDS.has(s))return '';
+  const meaningful=s.split(' ').filter(w=>w.length>=2&&!CP_STOPWORDS.has(w));
+  if(!meaningful.length)return '';
+  const joined=meaningful.join(' ');
+  return joined.length>=4?joined:'';
+ }
+
+ function cpRowDeepDetailTitles(row){
+  const levels=typeof ACCOUNT_LEVELS!=='undefined'&&ACCOUNT_LEVELS.length?ACCOUNT_LEVELS:[
+   {code:'کد حساب کل',title:'عنوان حساب کل'},
+   {code:'کد حساب معین',title:'عنوان حساب معین'},
+   {code:'کد حساب تفصیلی',title:'عنوان حساب تفصیلی'},
+   {code:'کد تفصیلی یک',title:'عنوان تفصیلی یک'},
+   {code:'کد تفصیلی دو',title:'عنوان تفصیلی دو'}
+  ];
+  const details=[];
+  for(const l of levels){
+   if(/تفصیل/.test([l.label||'',l.code||'',l.title||''].join(' '))){
+    const t=String(row[l.title]??'').trim();
+    if(t&&!details.includes(t))details.push(t);
+   }
+  }
+  return details;
+ }
+
+ function buildEntityLexicon(source,ctx){
+  const coreToCanonical=new Map(); // normalizedCore -> Set<canonicalDisplayName>
+  const coreToGroupKeys=new Map(); // normalizedCore -> Set<accountGroupKey>
+  const register=(displayName,groupKey)=>{
+   const core=cpNormalizeEntityCore(displayName);
+   if(!core||core.length<4)return;
+   if(!coreToCanonical.has(core))coreToCanonical.set(core,new Set());
+   coreToCanonical.get(core).add(displayName.trim());
+   if(groupKey&&!groupKey.startsWith('ROW:')){
+    if(!coreToGroupKeys.has(core))coreToGroupKeys.set(core,new Set());
+    coreToGroupKeys.get(core).add(groupKey);
+   }
+  };
+
+  for(const r of source){
+   const gKey=cpWorksheetAccountKey(r,ctx);
+   for(const t of cpRowDeepDetailTitles(r))register(t,gKey);
+  }
+  // Also harvest repeated explicit named phrases ("شرکت X", "آقای Y") from descriptions
+  const explicitCounts=new Map();
+  const explicitRe=/(?:شرکت|موسسه|مؤسسه|فروشگاه|آقای|خانم)\s+([\p{L}][\p{L}\s]{2,28})/gu;
+  for(const r of source){
+   const text=cpReferenceText(String(r['شرح سند']??'')+' '+String(r['شرح ردیف']??''));
+   for(const m of text.matchAll(explicitRe)){
+    const phrase=m[1].split(/\s+(?:بابت|طی|شماره|چک|فاکتور|حواله|رسید|به|از|در|و)\b/u)[0]?.trim();
+    const core=cpNormalizeEntityCore(phrase);
+    if(core&&core.length>=4)explicitCounts.set(core,(explicitCounts.get(core)||0)+1);
+   }
+  }
+  for(const [core,cnt] of explicitCounts){
+   if(cnt>=2&&!coreToCanonical.has(core)){
+    coreToCanonical.set(core,new Set([core]));
+   }
+  }
+
+  // Build sorted list of unambiguous cores (longest first to prefer full names)
+  const uniqueCores=[];
+  for(const [core,names] of coreToCanonical){
+   const gKeys=coreToGroupKeys.get(core);
+   const ambiguousAccount=gKeys&&gKeys.size>1;
+   uniqueCores.push({
+    core,
+    canonical:[...names][0],
+    allNames:[...names],
+    groupKeys:gKeys?[...gKeys]:[],
+    uniqueAccount:!ambiguousAccount&&(!gKeys||gKeys.size===1)
+   });
+  }
+  uniqueCores.sort((a,b)=>b.core.length-a.core.length);
+  return {coreToCanonical,coreToGroupKeys,entries:uniqueCores};
+ }
+
+ function extractEntitiesInText(text,lexicon){
+  if(!text||!lexicon)return [];
+  const normTxt=' '+cpReferenceText(text)+' ';
+  if(normTxt.trim().length<4)return [];
+  const hits=[];
+  for(const entry of lexicon.entries){
+   if(hits.length>=4)break;
+   if(normTxt.includes(' '+entry.core+' ')||normTxt.includes(entry.core)){
+    if(!hits.some(h=>h.core.includes(entry.core)||entry.core.includes(h.core))){
+     hits.push(entry);
+    }
+   }
+  }
+  return hits;
+ }
+
+ // --- 4. Bounded Subset-Sum & Fee/Tax/Deduction Solver ---
+ function solveBoundedSubsetAllocation(row,ctx,summary,groups){
+  const tol=ctx.tolerance||0.01;
+  const own=summary?.amounts?.get(row);
+  if(!summary?.valid||!summary.balanced||!own)return {status:'none',keys:[],label:''};
+  const target=own.d||own.c;
+  if(!(target>0)||!Array.isArray(groups)||groups.length<2)return {status:'none',keys:[],label:''};
+  const ownSide=own.d>0?'debit':'credit',otherSide=ownSide==='debit'?'credit':'debit';
+  const groupTotals=groups.map(g=>({
+   key:g.key,
+   name:g.name,
+   total:cpWorksheetGroupTotal(g,otherSide),
+   ancillary:ANCILLARY_ACCT_RE.test(g.name)
+  })).filter(g=>g.total>0);
+
+  if(groupTotals.length<2||groupTotals.length>16)return {status:'none',keys:[],label:''};
+
+  const solutions=[];
+  const maxSubset=Math.min(3,groupTotals.length);
+  let checks=0;
+  function dfs(startIdx,chosen,sum){
+   if(++checks>4000||solutions.length>2)return;
+   if(chosen.length>=1&&Math.abs(sum-target)<=tol){
+    solutions.push(chosen.map(x=>x.key));
+    return;
+   }
+   if(chosen.length>=maxSubset||sum>target+tol)return;
+   for(let i=startIdx;i<groupTotals.length;i++){
+    chosen.push(groupTotals[i]);
+    dfs(i+1,chosen,sum+groupTotals[i].total);
+    chosen.pop();
+    if(solutions.length>2)return;
+   }
+  }
+  dfs(0,[],0);
+
+  if(solutions.length===1){
+   return {
+    status:'unique',
+    keys:solutions[0],
+    label:solutions[0].length===1
+     ?'تنها حساب مقابل هم‌مبلغ با این ردیف در سند'
+     :`ترکیب یکتای مبالغ (${faNum(solutions[0].length)} حساب مقابل دقیقاً معادل مبلغ این ردیف)`
+   };
+  }
+  if(solutions.length>1){
+   return {status:'multiple',keys:[],label:'چند ترکیب هم‌مبلغ در سمت مقابل وجود دارد؛ بدون انتخاب حدسی'};
+  }
+
+  // Check net-of-ancillary (fee/VAT/deduction) on same side: target + ancillaryRow === single candidate
+  const sameSideRows=ownSide==='debit'?summary.debit:summary.credit;
+  const ancSame=sameSideRows.filter(r=>r!==row&&ANCILLARY_ACCT_RE.test(cpWorksheetName(r)));
+  if(ancSame.length>=1&&ancSame.length<=3){
+   const ancSum=ancSame.reduce((s,r)=>s+(summary.amounts.get(r)?.[ownSide==='debit'?'d':'c']||0),0);
+   if(ancSum>0){
+    const matches=groupTotals.filter(g=>Math.abs(g.total-(target+ancSum))<=tol);
+    if(matches.length===1){
+     return {
+      status:'unique_with_ancillary',
+      keys:[matches[0].key],
+      label:'تطبیق یکتای مبلغ با احتساب ردیف کارمزد/مالیات/کسورات هم‌سمت'
+     };
+    }
+   }
+  }
+  return {status:'none',keys:[],label:''};
+ }
+
+ // --- 5. Three-Tier Auditor Memory (Company / Account / Voucher Pattern) ---
+ function currentCompanyScope(){
+  const c=typeof SHEET_CFG!=='undefined'?String(SHEET_CFG.company||'').trim():'';
+  return cpReferenceText(c)||'__default_company__';
+ }
+ function loadAuditorMemory(){
+  try{
+   if(typeof localStorage==='undefined')return {version:1,companies:{}};
+   const raw=localStorage.getItem(MEMORY_STORAGE_KEY);
+   const parsed=raw?JSON.parse(raw):null;
+   return parsed&&typeof parsed==='object'&&parsed.companies?parsed:{version:1,companies:{}};
+  }catch{return {version:1,companies:{}};}
+ }
+ function saveAuditorMemory(){
+  try{
+   if(typeof localStorage!=='undefined'){
+    localStorage.setItem(MEMORY_STORAGE_KEY,JSON.stringify(SHARED_CP.memory));
+   }
+  }catch{}
+ }
+ function voucherCandidateTemplateKey(targetAcctKey,side,groups){
+  return JSON.stringify([targetAcctKey,side,[...groups.map(g=>g.key)].sort()]);
+ }
+ function recordAuditorMemory(row,ctx,selectedKeys){
+  if(!row||!ctx||!Array.isArray(selectedKeys)||!selectedKeys.length)return;
+  const m=ctx.wsModels?.get(row)||baseCpWorksheetModel(row,ctx);
+  const groups=m.groups?.length?m.groups:(m.conditionalGroups||[]);
+  if(!groups.length)return;
+  const scope=currentCompanyScope();
+  if(!SHARED_CP.memory.companies[scope]){
+   SHARED_CP.memory.companies[scope]={voucherTemplates:{},accountRules:{},confirmedEntities:[]};
+  }
+  const bucket=SHARED_CP.memory.companies[scope];
+  const targetKey=cpWorksheetAccountKey(row,ctx);
+  const side=cpWorksheetSide(row);
+  const now=new Date().toISOString();
+  const selectedNames=groups.filter(g=>selectedKeys.includes(g.key)).map(g=>g.name);
+
+  // Tier A: Voucher Candidate Template Memory
+  const tplKey=voucherCandidateTemplateKey(targetKey,side,groups);
+  const selSig=JSON.stringify([...selectedKeys].sort());
+  if(!bucket.voucherTemplates[tplKey])bucket.voucherTemplates[tplKey]={};
+  const tplEntry=bucket.voucherTemplates[tplKey][selSig]||{keys:[...selectedKeys],names:selectedNames,count:0,createdAt:now,updatedAt:now,source:'auditor_manual',version:1};
+  tplEntry.count++;tplEntry.updatedAt=now;
+  bucket.voucherTemplates[tplKey][selSig]=tplEntry;
+
+  // Tier B: Account-level Memory (guarded against generalizing specific person/company accounts on generic text)
+  const descCore=cpMeaningfulEventText(String(row['شرح سند']??'')+' '+String(row['شرح ردیف']??''));
+  const isSpecificParty=selectedNames.some(nm=>PERSON_OR_PARTY_ACCT_RE.test(nm));
+  if(!isSpecificParty||descCore.length>=5){
+   const acctRuleKey=JSON.stringify([targetKey,side,isSpecificParty?descCore:'*']);
+   if(!bucket.accountRules[acctRuleKey])bucket.accountRules[acctRuleKey]={};
+   const rEntry=bucket.accountRules[acctRuleKey][selSig]||{keys:[...selectedKeys],names:selectedNames,count:0,updatedAt:now,source:'auditor_manual'};
+   rEntry.count++;rEntry.updatedAt=now;
+   bucket.accountRules[acctRuleKey][selSig]=rEntry;
+  }
+
+  for(const nm of selectedNames){
+   if(!bucket.confirmedEntities.includes(nm)&&bucket.confirmedEntities.length<500)bucket.confirmedEntities.push(nm);
+  }
+  saveAuditorMemory();
+ }
+
+ function queryAuditorMemory(row,ctx,groups){
+  const scope=currentCompanyScope();
+  const bucket=SHARED_CP.memory.companies?.[scope];
+  if(!bucket||!groups?.length)return null;
+  const targetKey=cpWorksheetAccountKey(row,ctx),side=cpWorksheetSide(row);
+  const tplKey=voucherCandidateTemplateKey(targetKey,side,groups);
+  const tplMap=bucket.voucherTemplates?.[tplKey];
+  if(tplMap){
+   const variants=Object.values(tplMap).filter(v=>v.keys.every(k=>groups.some(g=>g.key===k)));
+   if(variants.length===1){
+    return {tier:'voucher_template',keys:variants[0].keys,count:variants[0].count,label:`سابقهٔ تصمیم حسابرس در همین الگوی سند (${faNum(variants[0].count)} بار تأییدشده)`};
+   }
+  }
+  const descCore=cpMeaningfulEventText(String(row['شرح سند']??'')+' '+String(row['شرح ردیف']??''));
+  for(const probe of [descCore,'*']){
+   if(!probe)continue;
+   const rMap=bucket.accountRules?.[JSON.stringify([targetKey,side,probe])];
+   if(rMap){
+    const variants=Object.values(rMap).filter(v=>v.keys.every(k=>groups.some(g=>g.key===k)));
+    if(variants.length===1){
+     return {tier:'account_memory',keys:variants[0].keys,count:variants[0].count,label:`حافظهٔ حسابرسی این حساب (${faNum(variants[0].count)} بار تأییدشده)`};
+    }
+   }
+  }
+  return null;
+ }
+
+ // --- 6. In-File Journal Entry Pattern Learner (یادگیری الگوهای تکرارشونده اسناد فایل) ---
+ function buildInFilePatterns(source,ctx){
+  // Learns strictly from unambiguous resolved rows in the same file (never from guesses).
+  const byAccountSide=new Map(); // `${acctKey}|${side}` -> Map<contraKey, count>
+  const byAccountDesc=new Map(); // `${acctKey}|${side}|${descCore}` -> Map<contraKey, count>
+
+  for(const r of source){
+   const m=ctx.wsModels.get(r);
+   if(!m||(m.kind!=='automatic'&&m.kind!=='manual'))continue;
+   const side=cpWorksheetSide(r);
+   if(side!=='debit'&&side!=='credit')continue;
+   const acctKey=cpWorksheetAccountKey(r,ctx);
+   if(acctKey.startsWith('ROW:'))continue;
+   const selectedGroups=m.kind==='manual'
+    ?m.groups.filter(g=>m.decision?.keys?.includes(g.key))
+    :(m.referenceAuto?m.groups.filter(g=>g.key===m.supplemental?.selected):m.groups);
+   if(selectedGroups.length!==1)continue;
+   const contraKey=selectedGroups[0].key;
+   if(contraKey.startsWith('ROW:'))continue;
+
+   const asKey=acctKey+'|'+side;
+   if(!byAccountSide.has(asKey))byAccountSide.set(asKey,new Map());
+   const map1=byAccountSide.get(asKey);
+   map1.set(contraKey,(map1.get(contraKey)||0)+1);
+
+   const core=cpMeaningfulEventText(String(r['شرح سند']??'')+' '+String(r['شرح ردیف']??''));
+   if(core.length>=4){
+    const adKey=asKey+'|'+core;
+    if(!byAccountDesc.has(adKey))byAccountDesc.set(adKey,new Map());
+    const map2=byAccountDesc.get(adKey);
+    map2.set(contraKey,(map2.get(contraKey)||0)+1);
+   }
+  }
+  return {byAccountSide,byAccountDesc};
+ }
+
+ // --- 7. Cross-Voucher & Intermediary Event Chain Tracker (ردیابی بین‌سندی) ---
+ function buildCrossVoucherChains(source,ctx){
+  const chains=new Map(); // row -> Array<{type, voucher, date, accountName, amount, detail}>
+  const addChain=(row,info)=>{
+   if(!chains.has(row))chains.set(row,[]);
+   const arr=chains.get(row);
+   if(arr.length<6&&!arr.some(x=>x.voucher===info.voucher&&x.accountName===info.accountName&&x.connector===info.connector)){
+    arr.push(info);
+   }
+  };
+
+  // 7A. Shared explicit reference tokens across distinct vouchers
+  const byToken=new Map();
+  for(const r of source){
+   const docKey=ctx.key(r);if(!docKey)continue;
+   const toks=cpReferenceTokens(r);
+   for(const t of toks){
+    if(!byToken.has(t.key))byToken.set(t.key,[]);
+    byToken.get(t.key).push({row:r,docKey});
+   }
+  }
+  for(const [tokKey,items] of byToken){
+   if(items.length<2||items.length>12)continue;
+   const distinctDocs=new Set(items.map(x=>x.docKey));
+   if(distinctDocs.size<2)continue;
+   for(const a of items){
+    for(const b of items){
+     if(a.docKey===b.docKey)continue;
+     const amtB=Math.abs(cpLabAmount(b.row['بدهکار'])||cpLabAmount(b.row['بستانکار'])||0);
+     addChain(a.row,{
+      type:'reference_chain',
+      connector:tokKey.replace(':',' '),
+      voucher:String(b.row['شماره سند']??''),
+      date:cpLabDate(b.row['تاریخ'])||String(b.row['تاریخ']??''),
+      accountName:cpWorksheetName(b.row),
+      amount:amtB
+     });
+    }
+   }
+  }
+
+  // 7B. Intermediary / Clearing account 2-voucher settlement bridges
+  const byIntermediaryAcct=new Map();
+  for(const r of source){
+   const docKey=ctx.key(r);if(!docKey)continue;
+   const name=cpWorksheetName(r);
+   if(!INTERMEDIARY_ACCT_RE.test(name))continue;
+   const acctKey=cpWorksheetAccountKey(r,ctx);
+   if(acctKey.startsWith('ROW:'))continue;
+   if(!byIntermediaryAcct.has(acctKey))byIntermediaryAcct.set(acctKey,[]);
+   byIntermediaryAcct.get(acctKey).push({row:r,docKey,side:cpWorksheetSide(r),amt:Math.abs(cpLabAmount(r['بدهکار'])||cpLabAmount(r['بستانکار'])||0),dateIdx:cpDateIndex(cpLabDate(r['تاریخ']))});
+  }
+  const tol=ctx.tolerance||0.01;
+  for(const [,entries] of byIntermediaryAcct){
+   if(entries.length<2||entries.length>60)continue;
+   const debits=entries.filter(e=>e.side==='debit'&&e.amt>0);
+   const credits=entries.filter(e=>e.side==='credit'&&e.amt>0);
+   for(const d of debits){
+    const matches=credits.filter(c=>c.docKey!==d.docKey&&Math.abs(c.amt-d.amt)<=tol&&d.dateIdx!==null&&c.dateIdx!==null&&Math.abs(c.dateIdx-d.dateIdx)<=7);
+    // Strict non-guessing: only bridge if unique 1-to-1 clearing match within 7 days AND shared entity/token or exact 2-entry subaccount
+    if(matches.length===1&&(entries.length===2||cpMeaningfulEventText(d.row['شرح ردیف'])===cpMeaningfulEventText(matches[0].row['شرح ردیف']))){
+     const c=matches[0];
+     const docDRows=ctx.summaries.get(d.docKey)?.rows||[];
+     const docCRows=ctx.summaries.get(c.docKey)?.rows||[];
+     const otherInC=docCRows.filter(x=>x!==c.row).map(cpWorksheetName).filter((v,i,a)=>a.indexOf(v)===i).slice(0,2).join('، ');
+     const otherInD=docDRows.filter(x=>x!==d.row).map(cpWorksheetName).filter((v,i,a)=>a.indexOf(v)===i).slice(0,2).join('، ');
+     if(otherInC){
+      for(const r of docDRows)if(r!==d.row)addChain(r,{type:'intermediary_bridge',connector:'تسویه حساب واسط ('+cpWorksheetName(d.row)+')',voucher:String(c.row['شماره سند']??''),date:cpLabDate(c.row['تاریخ'])||'',accountName:otherInC,amount:c.amt});
+     }
+     if(otherInD){
+      for(const r of docCRows)if(r!==c.row)addChain(r,{type:'intermediary_bridge',connector:'ایجاد حساب واسط ('+cpWorksheetName(c.row)+')',voucher:String(d.row['شماره سند']??''),date:cpLabDate(d.row['تاریخ'])||'',accountName:otherInD,amount:d.amt});
+     }
+    }
+   }
+  }
+  return chains;
+ }
+
+ // --- 8. Row Enrichment: Smart Candidate Evidence, Entity Separation & Evidence Tiers ---
+ function enrichRowModel(row,m,ctx){
+  const key=ctx.key(row),s=key?ctx.summaries.get(key):null;
+  const own=s?.amounts?.get(row);
+  // Conditional groups for valid-amount unbalanced vouchers so auditor can record conditional manual decision
+  if(m.kind==='unresolved'&&!m.groups.length&&s?.valid&&!s.balanced&&own&&(own.d>0)!==(own.c>0)){
+   const opp=own.d>0?s.credit:s.debit;
+   if(opp.length){
+    m.conditionalGroups=cpWorksheetGroups(opp,ctx);
+    m.conditionalSignature=JSON.stringify([key,'conditional_unbalanced',m.conditionalGroups.map(g=>[g.key,g.name,g.rows.length])]);
+    const manual=CP_WS_DECISIONS.get(row);
+    if(manual&&manual.conditionalStructural&&manual.signature===m.conditionalSignature&&manual.keys.every(k=>m.conditionalGroups.some(g=>g.key===k))){
+     m.kind='manual';
+     m.conditionalStructural=true;
+     m.groups=m.conditionalGroups;
+     m.names=m.conditionalGroups.filter(g=>manual.keys.includes(g.key)).map(g=>g.name);
+     m.badge='انتخاب مشروط کاربر (سند نامتوازن)';
+     m.reason='تصمیم دستی حسابرس با اطلاع از عدم توازن ساختاری گروه سند.';
+     m.decision=manual;
+    }
+   }
+  }
+
+  // Separate Contra-Accounts vs Counterparty Entities (شخص/شرکت طرف معامله)
+  m.hasStorno=Boolean(s?.hasStorno);
+  m.contraAccounts=[...(m.names||[])];
+  const entitySet=new Set();
+  const rowText=String(row['شرح سند']??'')+' '+String(row['شرح ردیف']??'');
+  for(const hit of extractEntitiesInText(rowText,ctx.lexicon)){
+   entitySet.add(hit.canonical);
+  }
+  const ownDetails=cpRowDeepDetailTitles(row);
+  for(let di=1;di<ownDetails.length;di++)entitySet.add(ownDetails[di]);
+  if(m.kind==='automatic'||m.kind==='manual'){
+   const activeGroups=m.kind==='manual'
+    ?m.groups.filter(g=>m.decision?.keys?.includes(g.key))
+    :(m.referenceAuto?m.groups.filter(g=>g.key===m.supplemental?.selected):m.groups);
+   for(const g of activeGroups){
+    for(const gr of g.rows){
+     for(const det of cpRowDeepDetailTitles(gr))entitySet.add(det);
+    }
+   }
+  }
+  // Remove only the row's own primary account title/core (keep floating tafzili 2/3 & external entities!)
+  const primaryOwnTitle=(typeof cpWorksheetDisplayLevels==='function'?cpWorksheetDisplayLevels():[])
+   .map(l=>String(row[l.title]??'').trim()).filter(Boolean).at(-1)||ownDetails[0]||'';
+  const primaryOwnCore=cpNormalizeEntityCore(primaryOwnTitle);
+  for(const ent of [...entitySet]){
+   const entCore=cpNormalizeEntityCore(ent);
+   if(ent===primaryOwnTitle||(primaryOwnCore&&entCore&&(entCore===primaryOwnCore||(' '+primaryOwnCore+' ').includes(' '+entCore+' ')))){
+    entitySet.delete(ent);
+   }
+  }
+  m.counterpartyEntities=[...entitySet];
+  m.crossChains=ctx.crossChains?.get(row)||[];
+
+  // Smart candidate hints & recommendation for ambiguous compound vouchers
+  m.smartSupport=new Map(); // groupKey -> Array<{text, strong}>
+  m.recommendation=null;
+  const addHint=(gKey,text,strong=false)=>{
+   if(!m.smartSupport.has(gKey))m.smartSupport.set(gKey,[]);
+   const list=m.smartSupport.get(gKey);
+   if(!list.some(x=>x.text===text))list.push({text,strong});
+  };
+
+  if(m.groups&&m.groups.length>1){
+   // A) Entity Lexicon matches on candidate groups
+   const textHits=extractEntitiesInText(rowText,ctx.lexicon);
+   const lexiconMatchedKeys=[];
+   for(const g of m.groups){
+    const gCore=cpNormalizeEntityCore(g.name.split(' ← ').at(-1)||g.name);
+    if(gCore&&textHits.some(h=>h.core===gCore&&h.uniqueAccount)){
+     lexiconMatchedKeys.push(g.key);
+     addHint(g.key,'تطابق یکتای نام در فرهنگ اسامی تفصیلی فایل',true);
+    }
+   }
+
+   // B) Bounded Subset-Sum & Fee/Tax allocation
+   const subset=solveBoundedSubsetAllocation(row,ctx,s,m.groups);
+   m.subsetInfo=subset;
+   if(subset.status==='unique'||subset.status==='unique_with_ancillary'){
+    for(const k of subset.keys)addHint(k,subset.label,true);
+   }
+
+   // C) Auditor 3-Tier Memory
+   const memHit=queryAuditorMemory(row,ctx,m.groups);
+   if(memHit){
+    for(const k of memHit.keys)addHint(k,memHit.label,true);
+   }
+
+   // D) In-File Journal Pattern Learner
+   const side=cpWorksheetSide(row),acctKey=cpWorksheetAccountKey(row,ctx);
+   const descCore=cpMeaningfulEventText(rowText);
+   let patternRecommendedKey=null,patternLabel='';
+   if(ctx.patterns&&!acctKey.startsWith('ROW:')){
+    const adMap=descCore.length>=4?ctx.patterns.byAccountDesc.get(acctKey+'|'+side+'|'+descCore):null;
+    const asMap=ctx.patterns.byAccountSide.get(acctKey+'|'+side);
+    const evaluateMap=(mp,labelPrefix,minCount)=>{
+     if(!mp)return;
+     const inDoc=m.groups.map(g=>({key:g.key,cnt:mp.get(g.key)||0})).filter(x=>x.cnt>0);
+     const total=inDoc.reduce((a,x)=>a+x.cnt,0);
+     inDoc.sort((a,b)=>b.cnt-a.cnt);
+     for(const item of inDoc){
+      const pct=Math.round((item.cnt/total)*100);
+      addHint(item.key,`${labelPrefix}: ${faNum(item.cnt)} سند مشابه (${faNum(pct)}٪)`,item.cnt>=minCount&&pct>=85);
+     }
+     if(!patternRecommendedKey&&inDoc.length>=1&&inDoc[0].cnt>=minCount&&(inDoc[0].cnt/total)>=0.85&&(inDoc.length===1||inDoc[0].cnt>=inDoc[1].cnt*3)){
+      patternRecommendedKey=inDoc[0].key;
+      patternLabel=`${labelPrefix} (${faNum(inDoc[0].cnt)} سند مشابه)`;
+     }
+    };
+    evaluateMap(adMap,'الگوی شرح و حساب در فایل',2);
+    evaluateMap(asMap,'الگوی پرتکرار این حساب در فایل',3);
+   }
+
+   // Synthesize non-automatic Recommendation (only when signals do not conflict!)
+   if(m.kind==='ambiguous'){
+    if(memHit){
+     m.recommendation={keys:memHit.keys,basis:memHit.label};
+    }else if(lexiconMatchedKeys.length===1){
+     m.recommendation={keys:lexiconMatchedKeys,basis:'تطابق یکتای نام شخص/شرکت در فرهنگ اسامی تفصیلی'};
+    }else if((subset.status==='unique'||subset.status==='unique_with_ancillary')&&patternRecommendedKey&&subset.keys.length===1&&subset.keys[0]===patternRecommendedKey){
+     m.recommendation={keys:subset.keys,basis:subset.label+' + '+patternLabel};
+    }else if(patternRecommendedKey){
+     m.recommendation={keys:[patternRecommendedKey],basis:patternLabel};
+    }else if(subset.status==='unique_with_ancillary'){
+     m.recommendation={keys:subset.keys,basis:subset.label};
+    }
+   }
+  }
+
+  // Transparent Evidence Tier (Tier 1..5)
+  if(m.kind==='manual'&&!m.conditionalStructural)m.evidenceTier={level:1,label:'انتخاب مستقیم حسابرس'};
+  else if(m.kind==='automatic'&&!m.referenceAuto)m.evidenceTier={level:1,label:'قطعی ساختاری درون‌سندی'};
+  else if(m.kind==='automatic'&&m.referenceAuto)m.evidenceTier={level:2,label:'مستند به ارجاع صریح و توازن مبالغ'};
+  else if(m.kind==='ambiguous'&&m.recommendation)m.evidenceTier={level:3,label:'پیشنهاد مستند آمادهٔ تأیید حسابرس'};
+  else if(m.kind==='ambiguous')m.evidenceTier={level:4,label:'چندگزینه‌ای نیازمند انتخاب حسابرس'};
+  else m.evidenceTier={level:5,label:m.conditionalStructural?'تصمیم مشروط حسابرس روی سند نامتوازن':'محدودیت ساختاری داده'};
+
+  return m;
+ }
+
+ // --- 9. Upfront Precomputation Pipeline Across FULL_ROWS ---
+ function sharedCpLevelsSig(){
+  return JSON.stringify(typeof ACCOUNT_LEVELS!=='undefined'?ACCOUNT_LEVELS:[]);
+ }
+
+ function sharedCpUpdateLedgerStats(ctx){
+  if(!ctx||!ctx.wsModels)return null;
+  let automatic=0,referenceAuto=0,manual=0,ambiguous=0,recommended=0,unresolved=0;
+  for(const m of ctx.wsModels.values()){
+   if(m.kind==='automatic'){automatic++;if(m.referenceAuto)referenceAuto++;}
+   else if(m.kind==='manual')manual++;
+   else if(m.kind==='ambiguous'){ambiguous++;if(m.recommendation)recommended++;}
+   else unresolved++;
+  }
+  ctx.ledgerStats={
+   totalRows:ctx.source.length,
+   totalDocs:ctx.documents.size,
+   missingKeys:ctx.missingKeys,
+   collisions:ctx.collisions.length,
+   automatic,
+   referenceAuto,
+   manual,
+   resolved:automatic+manual,
+   ambiguous,
+   recommended,
+   unresolved,
+   lexiconSize:ctx.lexicon?.entries?.length||0,
+   crossLinkedRows:ctx.crossChains?ctx.crossChains.size:0
+  };
+  return ctx.ledgerStats;
+ }
+
+ function sharedCounterpartyPrecompute(source=FULL_ROWS){
+  if(!Array.isArray(source)||!source.length){
+   SHARED_CP.ctx=null;SHARED_CP.levelsSig='';return null;
+  }
+  const ctx=buildEnhancedLabContext(source);
+  ctx.wsToken=++CP_WS_SERIAL;
+  ctx.wsModels=new Map();
+  ctx.eventCache=new Map();
+  ctx.levelsSig=sharedCpLevelsSig();
+  ctx.lexicon=buildEntityLexicon(source,ctx);
+  ctx.crossChains=buildCrossVoucherChains(source,ctx);
+  SHARED_CP.ctx=ctx;
+  SHARED_CP.levelsSig=ctx.levelsSig;
+  CP_WS_CONTEXT=ctx;
+
+  // Pass 1: Structural & reference models across all rows
+  for(let i=0;i<source.length;i++){
+   const r=source[i];
+   ctx.wsModels.set(r,baseCpWorksheetModel(r,ctx));
+  }
+  // Pass 2: Learn in-file patterns from unambiguously resolved rows
+  ctx.patterns=buildInFilePatterns(source,ctx);
+  // Pass 3: Enrich all rows with entity separation, subset-sum, memory/pattern hints & event cache
+  for(let i=0;i<source.length;i++){
+   const r=source[i];
+   const m=enrichRowModel(r,ctx.wsModels.get(r),ctx);
+   if(baseCpEventEvidence&&baseCpEventMatch&&m.kind!=='automatic'&&m.kind!=='manual'){
+    const ev=computeEnhancedEventEvidence(r,ctx);
+    const match=baseCpEventMatch(r,ctx,ev);
+    ctx.eventCache.set(r,{ev,match});
+   }
+  }
+  sharedCpUpdateLedgerStats(ctx);
+  return ctx;
+ }
+
+ function computeEnhancedEventEvidence(row,ctx){
+  if(!baseCpEventEvidence)return {ok:false,reason:'unavailable',rows:[]};
+  const summary=ctx.summaries.get(ctx.key(row)),own=summary?.amounts.get(row);
+  const no=reason=>({ok:false,reason,rows:[]});
+  if(!summary?.valid||!summary.balanced||!own||(own.d>0)===(own.c>0))return no('invalid_or_unbalanced_document');
+  const opposite=own.d>0?summary.credit:summary.debit,same=own.d>0?summary.debit:summary.credit;
+  const amount=r=>{const a=summary.amounts.get(r);return own.d>0?a.c:a.d;},total=own.d||own.c;
+  const normalize=v=>cpReferenceText(v),fields=['شرح سند','شرح ردیف'];
+  const common=new Set(fields.filter(f=>summary.rows.every(r=>normalize(r[f])===normalize(row[f]))));
+  const targetTokens=cpReferenceTokens(row);
+  if(targetTokens.length&&targetTokens.some(t=>targetTokens.some(x=>x.type===t.type&&x.id!==t.id)))return no('conflicting_target_references');
+
+  const coherent=(a,b)=>{
+   const ta=cpReferenceTokens(a),tb=cpReferenceTokens(b),types=new Map();
+   for(const t of ta){if(!types.has(t.type))types.set(t.type,new Set());types.get(t.type).add(t.id);}
+   if([...types.values()].some(ids=>ids.size>1))return false;
+   if(tb.some(t=>types.has(t.type)&&!types.get(t.type).has(t.id)))return false;
+   if(ta.length)return ta.every(t=>tb.some(x=>x.key===t.key));
+   // Guarded description match: generic stopwords like «پرداخت» or «دریافت» cannot bind rows!
+   const textMatch=fields.some(f=>{
+    if(common.has(f))return false;
+    const na=normalize(a[f]),nb=normalize(b[f]);
+    if(na.length<3||na!==nb)return false;
+    return cpMeaningfulEventText(na).length>=4;
+   });
+   if(textMatch)return true;
+   // Unique Entity Lexicon bridge between row description and candidate detail account
+   if(ctx.lexicon){
+    const hitsA=extractEntitiesInText(String(a['شرح سند']??'')+' '+String(a['شرح ردیف']??''),ctx.lexicon).filter(h=>h.uniqueAccount);
+    if(hitsA.length===1){
+     const bCore=cpNormalizeEntityCore(cpWorksheetName(b).split(' ← ').at(-1)||'');
+     if(bCore&&bCore===hitsA[0].core)return true;
+    }
+   }
+   return false;
+  };
+  const linked=opposite.filter(r=>coherent(row,r));
+  if(!linked.length)return no('no_event_specific_evidence');
+  return {ok:true,summary,own,opposite,same,amount,total,coherent,linked};
+ }
+
+ function sharedCounterpartyEnsure(){
+  if(!Array.isArray(FULL_ROWS)||!FULL_ROWS.length)return null;
+  if(SHARED_CP.ctx&&SHARED_CP.ctx.source===FULL_ROWS&&SHARED_CP.levelsSig===sharedCpLevelsSig()){
+   CP_WS_CONTEXT=SHARED_CP.ctx;
+   return SHARED_CP.ctx;
+  }
+  return sharedCounterpartyPrecompute(FULL_ROWS);
+ }
+
+ // --- 10. Request-Scoped Selected Account Package API ---
+ function resolveAccountRows(accountSelector){
+  if(Array.isArray(accountSelector)){
+   const nonNull=accountSelector.filter(Boolean);
+   if(!nonNull.length)return [];
+   // Distinguish an array of level-selection descriptors (SELECTED_BY_LEVEL / ANA.selected) from an array of ledger rows
+   const looksLikeLevelFilter=nonNull.every(x=>typeof x==='object'&&!('شماره سند' in x)&&!('بدهکار' in x)&&('code' in x||'title' in x));
+   if(looksLikeLevelFilter&&Array.isArray(ACCOUNT_ROWS)){
+    return ACCOUNT_ROWS.filter(r=>accountSelector.every((sel,i)=>{
+     if(!sel)return true;
+     const level=ACCOUNT_LEVELS[i];if(!level)return true;
+     const c=String(sel.code??'').trim(),t=String(sel.title??'').trim();
+     return (!c||String(r[level.code]??'').trim()===c)&&(!t||String(r[level.title]??'').trim()===t);
+    }));
+   }
+   return accountSelector;
+  }
+  if(!accountSelector||!Array.isArray(ACCOUNT_ROWS)||!ACCOUNT_ROWS.length)return [];
+  if(Array.isArray(accountSelector.rows))return accountSelector.rows;
+  if(Array.isArray(accountSelector.keyPath)&&typeof rowsForWorksheetAccount==='function'){
+   return rowsForWorksheetAccount(accountSelector);
+  }
+  const lvl=accountSelector.levelLabel||(ACCOUNT_LEVELS[accountSelector.levelIdx]&&ACCOUNT_LEVELS[accountSelector.levelIdx].label)||'';
+  const code=String(accountSelector.code||'').trim(),title=String(accountSelector.title||'').trim();
+  const pathKeys=Array.isArray(accountSelector.pathKeys)?accountSelector.pathKeys:[];
+  return ACCOUNT_ROWS.filter(r=>{
+   if(pathKeys.length)return pathKeys.every((key,i)=>{
+    const level=ACCOUNT_LEVELS[i];if(!level)return false;
+    return `${String(r[level.code]||'').trim()}|${String(r[level.title]||'').trim()}`===key;
+   });
+   const rowCode=String(r['کد حساب '+lvl]||'').trim(),rowTitle=String(r['عنوان حساب '+lvl]||'').trim();
+   return rowCode===code&&(!title||!rowTitle||rowTitle===title);
+  });
+ }
+
+ function sharedCounterpartyAnalyzeRows(rows){
+  const list=Array.isArray(rows)?rows:[];
+  const ctx=sharedCounterpartyEnsure();
+  const currentRows=[],openingRows=[],automatic=[],manual=[],resolved=[],ambiguous=[],unresolved=[];
+  const byCounterparty=new Map(),byEntity=new Map(),crossVoucherChains=[];
+  let openDr=0,openCr=0,curDr=0,curCr=0,referenceAuto=0,recommended=0;
+  const docSet=new Set();
+
+  if(!ctx){
+   return {
+    ctx:null,rows:list,currentRows,openingRows,automatic,manual,resolved,ambiguous,unresolved,
+    resolvedGroups:[],entityGroups:[],crossVoucherChains:[],
+    turnover:{openingBalance:0,debit:0,credit:0,movementNet:0,closingBalance:0,voucherCount:0},
+    counts:{total:list.length,current:0,opening:0,resolved:0,automatic:0,manual:0,referenceAuto:0,ambiguous:0,recommended:0,unresolved:0}
+   };
+  }
+
+  for(const r of list){
+   const dr=cpLabAmount(r['بدهکار'])||0,cr=cpLabAmount(r['بستانکار'])||0;
+   const docNo=String(r['شماره سند']??'').trim();if(docNo)docSet.add(docNo);
+   if(typeof anaIsOpening==='function'&&anaIsOpening(r)){
+    openingRows.push(r);openDr+=dr;openCr+=cr;continue;
+   }
+   currentRows.push(r);curDr+=dr;curCr+=cr;
+   const m=cpWorksheetModel(r,ctx);
+   if(m.kind==='automatic'){
+    automatic.push(r);resolved.push(r);
+    if(m.referenceAuto)referenceAuto++;
+   }else if(m.kind==='manual'){
+    manual.push(r);resolved.push(r);
+   }else if(m.kind==='ambiguous'){
+    ambiguous.push(r);
+    if(m.recommendation)recommended++;
+   }else{
+    unresolved.push(r);
+   }
+
+   if((m.kind==='automatic'||m.kind==='manual')&&m.names.length){
+    for(const name of m.names){
+     if(!byCounterparty.has(name))byCounterparty.set(name,{name,count:0,debit:0,credit:0,hasCode:false,hasManual:false});
+     const entry=byCounterparty.get(name);
+     entry.count++;entry.debit+=Math.abs(dr);entry.credit+=Math.abs(cr);
+     if(m.kind==='manual')entry.hasManual=true;else entry.hasCode=true;
+    }
+   }
+   for(const ent of (m.counterpartyEntities||[])){
+    if(!byEntity.has(ent))byEntity.set(ent,{name:ent,count:0});
+    byEntity.get(ent).count++;
+   }
+   if(m.crossChains&&m.crossChains.length){
+    crossVoucherChains.push({row:r,rowId:ctx.rowIds.get(r),voucher:docNo,links:m.crossChains});
+   }
+  }
+
+  const openingBalance=openDr-openCr,movementNet=curDr-curCr,closingBalance=openingBalance+movementNet;
+  const resolvedGroups=[...byCounterparty.values()].sort((a,b)=>b.count-a.count||(b.debit+b.credit)-(a.debit+a.credit)||a.name.localeCompare(b.name,'fa'));
+  const entityGroups=[...byEntity.values()].sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'fa'));
+
+  return {
+   ctx,
+   rows:list,
+   currentRows,
+   openingRows,
+   automatic,
+   manual,
+   resolved,
+   ambiguous,
+   unresolved,
+   resolvedGroups,
+   entityGroups,
+   crossVoucherChains,
+   turnover:{openingBalance,debit:curDr,credit:curCr,movementNet,closingBalance,voucherCount:docSet.size},
+   counts:{
+    total:list.length,
+    current:currentRows.length,
+    opening:openingRows.length,
+    resolved:resolved.length,
+    automatic:automatic.length,
+    manual:manual.length,
+    referenceAuto,
+    ambiguous:ambiguous.length,
+    recommended,
+    unresolved:unresolved.length
+   }
+  };
+ }
+
+ function sharedCounterpartyGetAccountPackage(accountSelector){
+  const rows=resolveAccountRows(accountSelector);
+  const analysis=sharedCounterpartyAnalyzeRows(rows);
+  return {
+   account:Array.isArray(accountSelector)?null:accountSelector,
+   rows:analysis.rows,
+   openingRows:analysis.openingRows,
+   currentRows:analysis.currentRows,
+   turnover:analysis.turnover,
+   contraAccounts:analysis.resolvedGroups,
+   counterpartyEntities:analysis.entityGroups,
+   crossVoucherChains:analysis.crossVoucherChains,
+   doubtfulRows:analysis.ambiguous,
+   structuralRows:analysis.unresolved,
+   resolvedRows:analysis.resolved,
+   counts:analysis.counts,
+   summary:analysis
+  };
+ }
+
+ // --- 11. Hooks on Core Functions & Enhanced Chooser Dialog (#cpWorksheetDialog) ---
+ cpLabContext=function(source){
+  if(source===FULL_ROWS&&Array.isArray(FULL_ROWS)&&FULL_ROWS.length){
+   const ctx=sharedCounterpartyEnsure();
+   if(ctx)return ctx;
+  }
+  return buildEnhancedLabContext(source);
+ };
+
+ cpWorksheetReset=function(){
+  SHARED_CP.ctx=null;
+  SHARED_CP.levelsSig='';
+  SHARED_CP.dirtyRows.clear();
+  SHARED_CP.uiState.clear();
+  SHARED_CP.lastEvidenceRef=null;
+  return baseCpWorksheetReset();
+ };
+
+ cpWorksheetBeginRender=function(){
+  return sharedCounterpartyEnsure()||baseCpWorksheetBeginRender();
+ };
+
+ cpWorksheetContext=function(){
+  return sharedCounterpartyEnsure()||baseCpWorksheetContext();
+ };
+
+ cpWorksheetModel=function(row,ctx){
+  const active=ctx||sharedCounterpartyEnsure();
+  if(active&&active.wsModels&&active.wsModels.has(row))return active.wsModels.get(row);
+  const raw=baseCpWorksheetModel(row,active||buildEnhancedLabContext(FULL_ROWS));
+  if(active&&active.rowIds?.has(row)){
+   enrichRowModel(row,raw,active);
+   if(active.wsModels)active.wsModels.set(row,raw);
+  }
+  return raw;
+ };
+
+ cpWorksheetCell=function(row,ctx){
+  const html=baseCpWorksheetCell(row,ctx);
+  const m=cpWorksheetModel(row,ctx);
+  if(m.kind==='unresolved'&&m.conditionalGroups?.length){
+   return html.replace('>شواهد</button>','>شواهد / تصمیم مشروط</button>');
+  }
+  return html;
+ };
+
+ function sharedCounterpartyCellHTML(row,ctx){
+  const active=ctx||sharedCounterpartyEnsure();
+  if(!active)return '—';
+  const saved={filled:CP_REPORT.filled,blank:CP_REPORT.blank,reasons:{...CP_REPORT.reasons}};
+  try{
+   return cpWorksheetCell(row,active);
+  }finally{
+   CP_REPORT.filled=saved.filled;
+   CP_REPORT.blank=saved.blank;
+   CP_REPORT.reasons=saved.reasons;
+  }
+ }
+
+ if(baseCpEventEvidence){
+  cpEventEvidence=function(row,ctx){
+   if(ctx&&ctx.eventCache&&ctx.eventCache.has(row))return ctx.eventCache.get(row).ev;
+   return computeEnhancedEventEvidence(row,ctx);
+  };
+ }
+ if(baseCpEventMatch){
+  cpEventMatch=function(row,ctx,prepared){
+   if(ctx&&ctx.eventCache&&ctx.eventCache.has(row))return ctx.eventCache.get(row).match;
+   return baseCpEventMatch(row,ctx,prepared);
+  };
+ }
+
+ // Strengthen AI quote validation so generic boilerplate quotes cannot bind arbitrary candidates
+ if(baseAnaCounterpartyValidate){
+  anaCounterpartyValidate=function(job,text){
+   const validated=baseAnaCounterpartyValidate(job,text);
+   if(!validated||!Array.isArray(validated.records))return validated;
+   validated.records=validated.records.map((rec,idx)=>{
+    if(rec.source!=='ai'||!Array.isArray(rec.selected)||!rec.selected.length)return rec;
+    const quotes=Array.isArray(rec.evidence)?rec.evidence:(rec.evidence?.quote?[rec.evidence.quote]:[]);
+    const quoteBlob=quotes.map(q=>String(q??'').trim()).filter(Boolean).join(' ');
+    const hasRef=cpReferenceTokens({'شرح سند':quoteBlob,'شرح ردیف':''}).length>0;
+    const meaningful=cpMeaningfulEventText(quoteBlob);
+    if(!hasRef&&meaningful.length<3){
+     return {...job.records[idx],source:'unresolved',status:'unresolved',selected:[],names:[],evidence:[],eligible:false,reason:'نقل‌قول هوش مصنوعی شامل شاهد اختصاصی معنادار نبود؛ بدون انتخاب حدسی متوقف شد.'};
+    }
+    const chosenCands=(rec.candidates||[]).filter(c=>rec.selected.includes(c.id));
+    const inCand=chosenCands.some(c=>{
+     const candBlob=cpReferenceText(c.name+' '+(c.rows||[]).map(x=>x.description+' '+x.lineDescription).join(' '));
+     if(hasRef)return quotes.some(q=>candBlob.includes(cpReferenceText(q)));
+     return meaningful.split(' ').some(w=>w.length>=3&&candBlob.includes(w));
+    });
+    if(!inCand){
+     return {...job.records[idx],source:'unresolved',status:'unresolved',selected:[],names:[],evidence:[],eligible:false,reason:'شاهد نقل‌شده با حساب کاندید انتخابی ارتباط متنی مستقیم نداشت؛ رد شد.'};
+    }
+    return rec;
+   });
+   validated.byRow=new Map(job.rows.map((r,i)=>[r,validated.records[i]]));
+   validated.counts={
+    code:validated.records.filter(r=>r.source==='code').length,
+    user:validated.records.filter(r=>r.source==='user').length,
+    ai:validated.records.filter(r=>r.source==='ai').length,
+    unresolved:validated.records.filter(r=>r.source==='unresolved').length
+   };
+   return validated;
+  };
+ }
+
+ function refreshRowsAfterManualChange(changedRows){
+  const ctx=sharedCounterpartyEnsure();
+  if(ctx){
+   for(const r of changedRows){
+    if(ctx.rowIds.has(r)){
+     ctx.wsModels.set(r,baseCpWorksheetModel(r,ctx));
+    }
+   }
+   ctx.patterns=buildInFilePatterns(ctx.source,ctx);
+   for(const r of ctx.source){
+    const cur=ctx.wsModels.get(r);
+    if(cur&&(changedRows.includes(r)||cur.kind==='ambiguous'||cur.conditionalGroups))enrichRowModel(r,cur,ctx);
+   }
+   sharedCpUpdateLedgerStats(ctx);
+  }
+  SHARED_CP.decisionRev++;
+  for(const r of changedRows)if(r)SHARED_CP.dirtyRows.add(r);
+  if(Array.isArray(ANA.out)){
+   for(const o of ANA.out){
+    if(o&&o.A&&Array.isArray(o.A.rows)&&changedRows.some(r=>o.A.rows.includes(r))){
+     const pkg=sharedCounterpartyGetAccountPackage(o.A.rows);
+     o.A.accountPackage=pkg;
+     o.A.sharedCounterparty=pkg.summary;
+     o.A.counterpartyEntities=pkg.counterpartyEntities;
+     o.A.crossVoucherChains=pkg.crossVoucherChains;
+     if(pkg.contraAccounts.length)o.A.counterparty=pkg.contraAccounts.map(g=>g.name);
+    }
+   }
+  }
+  queueMicrotask(()=>sharedCounterpartyNotifyAll(changedRows[0]||null));
+ }
+
+ function sharedCounterpartyNotifyAll(row){
+  const anaOutBox=document.getElementById('anaCounterpartyBox');
+  if(anaOutBox&&ANA.out&&ANA.out[ANA.active])sharedMountAnalysisOutputPanel();
+  const repDialog=document.getElementById('reportEvidence');
+  if(repDialog&&repDialog.open&&SHARED_CP.lastEvidenceRef)reportOpenReference(SHARED_CP.lastEvidenceRef);
+  for(const fn of SHARED_CP.listeners){try{fn(row,SHARED_CP.ctx);}catch(e){}}
+ }
+
+ cpWorksheetDecision=function(row,ctx,keys,note='',opts={}){
+  if(ctx!==CP_WS_CONTEXT||ctx.source!==FULL_ROWS)return {ok:false,error:'داده کاربرگ تغییر کرده است؛ کاربرگ را دوباره باز کنید.'};
+  const m=cpWorksheetModel(row,ctx);
+  if((opts.conditionalStructural||m.conditionalStructural)&&(m.conditionalGroups?.length||m.groups?.length)){
+   const pool=m.conditionalGroups?.length?m.conditionalGroups:m.groups;
+   const unique=[...new Set(keys)];
+   if(!unique.length||unique.some(k=>!pool.some(g=>g.key===k))){
+    return {ok:false,error:'حداقل یک گزینه معتبر را انتخاب کنید.'};
+   }
+   const timestamp=new Date().toISOString(),before=CP_WS_DECISIONS.get(row)||null;
+   const decision={keys:unique,signature:m.conditionalSignature,note:String(note),timestamp,origin:'user',conditionalStructural:true};
+   CP_WS_DECISIONS.set(row,decision);
+   const history=CP_WS_HISTORY.get(row)||[];
+   history.push({action:'select_conditional',timestamp,before:before?.keys||[],after:unique,note:decision.note});
+   CP_WS_HISTORY.set(row,history);
+   if(!opts.skipRefresh)refreshRowsAfterManualChange([row]);
+   return {ok:true};
+  }
+  const out=baseCpWorksheetDecision(row,ctx,keys,note);
+  if(out&&out.ok){
+   recordAuditorMemory(row,ctx,[...new Set(keys)]);
+   if(!opts.skipRefresh)refreshRowsAfterManualChange([row]);
+  }
+  return out;
+ };
+
+ cpWorksheetClearDecision=function(row){
+  const had=CP_WS_DECISIONS.has(row);
+  baseCpWorksheetClearDecision(row);
+  if(had)refreshRowsAfterManualChange([row]);
+ };
+
+ // Enhance #cpWorksheetDialog with Smart Evidence Badges, 1-Click Recommendation,
+ // Batch-Confirm for identical vouchers of the same account, Cross-Voucher Chains,
+ // and Conditional Manual Selection on imbalanced vouchers.
+ cpWorksheetOpen=function(row,ctx){
+  if(ctx!==CP_WS_CONTEXT||ctx.source!==FULL_ROWS)return;
+  const m=cpWorksheetModel(row,ctx);
+  const isCondOnly=(m.kind==='unresolved'||m.conditionalStructural)&&Array.isArray(m.conditionalGroups)&&m.conditionalGroups.length>0;
+
+  baseCpWorksheetOpen(row,ctx);
+  const d=document.getElementById('cpWorksheetDialog');
+  if(!d||!d.open)return;
+
+  // Case A: Unbalanced voucher with valid opposite-side candidate accounts -> allow conditional manual choice
+  if(isCondOnly&&!d.querySelector('#cpWsForm')){
+   const ownSide=cpWorksheetSide(row),otherSide=ownSide==='debit'?'credit':'debit',otherLabel=otherSide==='credit'?'بستانکار':'بدهکار';
+   const resolvedBox=d.querySelector('.cp-resolved-box');
+   if(resolvedBox){
+    const formWrap=document.createElement('div');
+    formWrap.innerHTML=`<div class="cp-struct-warn">⚠ <b>هشدار محدودیت ساختاری سند:</b> ${esc(m.evidence.reason)}<br>برنامه به‌صورت خودکار طرف‌حسابی تعیین نمی‌کند؛ اما در صورت بررسی اسناد مثبته می‌توانید تصمیم دستی مشروط خود را ثبت کنید.</div><form id="cpWsForm"><div class="cp-options-heading"><b>گزینه‌های ${otherLabel} مشاهده‌شده در همین سند</b><span>ثبت به‌عنوان تصمیم مشروط حسابرس</span></div><div class="cp-ws-options">${m.conditionalGroups.map((g,i)=>`<label class="cp-ws-option"><input type="checkbox" name="account" value="${i}" ${m.decision?.keys?.includes(g.key)?'checked':''}><span class="cp-option-content"><span class="cp-option-heading"><span class="cp-option-index">گزینه ${cpLabNumber(i+1)}</span><span class="cp-option-side">${otherLabel} · ${cpLabNumber(cpWorksheetGroupTotal(g,otherSide))}</span></span><strong class="cp-option-name">${esc(g.name)}</strong></span></label>`).join('')}</div><section id="cpWsSelection" class="cp-selection-box" aria-live="polite"></section><details class="cp-optional-note"><summary>افزودن یادداشت حسابرسی (پیشنهادی برای سند نامتوازن)</summary><textarea id="cpWsNote" rows="2"></textarea></details><p id="cpWsError" role="alert"></p><footer><button type="submit" id="cpWsApply">ثبت تصمیم مشروط حسابرس</button>${m.decision?'<button type="button" id="cpWsClear">پاک‌کردن انتخاب</button>':''}<button type="button" id="cpWsCancel">انصراف</button></footer></form>`;
+    resolvedBox.replaceWith(formWrap);
+    const fakeModel={groups:m.conditionalGroups};
+    d.querySelector('#cpWsNote').value=m.decision?.note||'';
+    d.querySelector('#cpWsCancel').onclick=()=>d.close();
+    d.querySelectorAll('input[name="account"]').forEach(inp=>inp.onchange=()=>cpWorksheetSelectionPreview(d,fakeModel,otherSide));
+    cpWorksheetSelectionPreview(d,fakeModel,otherSide);
+    const clr=d.querySelector('#cpWsClear');
+    if(clr)clr.onclick=()=>{cpWorksheetClearDecision(row);d.close();drawSheets();};
+    d.querySelector('#cpWsForm').onsubmit=ev=>{
+     ev.preventDefault();
+     const keys=[...d.querySelectorAll('input[name="account"]:checked')].map(x=>m.conditionalGroups[Number(x.value)]?.key);
+     const out=cpWorksheetDecision(row,ctx,keys,d.querySelector('#cpWsNote').value,{conditionalStructural:true});
+     if(!out.ok){d.querySelector('#cpWsError').textContent=out.error;return;}
+     d.close();drawSheets();
+    };
+   }
+  }
+
+  // Case B: Standard chooser form enhancements (Smart Badges, 1-Click Recommendation, Batch Confirm)
+  const form=d.querySelector('#cpWsForm');
+  if(form&&m.conditionalStructural&&!d.querySelector('.cp-struct-warn')){
+   const warn=document.createElement('div');
+   warn.className='cp-struct-warn';
+   warn.innerHTML=`⚠ <b>هشدار محدودیت ساختاری سند:</b> این سند در فایل منبع متوازن نیست؛ انتخاب ثبت‌شده تصمیم مشروط حسابرس است.`;
+   form.prepend(warn);
+  }
+  if(form&&!isCondOnly&&m.groups?.length>1){
+   const optionLabels=[...form.querySelectorAll('.cp-ws-option')];
+   m.groups.forEach((g,idx)=>{
+    const labelEl=optionLabels[idx];if(!labelEl)return;
+    const hints=m.smartSupport?.get(g.key)||[];
+    if(m.recommendation?.keys?.includes(g.key))labelEl.classList.add('is-recommended');
+    if(hints.length){
+     const holder=document.createElement('div');
+     holder.className='cp-smart-badges';
+     holder.innerHTML=hints.map(h=>`<span class="cp-smart-badge ${h.strong?'is-strong':''}">${esc(h.text)}</span>`).join('');
+     labelEl.querySelector('.cp-option-content')?.appendChild(holder);
+    }
+   });
+
+   if(m.recommendation&&m.recommendation.keys.length){
+    const recNames=m.groups.filter(g=>m.recommendation.keys.includes(g.key)).map(g=>g.name).join(' ، ');
+    const recBar=document.createElement('div');
+    recBar.className='cp-smart-rec';
+    recBar.innerHTML=`<div><b>پیشنهاد مستند سیستم:</b> ${esc(recNames)}<div style="font-size:11px;opacity:.9">مبنا: ${esc(m.recommendation.basis)} (بدون اعمال خودکار؛ نیازمند تأیید شما)</div></div><button type="button" id="cpWsApplyRecBtn">انتخاب گزینهٔ پیشنهادی</button>`;
+    form.prepend(recBar);
+    recBar.querySelector('#cpWsApplyRecBtn').onclick=()=>{
+     const ownSide=cpWorksheetSide(row),otherSide=ownSide==='debit'?'credit':'debit';
+     optionLabels.forEach((lbl,idx)=>{
+      const inp=lbl.querySelector('input[name="account"]');
+      if(inp)inp.checked=m.recommendation.keys.includes(m.groups[idx]?.key);
+     });
+     cpWorksheetSelectionPreview(d,m,otherSide);
+    };
+   }
+
+   // Find similar unresolved ambiguous rows of the SAME target account & side with identical candidate accounts
+   const targetAcctKey=cpWorksheetAccountKey(row,ctx),ownSide=cpWorksheetSide(row);
+   const tplSig=voucherCandidateTemplateKey(targetAcctKey,ownSide,m.groups);
+   const similarRows= !targetAcctKey.startsWith('ROW:') ? ctx.source.filter(r=>{
+    if(r===row)return false;
+    const mr=cpWorksheetModel(r,ctx);
+    if(mr.kind!=='ambiguous')return false;
+    return voucherCandidateTemplateKey(cpWorksheetAccountKey(r,ctx),cpWorksheetSide(r),mr.groups)===tplSig;
+   }) : [];
+
+   if(similarRows.length>0){
+    const sampleDocs=similarRows.slice(0,6).map(r=>String(r['شماره سند']??'')).filter(Boolean).join('، ');
+    const batchDiv=document.createElement('div');
+    batchDiv.className='cp-batch-box';
+    batchDiv.innerHTML=`<label><input type="checkbox" id="cpWsBatchApply"><span><b>اعمال هم‌زمان به ${faNum(similarRows.length)} ردیف مشابه دیگر در همین حساب</b><br><small>ردیف‌هایی از همین حساب که دقیقاً همین ترکیب حساب‌های مقابل را دارند (نمونه سندها: ${esc(sampleDocs)}${similarRows.length>6?' و ...':''}).</small></span></label>`;
+    const footer=form.querySelector('footer');
+    if(footer)footer.before(batchDiv);
+
+    form.onsubmit=event=>{
+     event.preventDefault();
+     const keys=[...d.querySelectorAll('input[name="account"]:checked')].map(x=>m.groups[Number(x.value)]?.key);
+     const noteVal=d.querySelector('#cpWsNote').value;
+     const batchChecked=!!d.querySelector('#cpWsBatchApply')?.checked;
+     const firstOut=cpWorksheetDecision(row,ctx,keys,noteVal,{skipRefresh:batchChecked});
+     if(!firstOut.ok){d.querySelector('#cpWsError').textContent=firstOut.error;return;}
+     if(batchChecked){
+      const changed=[row];
+      for(const sr of similarRows){
+       const rOut=cpWorksheetDecision(sr,ctx,keys,noteVal?noteVal+' (اعمال دسته‌جمعی الگوی مشابه)':'اعمال دسته‌جمعی الگوی مشابه',{skipRefresh:true});
+       if(rOut.ok)changed.push(sr);
+      }
+      refreshRowsAfterManualChange(changed);
+     }
+     d.close();drawSheets();
+    };
+   }
+  }
+
+  // Cross-Voucher Event Chain display inside dialog (if any cross-document link exists for this row)
+  if(m.crossChains&&m.crossChains.length){
+   const crossBox=document.createElement('div');
+   crossBox.className='cp-cross-box';
+   crossBox.innerHTML=`<b>🔗 ردیابی مرتبط در سایر اسناد فایل (بین‌سندی / حساب واسط)</b><div style="font-size:11px;color:#5a6e7a">صرفاً جهت اطلاع حسابرس؛ جایگزین حساب مقابلِ درون همین سند نمی‌شود:</div>${m.crossChains.map(c=>`<div class="cp-cross-item">سند <b>${esc(sampleDisplayDigits(c.voucher))}</b> مورخ ${esc(sampleDisplayDigits(c.date))} · <b>${esc(c.accountName)}</b> · مبلغ ${cpLabNumber(c.amount)} <small style="display:inline;color:#3c687c">(${esc(c.connector)})</small></div>`).join('')}`;
+   const details=d.querySelector('.cp-support-details');
+   if(details)details.before(crossBox);else d.appendChild(crossBox);
+  }
+ };
+
+ sampleForgetRemovedRows=function(removed,kept){
+  const retained=new Set(kept.flatMap(w=>w.sel.flatMap(s=>s.rows)));
+  if(Array.isArray(ANA.accounts)){
+   for(const a of ANA.accounts)for(const r of resolveAccountRows(a))retained.add(r);
+  }
+  const forgotten=[];
+  for(const w of removed)for(const s of w.sel)for(const row of s.rows)if(!retained.has(row)){
+   if(CP_WS_DECISIONS.has(row))forgotten.push(row);
+   CP_WS_DECISIONS.delete(row);CP_WS_HISTORY.delete(row);
+  }
+  const dialog=document.getElementById('cpWorksheetDialog');if(dialog){if(dialog.open)dialog.close();dialog.replaceChildren();}
+  const print=document.getElementById('printHost');if(print)print.replaceChildren();
+  const output=document.getElementById('outputArea');if(output)output.replaceChildren();
+  if(SHARED_CP.ctx&&SHARED_CP.ctx.source===FULL_ROWS){
+   if(forgotten.length)refreshRowsAfterManualChange(forgotten);
+   CP_WS_CONTEXT=SHARED_CP.ctx;
+  }
+ };
+
+ // Trigger upfront extraction across ALL rows of FULL_ROWS right after column mapping!
+ // Sampling's UI stages (4, 5, 6) and Home UI remain 100% untouched visually.
+ renderAccountStep=function(rows){
+  const out=baseRenderAccountStep(rows);
+  if(rows===FULL_ROWS&&Array.isArray(FULL_ROWS)&&FULL_ROWS.length){
+   sharedCounterpartyPrecompute(FULL_ROWS);
+  }
+  return out;
+ };
+
+ // --- 12. Analysis Module Integration (Strictly Scoped to the User's Selected Account!) ---
+ anaAnalyze=function(w){
+  const A=baseAnaAnalyze(w);
+  const pkg=sharedCounterpartyGetAccountPackage(A.rows||w);
+  A.accountPackage=pkg;
+  A.sharedCounterparty=pkg.summary;
+  A.counterpartyEntities=pkg.counterpartyEntities;
+  A.crossVoucherChains=pkg.crossVoucherChains;
+  if(pkg.contraAccounts.length){
+   A.counterparty=pkg.contraAccounts.map(g=>g.name);
+  }
+  return A;
+ };
+
+ function renderScopedAnalysisAccountPanel(host,o,panelId){
+  if(!host||!o)return;
+  const ctx=sharedCounterpartyEnsure();
+  if(!ctx){host.innerHTML='';return;}
+  const pkg=sharedCounterpartyGetAccountPackage(o.A?.rows||[]);
+  const S=pkg.summary,C=pkg.counts;
+  let state=SHARED_CP.uiState.get(panelId);
+  if(!state){state={tab:null,open:null,showAll:false};SHARED_CP.uiState.set(panelId,state);}
+
+  const slot=ANA.aiBy&&ANA.aiBy[ANA.active];
+  const hasDirty=(o.A?.rows||[]).some(r=>SHARED_CP.dirtyRows.has(r));
+  const hasAI=!!(slot?.nature||o.report?.prepared);
+  const aiNoticeHTML=(hasDirty&&hasAI)?`<div class="shared-cp-ai-notice"><span>انتخاب طرف‌حساب در این حساب تغییر کرد. در صورت تمایل خروجی هوش مصنوعی را بازخوانی کنید:</span><div style="display:flex;gap:6px;flex-wrap:wrap">${slot?.nature?'<button type="button" data-scp-refresh-nature="1">بازخوانی شرح ماهیت</button>':''}${o.report?.prepared?'<button type="button" data-scp-refresh-report="1">تهیهٔ دوباره آنالیز حساب</button>':''}</div></div>`:'';
+
+  // Just like Sampling: only demand user interaction when this selected account has doubtful/ambiguous rows!
+  const isOpen=state.open!==null?state.open:(C.ambiguous>0);
+
+  if(!isOpen&&C.ambiguous===0&&!aiNoticeHTML){
+   host.innerHTML=`<section class="shared-cp-panel is-compact no-print" data-scp-panel="${esc(panelId)}"><div class="shared-cp-head"><div><b>طرف‌حساب‌های «${esc(o.a.title||o.a.pathLabel)}»</b> <span style="font-size:12px;color:var(--muted,#60727d)">— ${faNum(C.resolved)} ردیف مشخص‌شده${S.entityGroups.length?' · '+faNum(S.entityGroups.length)+' شخص/نهاد مرتبط':''}${C.unresolved?' · '+faNum(C.unresolved)+' محدودیت ساختاری':''}</span></div><button type="button" class="shared-cp-toggle" data-scp-toggle="1">مشاهده / ویرایش طرف‌حساب‌های این حساب ▼</button></div></section>`;
+   host.querySelector('[data-scp-toggle]')?.addEventListener('click',()=>{state.open=true;renderScopedAnalysisAccountPanel(host,o,panelId);});
+   return;
+  }
+
+  const tabs=[
+   {id:'ambiguous',label:`موارد نیازمند انتخاب (${faNum(C.ambiguous)})`,rows:S.ambiguous},
+   {id:'resolved',label:`مشخص‌شده (${faNum(C.resolved)})`,rows:S.resolved}
+  ];
+  if(C.unresolved>0)tabs.push({id:'unresolved',label:`محدودیت ساختاری (${faNum(C.unresolved)})`,rows:S.unresolved});
+  tabs.push({id:'all',label:`همهٔ ردیف‌های جاری این حساب (${faNum(C.current)})`,rows:S.currentRows});
+
+  let activeTab=state.tab&&tabs.some(t=>t.id===state.tab)?state.tab:(C.ambiguous>0?'ambiguous':'resolved');
+  const tabObj=tabs.find(t=>t.id===activeTab)||tabs[0];
+  const limit=state.showAll?tabObj.rows.length:100;
+  const visibleRows=tabObj.rows.slice(0,limit);
+
+  const contraChips=S.resolvedGroups.slice(0,20).map(g=>{
+   const srcLabel=g.hasManual&&g.hasCode?'کد + انتخاب کاربر':g.hasManual?'انتخاب کاربر':'تشخیص کد';
+   return `<span class="shared-cp-chip"><b>${esc(g.name)}</b><small>${faNum(g.count)} ردیف · ${srcLabel}</small></span>`;
+  }).join('');
+  const entityChips=S.entityGroups.slice(0,12).map(e=>`<span class="shared-cp-chip" style="border-style:dashed"><b>شخص/نهاد: ${esc(e.name)}</b><small>${faNum(e.count)} مورد</small></span>`).join('');
+
+  const tableHTML=visibleRows.length?`<div class="shared-cp-scroll"><table class="shared-cp-table"><thead><tr><th style="width:46px">ردیف</th><th style="width:74px">سند</th><th style="width:92px">تاریخ</th><th>شرح سند / ردیف</th><th style="width:260px">طرف حساب</th><th style="width:110px">بدهکار</th><th style="width:110px">بستانکار</th></tr></thead><tbody>${visibleRows.map((r,idx)=>{
+   const m=cpWorksheetModel(r,ctx);
+   const ds=String(r['شرح سند']??'').trim(),dr=String(r['شرح ردیف']??'').trim();
+   const db=parseAmount(r['بدهکار']),cr=parseAmount(r['بستانکار']);
+   const recTag=m.kind==='ambiguous'&&m.recommendation?`<small style="display:block;color:#1b653e;margin-top:3px">★ دارای پیشنهاد مستند سیستم</small>`:'';
+   return `<tr data-cp-row-kind="${m.kind}"><td>${faNum(idx+1)}</td><td>${esc(sampleDisplayDigits(r['شماره سند']??''))}</td><td class="num">${esc(sampleDisplayDigits(r['تاریخ']??''))}</td><td><div>${esc(ds||dr||'—')}</div>${dr&&dr!==ds?`<small style="display:block;color:var(--muted,#60727d);margin-top:2px">${esc(dr)}</small>`:''}${recTag}</td><td>${sharedCounterpartyCellHTML(r,ctx)}</td><td class="num">${db?fmt(db):''}</td><td class="num">${cr?fmt(cr):''}</td></tr>`;
+  }).join('')}</tbody></table></div>${tabObj.rows.length>limit?`<div class="shared-cp-more"><span>نمایش ${faNum(limit)} از ${faNum(tabObj.rows.length)} ردیف</span><button type="button" class="shared-cp-toggle" data-scp-more="1">نمایش همه</button></div>`:''}`:`<p style="margin:8px 0 2px;font-size:12px;color:var(--muted,#60727d)">${activeTab==='ambiguous'?'✓ تمام موارد چندگزینه‌ای این حساب تعیین تکلیف شده‌اند.':'موردی در این بخش وجود ندارد.'}</p>`;
+
+  host.innerHTML=`<section class="shared-cp-panel no-print ${C.ambiguous?'has-attention':''}" data-scp-panel="${esc(panelId)}">
+   <div class="shared-cp-head">
+    <div>
+     <h3>${C.ambiguous?`تعیین طرف‌حساب‌های مشکوک / چندگزینه‌ای «${esc(o.a.title||o.a.pathLabel)}»`:`طرف‌حساب‌های «${esc(o.a.title||o.a.pathLabel)}»`}</h3>
+     <p>فقط اطلاعات و اسناد مربوط به همین حساب انتخابی نمایش داده شده است.</p>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+     <span class="shared-cp-pill is-ok">مشخص (کد): ${faNum(C.automatic)}</span>
+     ${C.manual?`<span class="shared-cp-pill is-manual">انتخاب کاربر: ${faNum(C.manual)}</span>`:''}
+     <span class="shared-cp-pill ${C.ambiguous?'is-warn':'is-ok'}">نیازمند انتخاب: ${faNum(C.ambiguous)}</span>
+     ${C.unresolved?`<span class="shared-cp-pill is-muted">محدودیت ساختاری: ${faNum(C.unresolved)}</span>`:''}
+     <button type="button" class="shared-cp-toggle" data-scp-toggle="1">${isOpen?'بستن ▲':'باز کردن ▼'}</button>
+    </div>
+   </div>
+   ${aiNoticeHTML}
+   ${isOpen?`<div class="shared-cp-resolved-box"><div class="shared-cp-resolved-title"><span>حساب‌های مقابل و اشخاص شناسایی‌شده در گردش این حساب</span></div><div class="shared-cp-chips">${contraChips||'<small style="color:var(--muted,#60727d)">هنوز طرف‌حساب مشخص‌شده‌ای ثبت نشده است.</small>'}${entityChips}</div></div><div class="shared-cp-tabs">${tabs.map(t=>`<button type="button" class="shared-cp-tab ${t.id===tabObj.id?'is-active':''}" data-scp-tab="${t.id}">${esc(t.label)}</button>`).join('')}</div>${tableHTML}`:''}
+  </section>`;
+
+  host.querySelector('[data-scp-toggle]')?.addEventListener('click',()=>{state.open=!isOpen;renderScopedAnalysisAccountPanel(host,o,panelId);});
+  host.querySelectorAll('[data-scp-tab]').forEach(btn=>btn.addEventListener('click',()=>{state.tab=btn.dataset.scpTab;state.showAll=false;renderScopedAnalysisAccountPanel(host,o,panelId);}));
+  host.querySelector('[data-scp-more]')?.addEventListener('click',()=>{state.showAll=true;renderScopedAnalysisAccountPanel(host,o,panelId);});
+  host.querySelector('[data-scp-refresh-nature]')?.addEventListener('click',()=>{
+   (o.A?.rows||[]).forEach(r=>SHARED_CP.dirtyRows.delete(r));anaAIRun();
+  });
+  host.querySelector('[data-scp-refresh-report]')?.addEventListener('click',()=>{
+   (o.A?.rows||[]).forEach(r=>SHARED_CP.dirtyRows.delete(r));reportRun();
+  });
+ }
+
+ function sharedMountAnalysisOutputPanel(){
+  const box=document.getElementById('anaCounterpartyBox');
+  const o=ANA.out&&ANA.out[ANA.active];
+  if(!box||!o)return;
+  renderScopedAnalysisAccountPanel(box,o,'analysis-a5-'+ANA.active);
+ }
+
+ renderAnalysisOutput=function(){
+  baseRenderAnalysisOutput();
+  const el=document.getElementById('anaOutput');
+  const aiBox=document.getElementById('anaAIBox');
+  if(!el||!aiBox||!ANA.out.length)return;
+  let cpBox=document.getElementById('anaCounterpartyBox');
+  if(!cpBox){
+   cpBox=document.createElement('div');
+   cpBox.id='anaCounterpartyBox';
+   cpBox.className='no-print';
+   aiBox.parentElement.insertBefore(cpBox,aiBox);
+  }
+  sharedMountAnalysisOutputPanel();
+ };
+
+ anaAIRun=async function(...args){
+  const o=ANA.out&&ANA.out[ANA.active];
+  if(o?.A?.rows)o.A.rows.forEach(r=>SHARED_CP.dirtyRows.delete(r));
+  const res=await baseAnaAIRun(...args);
+  sharedMountAnalysisOutputPanel();
+  return res;
+ };
+
+ reportRun=async function(...args){
+  const o=ANA.out&&ANA.out[ANA.active];
+  if(o?.A?.rows)o.A.rows.forEach(r=>SHARED_CP.dirtyRows.delete(r));
+  const res=await baseReportRun(...args);
+  sharedMountAnalysisOutputPanel();
+  return res;
+ };
+
+ reportOpenReference=function(ref){
+  SHARED_CP.lastEvidenceRef=ref;
+  baseReportOpenReference(ref);
+  const o=ANA.out&&ANA.out[ANA.active];
+  const dialog=document.getElementById('reportEvidence');
+  if(!o||!dialog)return;
+  const ctx=sharedCounterpartyEnsure();
+  if(!ctx)return;
+  const s=reportState(o),d=s.data||reportBuild(o.A);
+  const ids=ref==='S0'?[...d.rowMap.keys()]:((s.categories.find(c=>c.id===ref)||d.groups.find(c=>c.id===ref)||d.monthly.find(m=>m.id===ref)||d.top.find(m=>m.id===ref))?.rows||[]);
+  const table=dialog.querySelector('table');
+  if(!table)return;
+  const headRow=table.querySelector('thead tr');
+  if(headRow&&headRow.children.length===7){
+   const th=document.createElement('th');th.textContent='طرف حساب';
+   headRow.insertBefore(th,headRow.children[5]);
+  }
+  const bodyRows=table.querySelectorAll('tbody tr');
+  ids.slice(0,200).forEach((id,idx)=>{
+   const tr=bodyRows[idx],r=d.rowMap.get(id);
+   if(!tr||!r||tr.children.length!==7)return;
+   const td=document.createElement('td');
+   td.innerHTML=sharedCounterpartyCellHTML(r,ctx);
+   tr.insertBefore(td,tr.children[5]);
+  });
+ };
+
+ // Clean Request-Scoped Public API for Current & Future Modules
+ window.SharedCounterparty={
+  isReady:()=>!!(SHARED_CP.ctx&&SHARED_CP.ctx.source===FULL_ROWS&&Array.isArray(FULL_ROWS)&&FULL_ROWS.length),
+  precompute:sharedCounterpartyPrecompute,
+  ensure:sharedCounterpartyEnsure,
+  setConfig:(cfg={})=>{
+   if(typeof cfg.tolerance==='number'&&cfg.tolerance>=0)SHARED_CP.config.tolerance=cfg.tolerance;
+   if(Array.isArray(FULL_ROWS)&&FULL_ROWS.length)sharedCounterpartyPrecompute(FULL_ROWS);
+  },
+  getConfig:()=>({...SHARED_CP.config}),
+  getContext:()=>sharedCounterpartyEnsure(),
+  getLedgerStats:()=>sharedCounterpartyEnsure()?.ledgerStats||null,
+  getRowModel:(row)=>cpWorksheetModel(row,sharedCounterpartyEnsure()),
+  getAccountPackage:sharedCounterpartyGetAccountPackage,
+  analyzeRows:sharedCounterpartyAnalyzeRows,
+  renderCell:sharedCounterpartyCellHTML,
+  openChooser:(row)=>{const ctx=sharedCounterpartyEnsure();if(ctx&&row)cpWorksheetOpen(row,ctx);},
+  exportAuditorMemory:()=>JSON.parse(JSON.stringify(SHARED_CP.memory)),
+  importAuditorMemory:(data)=>{
+   if(data&&typeof data==='object'&&data.companies){
+    SHARED_CP.memory=data;saveAuditorMemory();
+    if(Array.isArray(FULL_ROWS)&&FULL_ROWS.length)sharedCounterpartyPrecompute(FULL_ROWS);
+   }
+  },
+  clearAuditorMemory:()=>{
+   SHARED_CP.memory={version:1,companies:{}};saveAuditorMemory();
+   if(Array.isArray(FULL_ROWS)&&FULL_ROWS.length)sharedCounterpartyPrecompute(FULL_ROWS);
+  },
+  onChange:(fn)=>{if(typeof fn==='function'){SHARED_CP.listeners.add(fn);return ()=>SHARED_CP.listeners.delete(fn);}return ()=>{};}
+ };
+})();
+// <<<SHARED-COUNTERPARTY-END>>>
 </script>
 <script>(()=>{
  const meta=document.getElementById('projectMeta'),next=document.getElementById('metaContinue');
