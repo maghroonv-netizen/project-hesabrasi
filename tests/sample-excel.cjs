@@ -1,0 +1,22 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const os=require('node:os'),path=require('node:path');
+const html=fs.readFileSync('audit-google-auto.html','utf8');
+const lib=html.match(/<script data-exceljs-embedded>\s*([\s\S]*?)<\/script>/);assert(lib);
+const libPath=path.join(os.tmpdir(),'hesabrasi-exceljs-test.cjs');fs.writeFileSync(libPath,lib[1]);const ExcelJS=require(libPath);
+const source=fs.readFileSync('sample-excel-export.js','utf8');assert(html.includes(source));
+const row1={'شرح سند':'بابت فروش','شرح ردیف':'', 'بدهکار':100,'بستانکار':0,'تاریخ':'1404/01/01','نوع سند':'جاری'};
+const row2={'شرح سند':'وصول','شرح ردیف':'واریز وجه','بدهکار':0,'بستانکار':30,'تاریخ':'1404/01/02','نوع سند':'جاری'};
+const op={'بدهکار':20,'بستانکار':0,'نوع سند':'ابتدای سال'};
+const box={ExcelJS,SHEET_CFG:{ctrl:1,company:'نمونه',year:'1404',prep:'تهیه',rev:'بررسی'},samplePrintLayout:()=>({orientation:'portrait'}),cpWorksheetContext:()=>({}),cpWorksheetModel:r=>({names:r===row1?['درآمد','مالیات']:['بانک'],kind:'automatic'}),parseAmount:v=>Number(v||0),rowsForWorksheetAccount:()=>[op,row1,row2]};
+vm.createContext(box);vm.runInContext(source,box);
+(async()=>{for(const count of [1,10]){
+ box.SHEET_CFG.ctrl=count;
+ const wb=await box.sampleBuildExcel({keyPath:['11|دارایی','1101|نقد']},[{doc:'45',rows:[row1,row2]}]);
+ const data=await wb.xlsx.writeBuffer();const copy=new ExcelJS.Workbook();await copy.xlsx.load(data);const ws=copy.worksheets[0];
+ assert(ws.getCell('A2').value.includes('دارایی (11) ← نقد (1101)'));
+ assert.equal(ws.getCell('E6').value,'درآمد /\nمالیات /');assert.equal(ws.getCell('E7').value,'بانک');
+ assert.equal(ws.getCell('G6').value,100);assert.equal(ws.getCell('H7').value,30);
+ assert.equal(ws.getCell('G8').value.result,100);assert.equal(ws.getCell('H8').value.result,30);
+ assert.equal(ws.getCell('E16').value.result,90);assert(ws.headerFooter.oddFooter.includes('&P'));
+ assert.equal(ws.pageSetup.orientation,'portrait');
+ }console.log('Editable XLSX round-trip tests passed');})().catch(e=>{console.error(e);process.exit(1)});
