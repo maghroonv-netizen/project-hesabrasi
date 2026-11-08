@@ -1699,13 +1699,13 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
 <script>
 const EXPECTED = [
-  "شماره سند","تاریخ","شرح سند","شرح ردیف","بدهکار","بستانکار",
+  "شماره سند","ردیف سند","تاریخ","شرح سند","شرح ردیف","بدهکار","بستانکار",
   "کد حساب کل","عنوان حساب کل","کد حساب معین","عنوان حساب معین",
   "کد حساب تفصیلی","عنوان حساب تفصیلی",
   "کد تفصیلی یک","عنوان تفصیلی یک","کد تفصیلی دو","عنوان تفصیلی دو"
 ];
 const OPTIONAL = new Set([
-  "کد تفصیلی یک","عنوان تفصیلی یک","کد تفصیلی دو","عنوان تفصیلی دو"
+  "ردیف سند","کد تفصیلی یک","عنوان تفصیلی یک","کد تفصیلی دو","عنوان تفصیلی دو"
 ]);
 
 const drop = document.getElementById('drop');
@@ -2353,9 +2353,15 @@ let TYPE_OVERRIDES = new Map();
 function bestGuesses(headers){
   // for each expected field, find header with highest similarity
   return EXPECTED.map(col=>{
+    // Avoid guessing the optional voucher sequence from an unrelated description
+    // or voucher-number column. Users can explicitly select another header.
+    if(col==='ردیف سند'){
+      const idx=headers.findIndex(h=>norm(h)==='ردیف سند');
+      return {idx,score:idx<0?0:1};
+    }
     let bestIdx = -1, bestScore = 0;
     headers.forEach((h,i)=>{
-      if(!h) return;
+      if(!h || norm(h)==='ردیف سند') return;
       const s = similarity(col, h);
       if(s > bestScore){ bestScore = s; bestIdx = i; }
     });
@@ -2478,6 +2484,9 @@ function confirmMapping(){
   if(missingRequired.length){
     previewArea.innerHTML = `<div class="card"><div class="err">این فیلدهای الزامی هنوز نگاشت نشده‌اند: ${missingRequired.join('، ')}</div></div>`;
     return;
+  }
+  if(mapping['ردیف سند']>=0&&Object.entries(mapping).some(([field,index])=>field!=='ردیف سند'&&index===mapping['ردیف سند'])){
+    previewArea.innerHTML = '<div class="card"><div class="err">ستون ردیف سند را جدا از سایر فیلدها انتخاب کنید.</div></div>';return;
   }
   previewArea.innerHTML = '';
 
@@ -6028,6 +6037,32 @@ function cpLabAccount(r){
  if(path.length)return path.join(' ← ');
  return ['عنوان حساب کل','عنوان حساب معین','عنوان حساب تفصیلی','نام حساب'].map(k=>String(r[k]??'').trim()).filter(Boolean).join(' ← ')||'عنوان حساب ارائه نشده';
 }
+// Voucher line order is an optional grouping clue, not proof of a transaction.
+// Refuse partial/duplicate sequences or unbalanced/invalid documents. A minimal
+// balanced consecutive block narrows candidates; many-to-many remains ambiguous.
+function cpVoucherOrderBlocks(summary){
+ if(!summary?.valid||!summary.balanced||summary.rows.length<2)return null;
+ const ordered=[];
+ for(const r of summary.rows){
+  const text=cpLabText(r['ردیف سند']);
+  if(!/^\d+$/.test(text))return null;
+  const n=Number(text);if(!Number.isSafeInteger(n)||n<1)return null;
+  const x=summary.amounts.get(r);if(!x||(x.d===0&&x.c===0))return null;
+  ordered.push({n,r,x});
+ }
+ ordered.sort((a,b)=>a.n-b.n);
+ if(ordered.some((item,i)=>item.n!==i+1))return null;
+ const blocks=new Map();let pending=[],d=0,c=0;
+ for(const item of ordered){
+  pending.push(item.r);d+=item.x.d;c+=item.x.c;
+  if(d>0&&c>0&&Math.abs(d-c)<=0.01){
+   const debit=pending.filter(r=>summary.amounts.get(r).d>0),credit=pending.filter(r=>summary.amounts.get(r).c>0);
+   const block={rows:pending,debit,credit};for(const r of pending)blocks.set(r,block);
+   pending=[];d=0;c=0;
+  }
+ }
+ return pending.length?null:blocks;
+}
 function cpLabExamine(row,ctx){
  const result={row,id:ctx.rowIds.get(row)||'نامشخص',status:'unresolved',label:'تعیین نشد',reason:'',counterpart:[],document:[],debit:null,credit:null,completeness:'unknown',direct:false,location:ctx.meta?.locations.get(row)||null};
  if(!ctx.rowIds.has(row)){result.reason='ردیف نمونه به ردیف اصلیِ دادهٔ بارگذاری‌شده متصل نیست.';return result;}
@@ -6037,6 +6072,17 @@ function cpLabExamine(row,ctx){
  result.debit=s.d;result.credit=s.c;
  if(!s.balanced){result.reason='گروه سند در دادهٔ بارگذاری‌شده متوازن نیست؛ استنتاج ساختاری متوقف شد.';return result;}
  const own=s.amounts.get(row);if(!own||own.d===0&&own.c===0){result.reason='ردیف نمونه مبلغ ندارد؛ رابطه مستقیم تعیین نشد.';return result;}
+ if(!ctx.voucherOrderBlocks)ctx.voucherOrderBlocks=new Map();
+ if(!ctx.voucherOrderBlocks.has(key))ctx.voucherOrderBlocks.set(key,cpVoucherOrderBlocks(s));
+ const block=ctx.voucherOrderBlocks.get(key)?.get(row);
+ if(block){
+  result.counterpart=own.d>0?block.credit:block.debit;
+  result.orderHint=true;
+  result.status=block.debit.length===1&&block.credit.length===1?'simple':block.debit.length===1||block.credit.length===1?'aggregate':'compound';
+  result.label='گروه متوازن بر اساس ترتیب ردیف سند';
+  result.reason='طرف‌های سمت مخالف در گروه پیاپی متوازن با استفاده از ردیف سند پیشنهاد شده‌اند؛ ترتیب و توازن به‌تنهایی ارتباط قطعی یا کامل‌بودن سند را اثبات نمی‌کند.';
+  return result;
+ }
  result.counterpart=own.d>0?s.credit:s.debit;
  if(s.debit.length===1&&s.credit.length===1){result.status='simple';result.label='دو ردیف متقابل مشاهده‌شده؛ کامل‌بودن نامعلوم';result.reason='در داده موجود، دو ردیف مبلغ‌دار در دو سمت و توازن مشاهده شد. این فقط ساختار مشاهده‌شده است؛ مقابل قطعی کل سند، معامله یا تسویه تأیید نشده است.';}
  else if(s.debit.length===1||s.credit.length===1){result.status='aggregate';result.label='مجموعه مقابل مشاهده‌شده؛ ساختار یک‌به‌چند';result.reason='مبالغ هر ردیف همان مقادیر ثبت‌شده‌اند. کامل‌بودن مجموعه تأیید نشده و تخصیص تجاری یا تسویه‌ای استنتاج نشده است.';}
@@ -6301,7 +6347,7 @@ function cpWorksheetModel(row,ctx){
  if(!ctx.wsGroups)ctx.wsGroups=new Map();if(!ctx.wsSignatures)ctx.wsSignatures=new Map();
  if(!ctx.wsGroups.has(evidence.counterpart))ctx.wsGroups.set(evidence.counterpart,cpWorksheetGroups(evidence.counterpart,ctx));
  const groups=ctx.wsGroups.get(evidence.counterpart);
- if(!ctx.wsSignatures.has(evidence.document))ctx.wsSignatures.set(evidence.document,JSON.stringify(evidence.document.map(r=>[ctx.rowIds.get(r),cpWorksheetAccountKey(r,ctx),String(r['بدهکار']??''),String(r['بستانکار']??''),String(r['شرح سند']??''),String(r['شرح ردیف']??'')])));
+ if(!ctx.wsSignatures.has(evidence.document))ctx.wsSignatures.set(evidence.document,JSON.stringify(evidence.document.map(r=>[ctx.rowIds.get(r),cpWorksheetAccountKey(r,ctx),String(r['بدهکار']??''),String(r['بستانکار']??''),String(r['شرح سند']??''),String(r['شرح ردیف']??''),String(r['ردیف سند']??'')])));
  const signature=JSON.stringify([ctx.key(row),evidence.status,ctx.wsSignatures.get(evidence.document)]);
  const result={row,evidence,groups,signature,kind:'unresolved',names:[],badge:'تعیین نشد',reason:evidence.reason,decision:null};
  if(evidence.status==='unresolved'||!groups.length)return result;
@@ -6316,7 +6362,7 @@ function cpWorksheetModel(row,ctx){
  }
  if(evidence.status==='compound'&&groups.length>1){result.kind='ambiguous';result.badge='نیازمند انتخاب';return result;}
  result.kind='automatic';result.names=groups.map(g=>g.name);
- result.badge=evidence.status==='simple'?'ساختاری در داده موجود':evidence.status==='aggregate'?'مقابل تجمیعی در داده موجود':'حساب مشترک سمت مقابل؛ پیوند ردیفی نامعلوم';
+ result.badge=evidence.orderHint?'پیشنهاد بر اساس ترتیب ردیف سند':evidence.status==='simple'?'ساختاری در داده موجود':evidence.status==='aggregate'?'مقابل تجمیعی در داده موجود':'حساب مشترک سمت مقابل؛ پیوند ردیفی نامعلوم';
  return result;
 }
 function cpWorksheetCell(row,ctx){
