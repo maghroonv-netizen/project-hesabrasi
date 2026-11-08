@@ -1,0 +1,20 @@
+// Offline regression tests of the actual functions embedded in the app.
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const html = fs.readFileSync('audit-google-auto.html', 'utf8');
+const start = html.indexOf('function adNatureExtract(raw){');
+const end = html.indexOf('function adClassifyGroups(', start);
+assert(start >= 0 && end > start);
+const sandbox = {window: {}};
+vm.createContext(sandbox);
+vm.runInContext(html.slice(start, end), sandbox);
+const reject = (text, expected) => assert.throws(() => sandbox.adNatureText(text, 'receivable'), e => e.message.includes(expected));
+reject('حسب بررسی‌های به عمل آمده، طی دوره فروش میلگرد مطالبات واحد افزایش یافته و طرف‌حساب آن موجودی نقد و بانک بوده است.', 'بانکی');
+reject('حسب بررسی‌های به عمل آمده، واریز وجه نقد از مشتری باعث افزایش مطالبات واحد شده است.', 'دریافت وجه');
+reject('حسب بررسی‌های به عمل آمده، استرداد چک و تسویه مانده بدهی ثبت شده که طرف حساب آنها حساب‌های پرداختنی است.', 'استرداد چک');
+reject('حسب بررسی‌های به عمل آمده، فروش به مبلغ ۲۰۰۰ ریال ثبت شده است.', 'عدد');
+const valid = 'حسب بررسی‌های به عمل آمده، این حساب مطالبات واحد از مشتری بابت فروش میلگرد را نشان می‌دهد. طی دوره فروش موجب ایجاد مطالبات شده و دریافت وجه مشتری نیز در گردش حساب ثبت شده است.';
+assert.equal(sandbox.adNatureText(valid, 'receivable'), valid);
+assert.equal(sandbox.adNatureText('__NO_SUPPORTED_NATURE__', 'receivable'), '__NO_SUPPORTED_NATURE__');
+console.log('Nature regression tests passed');
