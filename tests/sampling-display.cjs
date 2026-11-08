@@ -15,5 +15,8 @@ let cell=box.cpWorksheetCell({}, {rowIds:new Map(),wsToken:0});assert.equal((cel
 box.cpWorksheetModel=()=>({names:['اول'],kind:'automatic',badge:'پیشنهاد'});
 cell=box.cpWorksheetCell({}, {rowIds:new Map(),wsToken:0});assert(!cell.includes('cp-path-end'));
 assert(html.includes("p.querySelector('.sample-page-number').textContent='صفحه '+faNum(i+1)+' از '+faNum(pages.length)"));
-assert(html.includes("['.cp-txt',9,4.2,9]"));
+assert(html.includes("['.cp-txt',11,4.2,11]"));
+const printSheet=part('function printSheet(host){','// ===================== مرحله ششم');
+assert(printSheet.includes("window.addEventListener('afterprint',restore)"));
+assert(!printSheet.includes('finally{restore();}'));
 console.log('Sampling display tests passed');

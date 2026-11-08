@@ -1474,7 +1474,7 @@
 #cpWorksheetDialog .cp-resolved-account>span{font-size:12px;color:#56717e;white-space:nowrap}
 @media(max-width:480px){#cpWorksheetDialog{padding:14px;width:calc(100vw - 20px)}#cpWorksheetDialog header b{font-size:14px}#cpWorksheetDialog .cp-entry-main>strong{max-width:65%}#cpWorksheetDialog .cp-entry-amount b{font-size:16px}#cpWorksheetDialog .cp-ws-option{padding:10px}#cpWorksheetDialog .cp-basket-title{font-size:12px}}
 
-.sheet .cp-ws-result .cp-txt{font-size:9px;line-height:1.55}
+.sheet .cp-ws-result .cp-txt{font-size:11px;line-height:1.55}
 
 /* v9.5: one-line dates and accounting-only print content. */
 .sheet table.main td.sample-date{white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important;direction:ltr;text-align:center;padding-inline:2px}
@@ -1524,7 +1524,7 @@
 .sampling-template .sample-desc-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
 .sampling-template .sub{font-size:10.5px;color:var(--sample-mute);margin:2px 0 0;line-height:1.75}
 .sampling-template td.cp{text-align:right;font-size:10.5px;line-height:1.7}
-.sampling-template .cp .cp-txt{line-height:1.7;font-size:9px}
+.sampling-template .cp .cp-txt{line-height:1.7;font-size:11px}
 .sampling-template .cp .p{margin-bottom:3px}
 .sampling-template td.ctl{padding:0}
 .sampling-template .box{display:inline-block;width:var(--sample-box,12px);height:var(--sample-box,12px);border:1px solid #bfa860;border-radius:3px;background:#fff;padding:0;margin:0;min-height:0}
@@ -1561,7 +1561,7 @@
 .sampling-template.sample-print-page .sample-page-footer td{border-bottom:0;background:var(--sample-gold2)!important;font-weight:bold}
 .sampling-template.sample-print-page .sample-page-footer .lbl,.sampling-template .sample-brought-forward .lbl{text-align:right;padding-right:14px;color:#5a4300}
 .sampling-template.sample-print-page .sample-recap{flex:0 0 auto}
-.sampling-template.sample-print-page .sample-page-number{flex:0 0 auto;margin-top:auto;padding:3px 0 0;text-align:center;font-size:10px;font-weight:700;color:var(--sample-red);line-height:1.4;direction:rtl}
+.sampling-template.sample-print-page .sample-page-number{flex:0 0 auto;margin-top:auto;padding:4px 0 2px;text-align:center;font-size:12px;font-weight:700;color:#222;line-height:1.5;direction:rtl}
 .sampling-template .sample-brought-forward td{background:#fff2cc!important;font-weight:bold}
 
 .sampling-template.sample-print-page .sample-page-footer tr.total td{border-top:0}
@@ -3126,7 +3126,7 @@ function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function shrinkDesc(root){
   // [انتخابگر، اندازه‌ی اولیه، سقف ارتفاع بر حسب «خط»، کمینه‌ی مجاز]
   // شرح و طرف حساب هر دو از ۱۰ پیکسل شروع می‌شوند و متناسب با طولشان کوچک می‌شوند.
-  const rules=[['.desc-txt',10,3.6,6.5], ['.cp-txt',9,4.2,9]];
+  const rules=[['.desc-txt',10,3.6,6.5], ['.cp-txt',11,4.2,11]];
   rules.forEach(r=>{
     const [sel,top,lim,min]=r;
     root.querySelectorAll(sel).forEach(el=>{
@@ -3190,7 +3190,7 @@ function printSheet(host){
 // <<<SAMPLE-TEMPLATE-PRINT-END>>>
 
   document.title='';window.addEventListener('afterprint',restore);window.print();
-  }catch(error){window.alert(error.message||'چاپ انجام نشد؛ هیچ اطلاعاتی حذف نشد.');}finally{restore();}
+  }catch(error){restore();window.alert(error.message||'چاپ انجام نشد؛ هیچ اطلاعاتی حذف نشد.');}
 }
 
 // ===================== مرحله ششم — کاربرگ خروجی =====================
