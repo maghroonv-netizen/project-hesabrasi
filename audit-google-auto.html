@@ -4099,14 +4099,14 @@ function readWorkbookRows(file){
         // بهترین برگه: بیشترین تطبیق سرستون با ستون‌های فایل جاری
         let best=wb.SheetNames[0], bestScore=-1;
         for(const name of wb.SheetNames){
-          const raw=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:'',raw:false});
+          const raw=auditExtractSheetRows(wb.Sheets[name],{maxRows:40});
           if(!raw.length) continue;
           const h=(raw[0]||[]).map(norm);
           let sc=0;
           currentHeaders.forEach(ch=>{ if(h.some(x=>x===ch)) sc++; });
           if(sc>bestScore){ bestScore=sc; best=name; }
         }
-        const raw=XLSX.utils.sheet_to_json(wb.Sheets[best],{header:1,defval:'',raw:false});
+        const raw=auditExtractSheetRows(wb.Sheets[best]);
         if(!raw.length) return [];
         const h=raw[0].map(norm);
         const idxOf=ch=>h.indexOf(ch);
@@ -7466,12 +7466,15 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  const catalogURL=AI_ENDPOINT.replace(/\/chat\/completions$/,'/models');
  const notify=text=>{const el=document.getElementById('adaptiveCapacityStatus');if(el)el.textContent=text;};
  const describe=p=>p?'مدل: '+p.model+' | ظرفیت زمینه: '+(p.contextTokens??'نامشخص')+' توکن | سقف کاراکتر دستی: '+(p.charLimit??'ندارد')+' | '+(p.source==='provider_catalog'?'اطلاعات اعلام‌شدهٔ سرویس؛ اعتبار کلید/مسیر واقعی هنوز آزمایش نشده':'حد اعلام‌شدهٔ شما؛ تأیید سرویس نیست')+' | شمارش ورودی: برآورد محافظه‌کارانهٔ بایت UTF-8، نه توکنایزر دقیق.':'ظرفیت مدل نامشخص است؛ بدون اطلاعات معتبر یا حد دستی، درخواست پولی ارسال نمی‌شود.';
+ const cleanTok=v=>String(v==null?'':v).replace(/[^\x20-\x7E]+/g,'').trim().replace(/^Bearer\s+/i,'').replace(/[^\x21-\x7E]/g,'');
  async function discover(force=false){
-  if(!ROUTER_KEY){AD.controller?.abort();AD.serial++;AD.profile=null;AD.promise=null;credential='';model='';notify(describe(null));return null;}
-  if(!force&&credential===ROUTER_KEY&&model===ROUTER_MODEL&&provider===AD_PROVIDER){if(AD.promise)return AD.promise;if(AD.profile&&(AD.profile.source!=='provider_catalog'||Date.now()-Date.parse(AD.profile.retrievedAt)<900000))return AD.profile;}
-  AD.controller?.abort();const serial=++AD.serial,key=ROUTER_KEY,id=ROUTER_MODEL;credential=key;model=id;provider=AD_PROVIDER;AD.profile=null;AD.lastError='';const chosenProvider=AD_PROVIDER;
+  const cleanRouterKey=cleanTok(ROUTER_KEY);
+  const cleanRouterModel=cleanTok(ROUTER_MODEL);
+  if(!cleanRouterKey){AD.controller?.abort();AD.serial++;AD.profile=null;AD.promise=null;credential='';model='';notify(describe(null));return null;}
+  if(!force&&credential===cleanRouterKey&&model===cleanRouterModel&&provider===AD_PROVIDER){if(AD.promise)return AD.promise;if(AD.profile&&(AD.profile.source!=='provider_catalog'||Date.now()-Date.parse(AD.profile.retrievedAt)<900000))return AD.profile;}
+  AD.controller?.abort();const serial=++AD.serial,key=cleanRouterKey,id=cleanRouterModel;credential=key;model=id;provider=AD_PROVIDER;AD.profile=null;AD.lastError='';const chosenProvider=AD_PROVIDER;
   const controller=new AbortController();AD.controller=controller;notify('در حال خواندن ظرفیت مدل از فهرست سرویس؛ بدون ارسال دفتر یا درخواست تولید متن؛ در اتصال گوگل، کلید فقط به گوگل ارسال می‌شود…');
-  AD.promise=(async()=>{const timer=setTimeout(()=>controller.abort(),(window.HesabrasiAI&&HesabrasiAI.hasReady()?8000:10000));try{
+  AD.promise=(async()=>{const timer=setTimeout(()=>controller.abort(),15000);try{
    let catalog=null;
    if(chosenProvider!=='google'&&window.HesabrasiAI&&typeof HesabrasiAI.getCachedCatalog==='function'){catalog=HesabrasiAI.getCachedCatalog(chosenProvider);}
    if(!catalog){
@@ -7481,7 +7484,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
     const response=await fetch(url,{method:'GET',headers:extraHeaders,credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal});if(!response.ok)throw Error('دریافت ظرفیت از سرویس: HTTP '+response.status);catalog=await response.json();
     if(chosenProvider!=='google'&&window.HesabrasiAI&&typeof HesabrasiAI.storeCachedCatalog==='function')HesabrasiAI.storeCachedCatalog(chosenProvider,catalog);
    }
-   if(serial!==AD.serial||key!==ROUTER_KEY||id!==ROUTER_MODEL||chosenProvider!==AD_PROVIDER)return null;
+   if(serial!==AD.serial||key!==cleanTok(ROUTER_KEY)||id!==cleanTok(ROUTER_MODEL)||chosenProvider!==AD_PROVIDER)return null;
    AD.profile=Object.freeze(chosenProvider==='google'?adGoogleProfile(catalog,id):adCatalogProfile(catalog,id));notify(describe(AD.profile));return AD.profile;
   }catch(error){if(serial===AD.serial)AD.lastError=error.name==='AbortError'?'مهلت دریافت ظرفیت تمام شد.':String(error.message).split(key).join('[کلید حذف شد]');if(serial===AD.serial)notify(describe(null)+' '+(error.name==='AbortError'?'مهلت دریافت فهرست تمام شد.':'دریافت ظرفیت موفق نبود: '+AD.lastError+''));return null;}
   finally{clearTimeout(timer);if(serial===AD.serial)AD.promise=null;}})();return AD.promise;
@@ -7507,6 +7510,50 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
   if(!await approve(plan,p,title))throw Error('عملیات لغو شد؛ هیچ درخواست این عملیات ارسال نشد.');
   return {plan,stamp:s,current,used:0,spent:0};
  }
+ async function readWireBody(response){
+  const ct=String((response&&response.headers&&typeof response.headers.get==='function'&&response.headers.get('content-type'))||'').toLowerCase();
+  if(!response.ok||!ct.includes('text/event-stream')||!response.body||typeof response.body.getReader!=='function'){
+   try{return await response.json();}catch{return {};}
+  }
+  const reader=response.body.getReader(),decoder=new TextDecoder('utf-8');
+  let buf='',fullText='',finishReason=null,usage=null,streamErr=null,finished=false;
+  const handleLine=line=>{
+   const trimmed=line.trim();
+   if(!trimmed||trimmed.startsWith(':')||!trimmed.startsWith('data:'))return false;
+   const payloadStr=trimmed.slice(5).trim();
+   if(payloadStr==='[DONE]')return true;
+   try{
+    const chunk=JSON.parse(payloadStr);
+    if(chunk&&chunk.error){streamErr=chunk.error;return true;}
+    const ch=chunk&&Array.isArray(chunk.choices)?chunk.choices[0]:null;
+    if(ch){
+     const delta=ch.delta&&typeof ch.delta.content==='string'?ch.delta.content:(ch.message&&typeof ch.message.content==='string'?ch.message.content:'');
+     if(delta)fullText+=delta;
+     if(ch.finish_reason)finishReason=ch.finish_reason;
+    }
+    if(chunk&&chunk.usage)usage=chunk.usage;
+   }catch{}
+   return false;
+  };
+  while(!finished&&!streamErr){
+   let step;
+   try{step=await reader.read();}catch(readErr){
+    if(finishReason==='stop'&&fullText.trim())break;
+    throw readErr;
+   }
+   const {value,done}=step;
+   if(done){buf+=decoder.decode();break;}
+   buf+=decoder.decode(value,{stream:true});
+   let nl;
+   while((nl=buf.indexOf('\n'))>=0){
+    const line=buf.slice(0,nl);buf=buf.slice(nl+1);
+    if(handleLine(line)){finished=true;try{await reader.cancel();}catch{}buf='';break;}
+   }
+  }
+  if(!finished&&buf.trim())buf.split('\n').forEach(handleLine);
+  if(streamErr)return {error:streamErr};
+  return {choices:[{finish_reason:finishReason||'stop',message:{content:fullText}}],usage};
+ }
  async function wire(job,p,s,meta,current,operation){
   if(!fresh(s,current))throw Error('مدل، کلید، ظرفیت یا داده تغییر کرده؛ درخواست بعدی ارسال نشد.');
   if(!adFits(p,job.messages,job.output))throw Error('بستهٔ واقعی در ظرفیت برنامه‌ریزی‌شده جا نشد؛ بدون برش یا درخواست اضافی متوقف شد.');
@@ -7514,33 +7561,63 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
   const entry=typeof usageStart==='function'?usageStart(job.messages,meta):null;if(entry){entry.adaptiveRate={input:p.inputPrice,output:p.outputPrice,source:p.source,at:p.retrievedAt};usageSave();}
   const attempts=(window.HesabrasiAI&&typeof HesabrasiAI.readySlots==='function'&&HesabrasiAI.readySlots().length)?HesabrasiAI.readySlots().map(slot=>HesabrasiAI.stampFrom(slot,s)):[s];
   let lastFail=null,data=null,status='network_unknown',traceRequest=null,completed=false;
-  const perMs=(attempts.length>1)?Math.min(AI_TIMEOUT_MS,25000):AI_TIMEOUT_MS;
+  const perMs=(attempts.length>1)?Math.min(AI_TIMEOUT_MS,75000):AI_TIMEOUT_MS;
   for(let i=0;i<attempts.length;i++){
     const sx=attempts[i];
     if(window.HesabrasiAI&&sx.slotId&&HesabrasiAI.isCool(sx.slotId)&&attempts.some((a,idx)=>idx>i&&!(a.slotId&&HesabrasiAI.isCool(a.slotId)))) continue;
+    const cleanKey=cleanTok(sx.key);
+    const cleanModel=cleanTok(sx.model);
+    const sxClean={...sx,key:cleanKey,model:cleanModel};
     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),perMs);
+    const startedAt=Date.now();
     try{
-      const isReason=!!(p.thinking||adIsReasoningModel(sx.model));
-      let payload={model:sx.model,messages:job.messages};const field=p.parameters.includes('max_completion_tokens')&&!p.parameters.includes('max_tokens')?'max_completion_tokens':'max_tokens';payload[field]=job.output;
+      const isReason=!!(p.thinking||adIsReasoningModel(sxClean.model));
+      const gemini=window.HesabrasiAI?HesabrasiAI.isGemini(sxClean):sxClean.provider==='google';
+      const anthropic=!!(window.HesabrasiAI&&HesabrasiAI.isAnthropic(sxClean));
+      const useStream=!gemini&&!anthropic&&(sxClean.slotId==='open_router'||sxClean.provider==='open_router');
+      let payload={model:sxClean.model,messages:job.messages};const field=p.parameters.includes('max_completion_tokens')&&!p.parameters.includes('max_tokens')?'max_completion_tokens':'max_tokens';payload[field]=job.output;
       if(p.parameters.includes('temperature')&&!isReason)payload.temperature=.2;
-      if(isReason&&(sx.slotId==='open_router'||p.parameters.includes('reasoning'))){const eff=(sx.extra&&sx.extra.reasoningEffort)||'medium';if(eff&&eff!=='auto')payload.reasoning={effort:eff};}
-      else if(isReason&&sx.slotId==='openai_api'){const eff=(sx.extra&&sx.extra.reasoningEffort)||'medium';if(eff&&eff!=='auto')payload.reasoning_effort=eff;}
-      const gemini=window.HesabrasiAI?HesabrasiAI.isGemini(sx):sx.provider==='google';
+      if(isReason&&(sxClean.slotId==='open_router'||sxClean.provider==='open_router'||p.parameters.includes('reasoning'))){const eff=(sxClean.extra&&sxClean.extra.reasoningEffort)||'low';if(eff&&eff!=='auto')payload.reasoning={effort:eff};}
+      else if(isReason&&sxClean.slotId==='openai_api'){const eff=(sxClean.extra&&sxClean.extra.reasoningEffort)||'low';if(eff&&eff!=='auto')payload.reasoning_effort=eff;}
+      if(useStream){payload.stream=true;payload.stream_options={include_usage:true};}
       if(gemini)payload=adGooglePayload(job.messages,job.output);
-      else if(window.HesabrasiAI&&HesabrasiAI.isAnthropic(sx))payload=HesabrasiAI.anthropicPayload(job.messages,job.output,sx.model);
-      const requestJSON=JSON.stringify(payload);if(operation?.trace){traceRequest={index:operation.trace.requests.length+1,at:new Date().toISOString(),purpose:meta.purpose,provider:sx.provider,model:sx.model,requestJSON:requestJSON.split(sx.key).join('[کلید حذف شد]'),status:'attempted_not_delivery_proven'};operation.trace.requests.push(traceRequest);}
-      const url=window.HesabrasiAI?HesabrasiAI.chatUrl(sx):(gemini?AD_GOOGLE_ROOT+'models/'+adGoogleModelId(sx.model)+':generateContent':AI_ENDPOINT);
-      const headers=window.HesabrasiAI?HesabrasiAI.chatHeaders(sx):(gemini?{'Content-Type':'application/json','x-goog-api-key':sx.key}:{'Content-Type':'application/json',Authorization:'Bearer '+sx.key});
-      const response=await fetch(url,{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',headers:headers,body:requestJSON,signal:ctl.signal});try{data=await response.json();}catch{data={};}
-      if(gemini)data=adGoogleResponse(data);else if(window.HesabrasiAI&&HesabrasiAI.isAnthropic(sx))data=HesabrasiAI.anthropicResponse(data);
-      status=response.ok?'received':'HTTP '+response.status;if(traceRequest){const content=data.choices?.[0]?.message?.content;traceRequest.responseText=typeof content==='string'?content.split(sx.key).join('[کلید حذف شد]'):'';traceRequest.finishReason=data.googleFinish||data.choices?.[0]?.finish_reason||null;}
-      if(!response.ok){let message=typeof data.error?.message==='string'?data.error.message:typeof data.error==='string'?data.error:typeof data.message==='string'?data.message:'';message=String(message).split(sx.key).join('[کلید حذف شد]').replace(/ir-[A-Za-z0-9_-]+/g,'[کلید حذف شد]').slice(0,600);lastFail={ok:false,detail:'HTTP '+response.status+' — '+message+(i<attempts.length-1?'؛ سوییچ به ارائه‌دهندهٔ بعدی.':'؛ تلاش مجدد خودکار انجام نشد.'),usageId:entry?.id};if(window.HesabrasiAI&&HesabrasiAI.shouldSwitch(response.status,message)){HesabrasiAI.noteFail(sx.slotId,lastFail.detail);status='switched';continue;}completed=true;return lastFail;}
+      else if(anthropic)payload=HesabrasiAI.anthropicPayload(job.messages,job.output,sxClean.model);
+      const requestJSON=JSON.stringify(payload);if(operation?.trace){traceRequest={index:operation.trace.requests.length+1,at:new Date().toISOString(),purpose:meta.purpose,provider:sxClean.provider,model:sxClean.model,requestJSON:cleanKey?requestJSON.split(cleanKey).join('[کلید حذف شد]'):requestJSON,status:'attempted_not_delivery_proven'};operation.trace.requests.push(traceRequest);}
+      const url=window.HesabrasiAI?HesabrasiAI.chatUrl(sxClean):(gemini?AD_GOOGLE_ROOT+'models/'+adGoogleModelId(sxClean.model)+':generateContent':AI_ENDPOINT);
+      const headers=window.HesabrasiAI?HesabrasiAI.chatHeaders(sxClean):(gemini?{'Content-Type':'application/json','x-goog-api-key':cleanKey}:{'Content-Type':'application/json',Authorization:'Bearer '+cleanKey});
+      let response;
+      try{
+        response=await fetch(url,{method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',headers:headers,body:requestJSON,signal:ctl.signal});
+      }catch(firstNetErr){
+        // One safe handshake retry ONLY if connection failed in <2.5s before any HTTP response (e.g. mobile VPN wake-up blip).
+        if(firstNetErr&&firstNetErr.name!=='AbortError'&&(Date.now()-startedAt)<2500){
+          await new Promise(res=>setTimeout(res,750));
+          response=await fetch(url,{method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',headers:headers,body:requestJSON,signal:ctl.signal});
+        }else{
+          throw firstNetErr;
+        }
+      }
+      data=await readWireBody(response);
+      if(gemini)data=adGoogleResponse(data);else if(anthropic)data=HesabrasiAI.anthropicResponse(data);
+      const hasMidStreamErr=!!(response.ok&&data&&data.error);
+      status=(response.ok&&!hasMidStreamErr)?'received':'HTTP '+response.status;if(traceRequest){const content=data.choices?.[0]?.message?.content;traceRequest.responseText=typeof content==='string'?(cleanKey?content.split(cleanKey).join('[کلید حذف شد]'):content):'';traceRequest.finishReason=data.googleFinish||data.choices?.[0]?.finish_reason||null;}
+      if(!response.ok||hasMidStreamErr){let message=typeof data.error?.message==='string'?data.error.message:typeof data.error==='string'?data.error:typeof data.message==='string'?data.message:'';message=String(message);if(cleanKey)message=message.split(cleanKey).join('[کلید حذف شد]');message=message.replace(/ir-[A-Za-z0-9_-]+/g,'[کلید حذف شد]').slice(0,600);const codeLabel=hasMidStreamErr?'خطای سرویس در جریان پاسخ':'HTTP '+response.status;lastFail={ok:false,detail:codeLabel+' — '+message+(i<attempts.length-1?'؛ سوییچ به ارائه‌دهندهٔ بعدی.':'؛ تلاش مجدد خودکار انجام نشد.'),usageId:entry?.id};if(window.HesabrasiDebug)HesabrasiDebug.log('wire_http_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,status:response.status,error:lastFail.detail});if(window.HesabrasiAI&&HesabrasiAI.shouldSwitch(hasMidStreamErr?502:response.status,message)){HesabrasiAI.noteFail(sxClean.slotId,lastFail.detail);status='switched';continue;}completed=true;return lastFail;}
       if(data.choices?.[0]?.finish_reason==='length'){status='truncated';completed=true;return {ok:false,detail:'پاسخ ناقص به سقف خروجی رسید؛ '+(traceRequest?'درخواست '+traceRequest.index+' — ':'')+(meta.purpose==='nature-notes'?'یادداشت میانی ماهیت':meta.purpose==='nature'?'نگارش نهایی ماهیت':meta.purpose==='counterparty'?'بررسی طرف حساب':'دسته‌بندی')+'، سقف '+job.output+' توکن؛ بدون تلاش پولیِ مجدد متوقف شد.',usageId:entry?.id};}
       if(gemini&&data.googleFinish!=='STOP'){status='blocked_or_unfinished';completed=true;return {ok:false,detail:'گوگل پاسخ کامل قابل استفاده نداد: '+String(data.googleFinish).slice(0,80)+'؛ بدون تلاش مجدد.',usageId:entry?.id};}
-      const text=data.choices?.[0]?.message?.content;if(typeof text!=='string'||!text.trim()){status='empty_response';lastFail={ok:false,detail:'پاسخ متنی معتبر دریافت نشد.',usageId:entry?.id};if(window.HesabrasiAI&&attempts.length>1){HesabrasiAI.noteFail(sx.slotId,'empty');continue;}completed=true;return lastFail;}
+      const text=data.choices?.[0]?.message?.content;if(typeof text!=='string'||!text.trim()){status='empty_response';lastFail={ok:false,detail:'پاسخ متنی معتبر دریافت نشد.',usageId:entry?.id};if(window.HesabrasiDebug)HesabrasiDebug.log('wire_empty_response',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,raw:JSON.stringify(data||{}).slice(0,2000)});if(window.HesabrasiAI&&attempts.length>1){HesabrasiAI.noteFail(sxClean.slotId,'empty');continue;}completed=true;return lastFail;}
       if(!fresh(sx,current)){status='stale_response';completed=true;return {ok:false,detail:'پاسخ مربوط به تنظیمات/دادهٔ قبلی است؛ استفاده نشد.',usageId:entry?.id};}
-      if(window.HesabrasiAI&&sx.slotId)HesabrasiAI.noteOk(sx.slotId);completed=true;return {ok:true,text:text.trim(),usage:data.usage||null,usageId:entry?.id};
-    }catch(error){status=error.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';lastFail={ok:false,detail:error.name==='AbortError'?'مهلت درخواست تمام شد؛ مصرف احتمالی نامشخص است.':'خطای شبکه؛ تکرار پولی خودکار انجام نشد.',usageId:entry?.id};if(window.HesabrasiAI&&sx.slotId&&i<attempts.length-1){HesabrasiAI.noteFail(sx.slotId,lastFail.detail);continue;}completed=true;return lastFail;}
+      if(window.HesabrasiAI&&sxClean.slotId)HesabrasiAI.noteOk(sxClean.slotId);completed=true;return {ok:true,text:text.trim(),usage:data.usage||null,usageId:entry?.id};
+    }catch(error){
+      const elapsedSec=Math.round((Date.now()-startedAt)/100)/10;
+      let errMsg=String((error&&(error.name?error.name+': ':'')+(error.message||error))||'Unknown network error');
+      if(cleanKey)errMsg=errMsg.split(cleanKey).join('[کلید حذف شد]');
+      status=error&&error.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';
+      const vpnHint=/openrouter\.ai/i.test(url)&&error?.name!=='AbortError'?' (اتصال مستقیم به سرور OpenRouter قطع یا مسدود شد — روشن و پایدار بودن VPN و صحت کلید API را بررسی کنید)':'';
+      lastFail={ok:false,detail:error&&error.name==='AbortError'?('مهلت درخواست پس از '+elapsedSec+' ثانیه تمام شد؛ مصرف احتمالی نامشخص است.'):('خطای شبکه پس از '+elapsedSec+' ثانیه ('+errMsg.slice(0,180)+')'+vpnHint+'؛ تکرار پولی خودکار انجام نشد.'),usageId:entry?.id};
+      if(window.HesabrasiDebug)HesabrasiDebug.log('wire_network_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,elapsedSec,url,error:errMsg});
+      if(window.HesabrasiAI&&sxClean.slotId&&i<attempts.length-1){HesabrasiAI.noteFail(sxClean.slotId,lastFail.detail);continue;}
+      completed=true;return lastFail;
+    }
     finally{clearTimeout(timer);if(traceRequest)traceRequest.status=status;if(completed&&typeof usageComplete==='function')usageComplete(entry,data,status);}
   }
   if(!completed&&typeof usageComplete==='function')usageComplete(entry,data,status);
@@ -7952,9 +8029,19 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
       lines.push('======== رویدادها ========');
       p.events.forEach(function (ev) {
         lines.push('[' + ev.at + '] ' + ev.type);
-        if (ev.data && ev.data.error) lines.push('  خطا: ' + ev.data.error);
-        if (ev.data && ev.data.raw) lines.push('  raw: ' + String(ev.data.raw).slice(0, 1500));
-        if (ev.data && ev.data.text) lines.push('  text: ' + String(ev.data.text).slice(0, 800));
+        if (ev.data) {
+          var metaParts = [];
+          if (ev.data.provider) metaParts.push('provider=' + ev.data.provider);
+          if (ev.data.model) metaParts.push('model=' + ev.data.model);
+          if (ev.data.purpose) metaParts.push('purpose=' + ev.data.purpose);
+          if (ev.data.status !== undefined) metaParts.push('status=' + ev.data.status);
+          if (ev.data.elapsedSec !== undefined) metaParts.push('elapsedSec=' + ev.data.elapsedSec);
+          if (ev.data.url) metaParts.push('url=' + ev.data.url);
+          if (metaParts.length) lines.push('  جزئیات: ' + metaParts.join(' | '));
+          if (ev.data.error) lines.push('  خطا: ' + ev.data.error);
+          if (ev.data.raw) lines.push('  raw: ' + String(ev.data.raw).slice(0, 1500));
+          if (ev.data.text) lines.push('  text: ' + String(ev.data.text).slice(0, 800));
+        }
       });
     }
     return lines.join('\n');
@@ -10136,6 +10223,10 @@ el('routerForget').onclick=()=>{
     return null;
   }
 
+  function cleanAsciiToken(raw) {
+    return String(raw == null ? '' : raw).replace(/[^\x20-\x7E]+/g, '').trim().replace(/^Bearer\s+/i, '').replace(/[^\x21-\x7E]/g, '');
+  }
+
   function emptySlot(id) {
     var spec = BY_ID[id];
     return {
@@ -10143,7 +10234,7 @@ el('routerForget').onclick=()=>{
       key: '',
       model: spec ? spec.model : '',
       modelCustomized: false,
-      extra: id === 'open_router' || id === 'openai_api' ? { reasoningEffort: 'medium' } : {},
+      extra: id === 'open_router' || id === 'openai_api' ? { reasoningEffort: 'low' } : {},
       lastOk: false,
       lastError: '',
       lastTestAt: 0
@@ -10161,7 +10252,8 @@ el('routerForget').onclick=()=>{
 
   function load() {
     try {
-      var raw = localStorage.getItem(STORE_KEY);
+      var ls = global.localStorage;
+      var raw = ls ? ls.getItem(STORE_KEY) : null;
       if (!raw) return;
       var parsed = JSON.parse(raw);
       if (!parsed || parsed.v !== 1 || !parsed.slots) return;
@@ -10180,19 +10272,20 @@ el('routerForget').onclick=()=>{
       Object.keys(parsed.slots).forEach(function (id) {
         if (!BY_ID[id]) return;
         var s = parsed.slots[id] || {};
-        var savedModel = typeof s.model === 'string' && s.model ? s.model : BY_ID[id].model;
+        var savedModel = typeof s.model === 'string' && s.model ? cleanAsciiToken(s.model) : BY_ID[id].model;
+        if (!savedModel) savedModel = BY_ID[id].model;
         var customized = !!s.modelCustomized;
         /* Auto-upgrade legacy weak gpt-4o-mini default on OpenRouter / OpenAI / IranRouter / TokenRouter to analytical gpt-5-mini. */
         if (!customized && (savedModel === 'openai/gpt-4o-mini' || savedModel === 'gpt-4o-mini')) {
           savedModel = BY_ID[id].model;
         }
         var extraObj = (s.extra && typeof s.extra === 'object') ? s.extra : {};
-        if ((id === 'open_router' || id === 'openai_api') && !extraObj.reasoningEffort) {
-          extraObj.reasoningEffort = 'medium';
+        if ((id === 'open_router' || id === 'openai_api') && (!extraObj.reasoningEffort || !extraObj.effortCustomized)) {
+          extraObj.reasoningEffort = 'low';
         }
         next.slots[id] = {
           enabled: !!s.enabled,
-          key: typeof s.key === 'string' ? s.key : '',
+          key: typeof s.key === 'string' ? cleanAsciiToken(s.key) : '',
           model: savedModel,
           modelCustomized: customized,
           extra: extraObj,
@@ -10217,7 +10310,8 @@ el('routerForget').onclick=()=>{
 
   function save() {
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({
+      var ls = global.localStorage;
+      if (ls) ls.setItem(STORE_KEY, JSON.stringify({
         v: 1,
         slots: state.slots,
         order: state.order,
@@ -10300,13 +10394,13 @@ el('routerForget').onclick=()=>{
 
   function chatHeaders(s) {
     var spec = resolveSpec(s);
-    var key = s && s.key ? s.key : '';
+    var key = s && s.key ? cleanAsciiToken(s.key) : '';
     var headers = { 'Content-Type': 'application/json' };
     var skipAuth = !key || key === 'local';
     if (!spec || spec.kind === 'openai' || spec.kind === 'iranrouter') {
       if (!skipAuth) headers.Authorization = 'Bearer ' + key;
-      if (spec && spec.hdr === 'openrouter') {
-        headers['HTTP-Referer'] = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://hesabrasi.local';
+      if (spec && spec.hdr === 'openrouter' && typeof location !== 'undefined' && /^https?:\/\//i.test(String(location.origin || ''))) {
+        headers['HTTP-Referer'] = location.origin;
         headers['X-Title'] = 'Hesabrasi';
       }
       return headers;
@@ -10355,16 +10449,17 @@ el('routerForget').onclick=()=>{
 
   function modelsHeaders(info) {
     var provider = info && info.provider;
-    var key = info && info.key ? String(info.key).trim() : '';
+    var key = info && info.key ? cleanAsciiToken(info.key) : '';
     if (provider === 'google' || provider === 'gemini') return key ? { 'x-goog-api-key': key } : {};
     var spec = BY_ID[provider];
     if (spec && spec.kind === 'gemini') return key ? { 'x-goog-api-key': key } : {};
     if (spec && spec.kind === 'azure') return key ? { 'api-key': key } : {};
     if (spec && spec.hdr === 'openrouter') {
-      var h = {
-        'HTTP-Referer': (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://hesabrasi.local',
-        'X-Title': 'Hesabrasi'
-      };
+      var h = {};
+      if (typeof location !== 'undefined' && /^https?:\/\//i.test(String(location.origin || ''))) {
+        h['HTTP-Referer'] = location.origin;
+        h['X-Title'] = 'Hesabrasi';
+      }
       if (key) h.Authorization = 'Bearer ' + key;
       return h;
     }
@@ -10375,7 +10470,7 @@ el('routerForget').onclick=()=>{
     var spec = BY_ID[providerId];
     if (!spec) return null;
     var sl = state.slots[providerId] || emptySlot(providerId);
-    var key = (typeof keyOverride === 'string' ? keyOverride : sl.key || '').trim();
+    var key = cleanAsciiToken(typeof keyOverride === 'string' ? keyOverride : sl.key || '');
     var keyFp = key ? (key.slice(0, 4) + ':' + key.length) : 'anon';
     var existing = modelCache[providerId];
     if (!force && existing && existing.raw && existing.keyFp === keyFp && (Date.now() - existing.fetchedAt) < CATALOG_TTL_MS) {
@@ -10390,7 +10485,7 @@ el('routerForget').onclick=()=>{
     paintModelSelector(providerId);
 
     var ctl = new AbortController();
-    var timer = setTimeout(function () { ctl.abort(); }, 12000);
+    var timer = setTimeout(function () { ctl.abort(); }, 15000);
     try {
       var resp = await fetch(url, {
         method: 'GET',
@@ -10776,9 +10871,13 @@ el('routerForget').onclick=()=>{
     var model = card.querySelector('[data-f="model"]');
     var effort = card.querySelector('[data-f="reasoning-effort"]');
     sl.enabled = !!(en && en.checked);
-    if (key) sl.key = key.value.trim();
+    if (key) {
+      sl.key = cleanAsciiToken(key.value);
+      if (key.value && key.value !== sl.key) key.value = sl.key;
+    }
     if (model) {
-      var newModel = model.value.trim() || spec.model;
+      var newModel = cleanAsciiToken(model.value) || spec.model;
+      if (model.value && model.value !== newModel) model.value = newModel;
       if (newModel !== spec.model) sl.modelCustomized = true;
       sl.model = newModel;
     }
@@ -10797,6 +10896,45 @@ el('routerForget').onclick=()=>{
 
   function collectAll() {
     state.order.forEach(readCard);
+  }
+
+  async function readTestResponse(response) {
+    var ct = String((response && response.headers && typeof response.headers.get === 'function' && response.headers.get('content-type')) || '').toLowerCase();
+    if (!response.ok || ct.indexOf('text/event-stream') === -1 || !response.body || typeof response.body.getReader !== 'function') {
+      try { return await response.json(); } catch (e0) { return {}; }
+    }
+    var reader = response.body.getReader(), decoder = new TextDecoder('utf-8');
+    var buf = '', fullText = '', streamErr = null, finished = false;
+    function parseLine(line) {
+      var tr = line.trim();
+      if (!tr || tr.charAt(0) === ':' || tr.indexOf('data:') !== 0) return false;
+      var ps = tr.slice(5).trim();
+      if (ps === '[DONE]') return true;
+      try {
+        var ch = JSON.parse(ps);
+        if (ch && ch.error) { streamErr = ch.error; return true; }
+        var c0 = ch && Array.isArray(ch.choices) ? ch.choices[0] : null;
+        if (c0) {
+          var d = c0.delta && typeof c0.delta.content === 'string' ? c0.delta.content : (c0.message && typeof c0.message.content === 'string' ? c0.message.content : '');
+          if (d) fullText += d;
+        }
+      } catch (e1) {}
+      return false;
+    }
+    while (!finished && !streamErr) {
+      var step = await reader.read();
+      if (step.done) { buf += decoder.decode(); break; }
+      buf += decoder.decode(step.value, { stream: true });
+      var nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        var line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (parseLine(line)) { finished = true; try { await reader.cancel(); } catch (e2) {} buf = ''; break; }
+      }
+    }
+    if (!finished && buf.trim()) buf.split('\n').forEach(parseLine);
+    if (streamErr) return { error: streamErr };
+    return { choices: [{ message: { content: fullText } }] };
   }
 
   async function testSlot(id) {
@@ -10845,8 +10983,9 @@ el('routerForget').onclick=()=>{
     } else {
       payload = { model: sx.model, messages: [{ role: 'user', content: TEST_PROMPT }], max_tokens: 32, temperature: 0 };
     }
+    if (id === 'open_router') payload.stream = true;
     var ctl = new AbortController();
-    var timer = setTimeout(function () { ctl.abort(); }, 25000);
+    var timer = setTimeout(function () { ctl.abort(); }, 30000);
     try {
       var response = await fetch(chatUrl(sx), {
         method: 'POST',
@@ -10856,15 +10995,14 @@ el('routerForget').onclick=()=>{
         body: JSON.stringify(payload),
         signal: ctl.signal
       });
-      var data = {};
-      try { data = await response.json(); } catch (e1) { data = {}; }
+      var data = await readTestResponse(response);
       if (gemini && typeof adGoogleResponse === 'function') data = adGoogleResponse(data);
       else if (isAnthropic(sx)) data = anthropicResponse(data);
-      if (!response.ok) {
+      if (!response.ok || (data && data.error)) {
         var message = (data && data.error && (data.error.message || data.error)) || data.message || '';
         sl.lastOk = false;
-        sl.lastError = 'HTTP ' + response.status + (message ? ' — ' + String(message).slice(0, 240) : '');
-        if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_test_failed', { error: spec.name + ': ' + sl.lastError });
+        sl.lastError = (response.ok ? 'خطای جریان پاسخ' : ('HTTP ' + response.status)) + (message ? ' — ' + String(message).slice(0, 240) : '');
+        if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_test_failed', { provider: id, model: sx.model, error: spec.name + ': ' + sl.lastError });
         save(); paintStatus();
         return { ok: false, detail: sl.lastError };
       }
@@ -10881,8 +11019,8 @@ el('routerForget').onclick=()=>{
       return { ok: true, text: text.trim() };
     } catch (err) {
       sl.lastOk = false;
-      sl.lastError = err && err.name === 'AbortError' ? 'مهلت آزمایش تمام شد (یا CORS مانع شد).' : ('خطای شبکه/CORS: ' + (err && err.message ? err.message : err));
-      if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_network_error', { error: spec.name + ': ' + sl.lastError });
+      sl.lastError = err && err.name === 'AbortError' ? 'مهلت آزمایش تمام شد (VPN یا سرعت شبکه را بررسی کنید).' : ('خطای شبکه/VPN: ' + (err && err.message ? err.message : err));
+      if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_network_error', { provider: id, model: sx.model, error: spec.name + ': ' + sl.lastError });
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
     } finally {
@@ -10925,7 +11063,7 @@ el('routerForget').onclick=()=>{
   }
 
   function openRouterModelControlsHtml(sl) {
-    var eff = (sl.extra && sl.extra.reasoningEffort) || 'medium';
+    var eff = (sl.extra && sl.extra.reasoningEffort) || 'low';
     return (
       '<div class="aihub-or-box">' +
         '<div class="aihub-or-head">' +
@@ -10954,9 +11092,9 @@ el('routerForget').onclick=()=>{
           '</label>' +
           '<label data-aihub-effort-wrap>عمق استدلال و مدیریت مصرف توکن' +
             '<select data-f="reasoning-effort">' +
-              '<option value="medium"' + (eff === 'medium' ? ' selected' : '') + '>متعادل — تحلیل قوی حسابرسی + توکن به‌صرفه (پیشنهادی)</option>' +
-              '<option value="low"' + (eff === 'low' ? ' selected' : '') + '>اقتصادی — کمترین مصرف توکن استدلال</option>' +
-              '<option value="high"' + (eff === 'high' ? ' selected' : '') + '>عمیق — استدلال حداکثری برای حساب‌های پیچیده</option>' +
+              '<option value="low"' + (eff === 'low' ? ' selected' : '') + '>بهینه و سریع — کمترین مصرف توکن و پایداری شبکه موبایل (پیشنهادی)</option>' +
+              '<option value="medium"' + (eff === 'medium' ? ' selected' : '') + '>متعادل — استدلال عمیق‌تر (زمان انتظار و مصرف توکن بیشتر)</option>' +
+              '<option value="high"' + (eff === 'high' ? ' selected' : '') + '>عمیق — استدلال حداکثری برای حساب‌های بسیار پیچیده</option>' +
             '</select>' +
           '</label>' +
         '</div>' +
@@ -11074,7 +11212,8 @@ el('routerForget').onclick=()=>{
       return;
     }
     if (id === 'open_router' && f === 'key') {
-      var val = String(t.value || '').trim();
+      var val = cleanAsciiToken(t.value);
+      if (t.value && t.value !== val) t.value = val;
       if (val.length >= 12) {
         var sl = state.slots.open_router || emptySlot('open_router');
         sl.key = val;
@@ -11110,6 +11249,12 @@ el('routerForget').onclick=()=>{
       uiFilterState.scope = t.value || 'all';
       paintModelSelector('open_router');
       return;
+    }
+    if (f === 'reasoning-effort') {
+      var slEff = state.slots[id] || emptySlot(id);
+      slEff.extra = slEff.extra || {};
+      slEff.extra.effortCustomized = true;
+      state.slots[id] = slEff;
     }
     if (id === 'open_router' && f === 'model-select') {
       var modelInput = card.querySelector('[data-f="model"]');
