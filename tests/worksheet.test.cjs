@@ -10,18 +10,27 @@ const cats=reportAggregate({groups:[{category:'گردش',basis:'شرح',refs:dat
 renderAnalysisOutput();const root=document.querySelector('#anaSheet .audit-template');
 function ok(v,msg){if(!v)throw Error(msg)}
 const capDocs=[{id:'54',amount:54},{id:'47',amount:47},{id:'20',amount:20},{id:'5',amount:5}],capped=selTop(capDocs,50,d=>d.amount,true);
-ok(capped.sum===47&&capped.sel.map(d=>d.id).join(',')==='47','cap fallback provides the closest lower sample');
+ok(capped.sum===0&&capped.sel.length===0,'stop at the first oversized top row rather than filling with smaller rows');
 const approximate=selTopApprox([{id:'48',amount:48},{id:'46',amount:46},{id:'3a',amount:3},{id:'3b',amount:3}],50,d=>d.amount,100);
-ok(approximate.sum===51&&approximate.sel.map(d=>d.id).join(',')==='48,3a','percentage selection may choose a closer slightly-higher event total');
+ok(approximate.sum===48&&approximate.sel.map(d=>d.id).join(',')==='48','percentage selection stops before the first event that exceeds its target');
 const voucher={doc:'100',debit:100,credit:0,rows:[{'بدهکار':60,'بستانکار':0},{'بدهکار':40,'بستانکار':0}]},voucherEvents=selTop(sampleEventUnits([voucher]),60,d=>d.debit,true);
 ok(voucherEvents.sum===60&&voucherEvents.sel.length===1&&voucherEvents.sel[0].rows[0]['بدهکار']===60,'percentage sample must include only selected event rows, not the entire voucher');
 ok(sampleCoveragePercent(579,1000)===57.9,'actual percentage rounds down to one decimal');
 ok(selTop([{amount:54}],50,d=>d.amount).sum===54,'fixed-amount target keeps existing reach/overshoot behavior');
 const oldSampleDocs=sampleDocs,oldSampleAccounts=WORKSHEET_ACCOUNTS,oldSampleCfg={...SAMP_CFG},pctInput=document.createElement('input');pctInput.className='samp-val';pctInput.value='50';document.body.append(pctInput);
 sampleDocs=()=>capDocs.map(d=>({doc:d.id,debit:d.amount,credit:0,rows:[{'بدهکار':d.amount,'بستانکار':0,'تاریخ':'1403/01/01'}]}));WORKSHEET_ACCOUNTS=[{}];SAMP_CFG={m:'top',base:'d',tmode:'p'};const sampleResult=computeSample(0);
-ok(sampleResult.res.sum===59&&sampleResult.res.count===2&&sampleResult.res.unit==='row'&&sampleResult.msg.includes('۴۶٫۸٪')&&sampleResult.msg.includes('هدف ۵۰٪'),'percentage run samples event rows under cap and reports rounded-down actual coverage');
+ok(sampleResult.res.sum===54&&sampleResult.res.count===1&&sampleResult.res.unit==='row'&&sampleResult.msg.includes('۴۲٫۸٪')&&sampleResult.msg.includes('هدف ۵۰٪'),'percentage run stops at first oversized event and reports actual coverage');
+const bothRows=[
+ {'شماره سند':'1','ردیف سند':'1','تاریخ':'1403/01/01','بدهکار':100,'بستانکار':0},
+ {'شماره سند':'1','ردیف سند':'2','تاریخ':'1403/01/01','بدهکار':70,'بستانکار':50},
+ {'شماره سند':'2','ردیف سند':'1','تاریخ':'1403/01/02','بدهکار':40,'بستانکار':40},
+ {'شماره سند':'3','ردیف سند':'1','تاریخ':'1403/01/03','بدهکار':0,'بستانکار':40}
+];
+sampleDocs=()=>docLevelAgg(bothRows);SAMP_CFG={m:'top',base:'b',tmode:'p'};const bothResult=computeSample(0),bothSelected=bothResult.res.sel.flatMap(unit=>unit.rows);
+ok(bothSelected.length===2&&bothSelected.includes(bothRows[0])&&bothSelected.includes(bothRows[1])&&!bothSelected.includes(bothRows[2])&&!bothSelected.includes(bothRows[3]),'both-side percentage samples debit and credit independently, then unions selected event identities');
+ok(bothResult.msg.includes('بدهکار')&&bothResult.msg.includes('بستانکار')&&bothResult.msg.includes('۸۰٫۹٪')&&bothResult.msg.includes('۳۸٫۴٪'),'both-side result reports separate actual coverage');
 sampleDocs=oldSampleDocs;WORKSHEET_ACCOUNTS=oldSampleAccounts;SAMP_CFG=oldSampleCfg;pctInput.remove();
-ok(!METHOD_HELP.top.li[2].includes('تا رسیدن به ۶۰٪')&&METHOD_HELP.top.li[2].includes('پوشش واقعی می‌تواند کمی کمتر یا بیشتر باشد'),'percentage help describes a cap');
+ok(METHOD_HELP.top.li[2].includes('برای هر ستون جداگانه')&&METHOD_HELP.top.li[2].includes('انتخاب متوقف می‌شود'),'percentage help describes independent targets and stop-at-overshoot rule');
 ok(root.querySelector('[data-unit-header]').textContent.includes('ریال'),'rial header');ok(root.querySelectorAll('.descs tbody tr').length===9,'rows');ok(!root.querySelector('.acct-meta-strip')&&!root.querySelector('[data-account-code]'),'removed account metadata');ok(!root.querySelector('.c-id')&&!root.textContent.includes('عطف'),'removed analysis reference column');ok(o.unitMode==='rial','rial default');ok(!document.querySelector('#anaUnitMode'),'no million-rial option');
 ok([...root.querySelectorAll('.compact-note .body')].map(e=>e.dataset.field).join(',')==='issues,follow-up,conclusion','order');
 let x=root.querySelector('[data-row-index="1"][data-amount="dr"]');x.textContent='۲٬۰۰۰٬۰۰۰';x.dispatchEvent(new Event('input',{bubbles:true}));ok(root.querySelector('[data-amount="sumdr"]').textContent==='۲٬۰۰۰٬۰۰۰','sum in full rials');ok(root.querySelector('[data-amount="baldr"]').textContent==='۱٬۶۰۰٬۰۰۰','balance in full rials');
