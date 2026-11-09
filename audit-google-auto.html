@@ -3339,7 +3339,7 @@ function helpHtml(m){
   return `<b>${h.head}</b><ol>${h.li.map(x=>`<li>${x}</li>`).join('')}</ol><div class="warn">${h.warn}</div>`;
 }
 function printHint(){
-  return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند. برای حذف سطر ناخواسته، × کنار شماره ردیف را بزنید؛ فایل اصلی اکسل تغییر نمی‌کند.</p>';
+  return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند. برای حذف سند ناخواسته، × کنار شماره ردیف را بزنید؛ همهٔ ردیف‌های انتخاب‌شدهٔ همان سند از کاربرگ حذف می‌شوند و فایل اصلی اکسل تغییر نمی‌کند.</p>';
 }
 function sheetHTML(w, sel){
   const layout=samplePrintLayout(w),c=SHEET_CFG,n=Math.max(1,Math.min(15,Math.round(Number(c.ctrl)||10))),cpCtx=cpWorksheetContext(),SPAN=8+n;
@@ -3351,7 +3351,7 @@ function sheetHTML(w, sel){
     const desc=r['شرح سند']||r['شرح ردیف']||'';
     const sub=r['شرح ردیف']&&r['شرح ردیف']!==r['شرح سند']?`<div class="sub sample-desc-text">${esc(r['شرح ردیف'])}</div>`:'';
     const cp=cpWorksheetCell(r,cpCtx);
-    return `<tr class="item" data-sample-row="${k}" data-sample-debit="${db}" data-sample-credit="${cr}"><td class="sample-serial-cell"><span class="rownum">${faNum(k)}</span><button type="button" class="sample-row-remove no-print" data-sample-remove="${k}" title="حذف این ردیف از کاربرگ نمونه؛ فایل منبع تغییر نمی‌کند" aria-label="حذف ردیف ${faNum(k)} از کاربرگ نمونه">×</button></td><td class="num sample-voucher">${esc(sampleDisplayDigits(doc))}</td><td class="sample-date date"><span class="sample-date-text">${esc(sampleDisplayDigits(r['تاریخ']??''))}</span></td><td class="desc l"><div class="sample-desc-text">${esc(desc)}</div>${sub}</td><td class="cp l">${cp}</td><td class="ref"></td><td class="num dr">${db?fmt(db):''}</td><td class="num cr">${cr?fmt(cr):''}</td>${Array.from({length:n},()=>'<td class="ctl"><span class="box"></span></td>').join('')}</tr>`;
+    return `<tr class="item" data-sample-row="${k}" data-sample-debit="${db}" data-sample-credit="${cr}"><td class="sample-serial-cell"><span class="rownum">${faNum(k)}</span><button type="button" class="sample-row-remove no-print" data-sample-remove="${k}" title="حذف همه ردیف‌های این سند از کاربرگ نمونه؛ فایل منبع تغییر نمی‌کند" aria-label="حذف سند ${esc(sampleDisplayDigits(doc))} از کاربرگ نمونه">×</button></td><td class="num sample-voucher">${esc(sampleDisplayDigits(doc))}</td><td class="sample-date date"><span class="sample-date-text">${esc(sampleDisplayDigits(r['تاریخ']??''))}</span></td><td class="desc l"><div class="sample-desc-text">${esc(desc)}</div>${sub}</td><td class="cp l">${cp}</td><td class="ref"></td><td class="num dr">${db?fmt(db):''}</td><td class="num cr">${cr?fmt(cr):''}</td>${Array.from({length:n},()=>'<td class="ctl"><span class="box"></span></td>').join('')}</tr>`;
   }).join('');
   const total=`<tr class="total tot"><td colspan="6" class="lbl">جمع اقلام رسیدگی‌شده</td><td class="num dr">${fmt(sd)}</td><td class="num cr">${fmt(sc)}</td><td colspan="${n}"></td></tr>`;
   // Same software-only opening/current/sample arithmetic as the approved worksheet.
@@ -3710,15 +3710,11 @@ function sampleSelectionStatus(item){return '✓ '+faNum(item.count??item.sel.le
 function sampleRemoveRow(viewIndex,rowIndex){
   const item=SHEET_OUT[viewIndex];if(!item)return;
   const entry=sampleOrderedRows(item.sel)[rowIndex-1];if(!entry)return;
-  let removed=false;
-  item.sel=item.sel.map(group=>{
-    const at=group.rows.indexOf(entry.r);if(at<0)return group;
-    removed=true;const rows=group.rows.filter(row=>row!==entry.r);
-    return rows.length?{...group,rows}:null;
-  }).filter(Boolean);
-  if(!removed)return;
-  if(item.unit==='row')item.count=Math.max(0,(item.count??rowIndex)-1);else item.count=item.sel.length;
-  item.msg=(item.msg?item.msg+' · ':'')+'حذف دستی: یک ردیف از کاربرگ نمونه حذف شد؛ پوشش درج‌شده مربوط به قبل از حذف است و فایل منبع تغییر نکرد.';
+  const docKey=String(entry.doc),removedEvents=item.sel.filter(group=>String(group.doc)===docKey).reduce((n,group)=>n+group.rows.length,0);
+  if(!removedEvents)return;
+  item.sel=item.sel.filter(group=>String(group.doc)!==docKey);
+  if(item.unit==='row')item.count=Math.max(0,(item.count??sampleOrderedRows(item.sel).length+removedEvents)-removedEvents);else item.count=item.sel.length;
+  item.msg=(item.msg?item.msg+' · ':'')+'حذف دستی: سند '+sampleDisplayDigits(entry.doc)+' و '+faNum(removedEvents)+' ردیف آن از کاربرگ نمونه حذف شد؛ پوشش درج‌شده مربوط به قبل از حذف است و فایل منبع تغییر نکرد.';
   const status=document.querySelector('tr[data-ws-idx="'+item.i+'"] .st');
   if(status){status.className='st ok';status.textContent=sampleSelectionStatus(item);status.title=item.msg;}
   drawSheets(true);

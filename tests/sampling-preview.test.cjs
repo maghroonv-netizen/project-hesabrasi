@@ -105,6 +105,17 @@ const { PDFDocument } = require('pdf-lib');
       assert.strictEqual((await PDFDocument.load(bytes)).getPageCount(),expected.length,`${orientation}/${density}: actual PDF page count`);
       await page.emulateMedia({media:null});
     }
+    const multiRowDelete=await page.evaluate(()=>{
+      ACCOUNT_LEVELS=[{code:'کد حساب',title:'عنوان حساب'}];
+      const row=(doc,date,code,title,debit,credit)=>({'شماره سند':doc,'تاریخ':date,'شرح سند':'سند نمونه','شرح ردیف':'رویداد '+doc+' '+code,'نوع سند':'روزانه','کد حساب':code,'عنوان حساب':title,'بدهکار':debit,'بستانکار':credit});
+      const a=row('700','1403/01/01','100','حساب نمونه',60,0),b=row('700','1403/01/01','100','حساب نمونه',40,0),contra=row('700','1403/01/01','200','طرف حساب',0,100),last=row('701','1403/01/02','100','حساب نمونه',30,0),lastContra=row('701','1403/01/02','200','طرف حساب',0,30);
+      FULL_ROWS=[a,b,contra,last,lastContra];ACCOUNT_ROWS=FULL_ROWS;
+      const w={keyPath:['100|حساب نمونه'],levelIdx:0,pathLabel:'حساب نمونه',title:'حساب نمونه',code:'100'};
+      SHEET_OUT=[{i:0,w,sel:[{doc:'700',rows:[a,b]},{doc:'701',rows:[last]}],count:3,unit:'row',msg:'نمونه'}];ACTIVE_SHEET=0;drawSheets();
+      document.querySelector('.sheetwrap:not(.hide) .sample-row-remove').click();
+      return {remaining:SHEET_OUT[0].sel.flatMap(group=>group.rows).length,doc:SHEET_OUT[0].sel[0]?.doc,count:SHEET_OUT[0].count,sourceRows:FULL_ROWS.length};
+    });
+    assert.deepStrictEqual(multiRowDelete,{remaining:1,doc:'701',count:1,sourceRows:5});
     // A single sampled voucher with many contra-accounts can span pages. The
     // button belongs only after the final fragment, without repeating amounts.
     const split=await page.evaluate(()=>{
