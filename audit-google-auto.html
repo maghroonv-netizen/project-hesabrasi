@@ -1946,6 +1946,24 @@ body.meta-stage-active .wrap{display:none!important;}
 .sheet-sampling-edit label{display:flex;align-items:center;gap:8px;flex:0 1 310px;font-size:.82rem;font-weight:600;}
 .sheet-sampling-edit input{max-width:170px;min-width:100px;}
 @media(max-width:700px){.sample-output-settings.card{padding:14px;}.sheet-sampling-edit label{flex:1 1 100%;justify-content:space-between;}.sheet-sampling-edit input{max-width:55%;}}
+.raw-preview-banner{padding:9px 12px;margin:0 0 10px;border-inline-start:3px solid var(--accent);background:var(--bg);color:var(--muted);font-size:.82rem;}
+.raw-preview-tag{padding:6px 10px;border-radius:8px;background:var(--ok-bg);color:var(--ok);font-size:.8rem;font-weight:700;}
+.sample-output-error{margin:0 0 10px;}
+.sample-population-manager{margin:0 0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);}
+.sample-population-manager summary{padding:10px 12px;cursor:pointer;font-weight:700;font-size:.84rem;}
+.sample-population-tools{padding:0 12px 12px;}
+.sample-population-tools>span{display:block;margin:0 0 8px;color:var(--muted);font-size:.78rem;}
+.sample-population-tools .scrollx{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+.sample-population-tools table{width:100%;min-width:780px;border-collapse:collapse;font-size:.75rem;}
+.sample-population-tools th,.sample-population-tools td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;}
+.sample-population-tools td:last-child{min-width:260px;}
+.sample-population-tools .transfer-candidate{background:color-mix(in srgb,var(--warn,#f0a52b) 10%,var(--panel));}
+.sample-population-tools tr.excluded{opacity:.58;}
+.sample-population-tools tr.excluded td:last-child{text-decoration:line-through;}
+.sheetwrap[data-raw-preview="1"] .sample-row-remove{display:none!important;}
+.sheetwrap[data-raw-preview="1"] .sample-population-excluded{opacity:.48;background:color-mix(in srgb,var(--bad) 10%,var(--panel));}
+.sample-excluded-badge{display:block;font-size:.52rem;color:var(--bad);line-height:1.1;}
+@media print{.sheetwrap[data-raw-preview="1"]{display:none!important;}}
 </style>
 </head>
 <body class="meta-stage-active">
@@ -2016,8 +2034,7 @@ body.meta-stage-active .wrap{display:none!important;}
   <section class="stage" data-stage="2"><div id="results"></div></section>
   <section class="stage" data-stage="3"><div id="typeControlArea"></div></section>
   <section class="stage" data-stage="4"><div id="accountArea"></div></section>
-  <section class="stage" data-stage="5"><div id="samplingArea"></div></section>
-  <section class="stage" data-stage="6"><div id="outputArea"></div></section>
+  <section class="stage" data-stage="5"><div id="outputArea"></div></section>
 
   <!-- ================= ماژول ۲ : آنالیز و رسیدگی به حساب ================= -->
   <section class="stage" data-stage="a2"><div id="anaAccounts"></div></section>
@@ -2079,7 +2096,7 @@ const loadArea = document.getElementById('loadArea');
    مرحله دیده می‌شود تا صفحه کوتاه و روال نگه داشته شود.                    */
 const MODULES=[
   {id:'sample',  name:'نمونه‌گیری',              icon:'🎯',
-   desc:'انتخاب جامعه، تعیین روش و اندازه نمونه، و تهیه کاربرگ نمونه‌گیری.'},
+   desc:'انتخاب حساب‌ها و تنظیم نمونه در پیش‌نمایش کاربرگ.'},
   {id:'analysis',name:'آنالیز و رسیدگی به حساب', icon:'🔍',
    desc:'انتخاب حساب سلسله‌مراتبی و تهیه کاربرگ ماهیت و آنالیز حساب.'}
 ];
@@ -2087,8 +2104,7 @@ const MODULE_STEPS={
   sample:[
     {n:'3', title:'اسناد ابتدای سال'},
     {n:'4', title:'انتخاب حساب'},
-    {n:'5', title:'نمونه‌گیری'},
-    {n:'6', title:'پیش‌نمایش و اصلاح کاربرگ'}
+    {n:'5', title:'پیش‌نمایش و نمونه‌گیری'}
   ],
   analysis:[
     {n:'a2', title:'انتخاب حساب'},
@@ -2195,7 +2211,7 @@ function renderModuleHome(){
 }
 
 const curSteps=()=>MODULE_STEPS[CUR_MODULE] || [];
-let SHEET_OUT=[];          // کاربرگ‌های تولیدشده: {i, w, sel}
+let SHEET_OUT=[];          // پیش‌نمایش‌های خام یا نمونه‌گیری‌شده: {i, w, sel}
 let ACTIVE_SHEET=0;
 const faNum=n=>Number(n).toLocaleString('fa-IR');
 function has(el){ const e=document.getElementById(el); return !!(e && e.innerHTML.trim()); }
@@ -2206,7 +2222,6 @@ function stepReady(n){
   if(n==='3') return has('typeControlArea');
   if(n==='4') return has('accountArea');
   if(n==='5') return WORKSHEET_ACCOUNTS.length>0;
-  if(n==='6') return SHEET_OUT.length>0;
   return false;
 }
 function stepIndex(n){ const L=curSteps(); const i=L.findIndex(s=>s.n===String(n)); return i<0?0:i; }
@@ -2230,9 +2245,7 @@ function gotoStep(n){
   if(i<0){ return; }
   if(i>0 && !stepReady(n)) return;              // مرحله‌ی آماده‌نشده قابل ورود نیست
   if(CUR_MODULE==='sample'){
-    if(n==='5' && !document.querySelector('table.smp')) renderSamplingStep();
-    if(n==='6' && !has('outputArea')) renderOutputStep();
-    if(n==='6') checkStale();
+    if(n==='5'){ensureRawPreviews();renderOutputStep();}
   }else{
     CUR_STEP=n;
     onAnalysisModuleEnter();
@@ -2435,7 +2448,6 @@ function handleFile(file){
   results.innerHTML = '';
   document.getElementById('accountArea').innerHTML = '';
   document.getElementById('typeControlArea').innerHTML = '';
-  document.getElementById('samplingArea').innerHTML = '';
   document.getElementById('outputArea').innerHTML = '';
   TYPE_OVERRIDES = new Map();
   currentHeaders = []; currentRows = []; FULL_ROWS = [];
@@ -2947,7 +2959,8 @@ function removeWorksheetAccount(idx){
   const removed=SHEET_OUT.filter(x=>x.i===idx||x.w===WORKSHEET_ACCOUNTS[idx]);
   if(removed.length&&!window.confirm('این حساب از فهرست نمونه‌گیری و کاربرگ ساخته‌شدهٔ آن از حافظهٔ جلسه حذف شود؟ انتخاب‌های دستی مربوط نیز پاک می‌شوند؛ فایل اکسل و کاربرگ‌های دیگر حفظ می‌شوند.'))return;
   const allAccountRows=rowsForWorksheetAccount(WORKSHEET_ACCOUNTS[idx]);
-  const target=document.querySelector('#samplingArea .samp-val')?.value??'',active=SHEET_OUT[ACTIVE_SHEET];
+  SAMP_TARGET=document.querySelector('#sampleOutputSettings .samp-val')?.value??SAMP_TARGET;
+  const active=SHEET_OUT[ACTIVE_SHEET];
   WORKSHEET_ACCOUNTS.splice(idx,1);
   SHEET_OUT=SHEET_OUT.filter(x=>!removed.includes(x));
   SHEET_OUT.forEach(x=>{if(x.i>idx)x.i--;});
@@ -2955,13 +2968,9 @@ function removeWorksheetAccount(idx){
   ACTIVE_SHEET=Math.max(0,SHEET_OUT.indexOf(active));
   if(!SHEET_OUT.length)LAST_CFG=null;
   renderWorksheetAccountsChips();
-  renderSamplingStep();
-  const value=document.querySelector('#samplingArea .samp-val');if(value)value.value=target;
-  // Refresh status text from surviving outputs without changing the sample.
-  SHEET_OUT.forEach(x=>{const status=document.querySelector('tr[data-ws-idx="'+x.i+'"] .st');if(status){status.className='st ok';status.textContent=sampleSelectionStatus(x);status.title=x.msg||'';}});
-  if(CUR_STEP==='6'){
-   if(SHEET_OUT.length)renderOutputStep();
-   else gotoStep(WORKSHEET_ACCOUNTS.length?5:4);
+  if(CUR_STEP==='5'){
+    if(WORKSHEET_ACCOUNTS.length){ensureRawPreviews();renderOutputStep();}
+    else gotoStep(4);
   }
   renderStepper();
   const m=document.getElementById('acctModal');
@@ -2972,17 +2981,16 @@ function renderWorksheetAccountsChips(){
   const host = document.getElementById('wsAccountsArea');
   if(!host) return;
   if(!WORKSHEET_ACCOUNTS.length){
-    host.innerHTML = '<p class="hint" style="margin:10px 0 0;">هنوز حسابی برای کاربرگ نمونه علامت نخورده — در فهرست هر سطح، کنار حساب موردنظر تیک بزنید. هر تیک یک کاربرگ جدا می‌سازد.</p><div class="btnrow"><button type="button" class="confirm" disabled style="opacity:.5">ادامه به تنظیمات نمونه‌گیری ←</button></div>';
+    host.innerHTML = '<p class="hint" style="margin:10px 0 0;">هنوز حسابی برای پیش‌نمایش انتخاب نشده است.</p><div class="btnrow"><button type="button" class="confirm" disabled style="opacity:.5">ادامه به پیش‌نمایش ←</button></div>';
     return;
   }
   host.innerHTML = `<div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)">`+
-    `<b>${faNum(WORKSHEET_ACCOUNTS.length)} حساب برای تهیه‌ی کاربرگ نمونه علامت خورده — برای هرکدام یک کاربرگ جدا ساخته می‌شود:</b><br>` +
+    `<b>${faNum(WORKSHEET_ACCOUNTS.length)} حساب انتخاب شده — برای هرکدام یک پیش‌نمایش جدا باز می‌شود:</b><br>` +
     WORKSHEET_ACCOUNTS.map((w,i)=>
       `<span class="restore-chip">${w.pathLabel}<button class="restore-btn ws-remove-btn" data-idx="${i}" style="background:var(--bad);">حذف</button></span>`
-    ).join('') + `<div class="btnrow"><button type="button" class="confirm" id="accountsContinueBtn">تأیید حساب‌ها و ادامه به تنظیمات نمونه‌گیری ←</button></div></div>`;
+    ).join('') + `<div class="btnrow"><button type="button" class="confirm" id="accountsContinueBtn">تأیید حساب‌ها و نمایش پیش‌نمایش ←</button></div></div>`;
   document.getElementById('accountsContinueBtn').addEventListener('click',()=>{
     if(!WORKSHEET_ACCOUNTS.length) return;
-    renderSamplingStep();
     gotoStep(5);
   });
   host.querySelectorAll('.ws-remove-btn').forEach(btn=>{
@@ -3302,17 +3310,18 @@ const CFG_HELP = {
 function printHint(){
   return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند. برای حذف رویداد ناخواسته، × کنار شماره ردیف را بزنید؛ فقط همان ردیف حذف می‌شود، حتی اگر شماره سند تکراری باشد. فایل اصلی اکسل تغییر نمی‌کند.</p>';
 }
-function sheetHTML(w, sel){
+function sheetHTML(w, sel, excludedRows=[]){
   const layout=samplePrintLayout(w),c=SHEET_CFG,n=Math.max(1,Math.min(15,Math.round(Number(c.ctrl)||10))),cpCtx=cpWorksheetContext(),SPAN=8+n;
   CP_REPORT.filled=0;CP_REPORT.blank=0;CP_REPORT.reasons={};
   const order=sampleOrderedRows(sel);
   let sd=0,sc=0,k=0;
+  const excludedSet=new Set(excludedRows);
   const body=order.map(({doc,r})=>{
-    const db=parseAmount(r['بدهکار']),cr=parseAmount(r['بستانکار']);sd+=db;sc+=cr;k++;
+    const db=parseAmount(r['بدهکار']),cr=parseAmount(r['بستانکار']),excluded=excludedSet.has(r);sd+=db;sc+=cr;k++;
     const desc=r['شرح سند']||r['شرح ردیف']||'';
     const sub=r['شرح ردیف']&&r['شرح ردیف']!==r['شرح سند']?`<div class="sub sample-desc-text">${esc(r['شرح ردیف'])}</div>`:'';
     const cp=cpWorksheetCell(r,cpCtx);
-    return `<tr class="item" data-sample-row="${k}" data-sample-debit="${db}" data-sample-credit="${cr}"><td class="sample-serial-cell"><span class="rownum">${faNum(k)}</span><button type="button" class="sample-row-remove no-print" data-sample-remove="${k}" title="حذف فقط همین رویداد از کاربرگ نمونه؛ ردیف‌های هم‌شماره باقی می‌مانند و فایل منبع تغییر نمی‌کند" aria-label="حذف رویداد ردیف ${faNum(k)} از کاربرگ نمونه">×</button></td><td class="num sample-voucher">${esc(sampleDisplayDigits(doc))}</td><td class="sample-date date"><span class="sample-date-text">${esc(sampleDisplayDigits(r['تاریخ']??''))}</span></td><td class="desc l"><div class="sample-desc-text">${esc(desc)}</div>${sub}</td><td class="cp l">${cp}</td><td class="ref"></td><td class="num dr">${db?fmt(db):''}</td><td class="num cr">${cr?fmt(cr):''}</td>${Array.from({length:n},()=>'<td class="ctl"><span class="box"></span></td>').join('')}</tr>`;
+    return `<tr class="item ${excluded?'sample-population-excluded':''}" data-sample-row="${k}" data-sample-debit="${db}" data-sample-credit="${cr}"><td class="sample-serial-cell"><span class="rownum">${faNum(k)}</span>${excluded?'<span class="sample-excluded-badge no-print">کنارگذاشته</span>':''}<button type="button" class="sample-row-remove no-print" data-sample-remove="${k}" title="حذف فقط همین رویداد از کاربرگ نمونه؛ ردیف‌های هم‌شماره باقی می‌مانند و فایل منبع تغییر نمی‌کند" aria-label="حذف رویداد ردیف ${faNum(k)} از کاربرگ نمونه">×</button></td><td class="num sample-voucher">${esc(sampleDisplayDigits(doc))}</td><td class="sample-date date"><span class="sample-date-text">${esc(sampleDisplayDigits(r['تاریخ']??''))}</span></td><td class="desc l"><div class="sample-desc-text">${esc(desc)}</div>${sub}</td><td class="cp l">${cp}</td><td class="ref"></td><td class="num dr">${db?fmt(db):''}</td><td class="num cr">${cr?fmt(cr):''}</td>${Array.from({length:n},()=>'<td class="ctl"><span class="box"></span></td>').join('')}</tr>`;
   }).join('');
   const total=`<tr class="total tot"><td colspan="6" class="lbl">جمع اقلام رسیدگی‌شده</td><td class="num dr">${fmt(sd)}</td><td class="num cr">${fmt(sc)}</td><td colspan="${n}"></td></tr>`;
   // Same software-only opening/current/sample arithmetic as the approved worksheet.
@@ -3444,11 +3453,36 @@ function printSheet(host){
   }catch(error){restore();window.alert(error.message||'چاپ انجام نشد؛ هیچ اطلاعاتی حذف نشد.');}
 }
 
-// ===================== مرحله ششم — کاربرگ خروجی =====================
+function ensureRawPreviews(){
+  const current=SHEET_OUT.length===WORKSHEET_ACCOUNTS.length&&SHEET_OUT.every((item,i)=>!item.w||item.w===WORKSHEET_ACCOUNTS[i]);
+  if(current){SHEET_OUT.forEach((item,i)=>{item.i=i;item.w=WORKSHEET_ACCOUNTS[i];item.rawRows??=accountRows(item.w);item.excludedRows??=[];item.cfg??={...SAMP_CFG};item.target??=SAMP_TARGET;if(item.rawPreview===undefined)item.rawPreview=false;});return;}
+  SHEET_OUT=WORKSHEET_ACCOUNTS.map((w,i)=>{
+    const rawRows=accountRows(w),sel=docLevelAgg(rawRows);
+    return {i,w,sel,count:rawRows.length,unit:'row',msg:'پیش‌نمایش خام گردش حساب؛ نمونه‌گیری هنوز اعمال نشده است.',cfg:{...SAMP_CFG},target:SAMP_TARGET,rawRows,excludedRows:[],rawPreview:true};
+  });
+  ACTIVE_SHEET=0;
+}
+function sampleTransferReason(row){
+  const text=[row['شرح سند'],row['شرح ردیف'],row['نوع سند']].join(' ');
+  return /انتقال|مانده\s*(انتقال|تسویه)|تسویه\s*(مانده|حساب)|بستن\s*حساب|اصلاح\s*حساب/.test(text)?'احتمال انتقال/تسویه':'';
+}
+function samplePopulationHTML(item){
+  const rows=item.rawRows||accountRows(item.w),excluded=item.excludedRows||[],suspects=rows.filter(sampleTransferReason).length;
+  return `<details class="sample-population-manager no-print" ${item.rawPreview&&suspects?'open':''}>
+    <summary>جامعهٔ نمونه و انتقال‌مانده‌ها — ${faNum(rows.length)} رویداد، ${faNum(suspects)} مورد احتمالی، ${faNum(excluded.length)} مورد کنارگذاشته</summary>
+    <div class="sample-population-tools"><span>موارد انتقالی خودکار حذف نمی‌شوند؛ با تیک‌زدن هر ردیف، فقط همان رویداد از جامعهٔ نمونه‌گیری کنار می‌رود و فایل منبع تغییر نمی‌کند.</span>
+      <div class="scrollx"><table><thead><tr><th>جامعه</th><th>تاریخ</th><th>سند</th><th>ردیف</th><th>بدهکار</th><th>بستانکار</th><th>شرح / تشخیص</th></tr></thead><tbody>
+      ${rows.map((r,index)=>{const reason=sampleTransferReason(r),off=excluded.includes(r);return `<tr class="${reason?'transfer-candidate':''} ${off?'excluded':''}"><td><input type="checkbox" data-population-exclude="${index}" ${off?'checked':''} aria-label="کنارگذاری این رویداد از جامعهٔ نمونه‌گیری"></td><td>${esc(sampleDisplayDigits(r['تاریخ']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره سند']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره ردیف']??''))}</td><td>${fmt(parseAmount(r['بدهکار']))}</td><td>${fmt(parseAmount(r['بستانکار']))}</td><td>${esc(r['شرح ردیف']||r['شرح سند']||'')}${reason?` <b>— ${reason}</b>`:''}</td></tr>`;}).join('')}
+      </tbody></table></div>
+    </div>
+  </details>`;
+}
+// ===================== پیش‌نمایش و نمونه‌گیری =====================
 function renderOutputStep(){
+  ensureRawPreviews();
   const area=document.getElementById('outputArea');
   if(!SHEET_OUT.length){
-    area.innerHTML='<div class="card"><div class="err">هنوز کاربرگی ساخته نشده است. به مرحله «نمونه‌گیری» برگردید و برای حساب‌ها کاربرگ بسازید.</div></div>';
+    area.innerHTML='<div class="card"><div class="err">برای نمایش پیش‌نمایش، ابتدا از مرحلهٔ «انتخاب حساب» یک یا چند حساب انتخاب کنید.</div></div>';
     return;
   }
   const cfg=[['company','نام واحد مورد رسیدگی'],['year','تاریخ ترازنامه'],['prep','تهیه‌کننده'],['rev','بررسی‌کننده'],['date','تاریخ تهیه']];
@@ -3471,8 +3505,8 @@ function renderOutputStep(){
       <input class="custom-name" type="number" min="1" max="15" data-cfg="ctrl" title="${CFG_HELP.ctrl}" value="${SHEET_CFG.ctrl}"></div>
   </div>
   <div class="card">
-    <h1>کاربرگ‌های تولیدشده</h1>
-    <p class="sub">${faNum(SHEET_OUT.length)} کاربرگ آماده است. برای دیدن هرکدام روی تب آن بزنید.</p>
+    <h1>پیش‌نمایش حساب‌ها</h1>
+    <p class="sub">${faNum(SHEET_OUT.length)} حساب انتخاب شده؛ پیش‌نمایش اولیه خام است و با اعمال نمونه‌گیری به‌روزرسانی می‌شود.</p>
     <div id="staleBox"></div>
     <div class="tabs" id="sheetTabs"></div>
     <div id="sheetViews"></div>
@@ -3499,7 +3533,7 @@ function renderOutputStep(){
 }
 function checkStale(){
   const box=document.getElementById('staleBox'); if(!box) return;
-  const stale=SHEET_OUT.some(item=>JSON.stringify(item.cfg||{})!==JSON.stringify(SAMP_CFG));
+  const stale=SHEET_OUT.some(item=>!item.rawPreview&&JSON.stringify(item.cfg||{})!==JSON.stringify(SAMP_CFG));
   box.innerHTML=stale?'<div class="err" style="margin-bottom:12px">تنظیمات کلی تغییر کرده است؛ برای بازسازی همهٔ کاربرگ‌ها دکمهٔ «اعمال و بازسازی همهٔ کاربرگ‌ها» را بزنید. می‌توانید فقط کاربرگ فعال را هم جداگانه به‌روز کنید.</div>':'';
 }
 function drawSheets(preserveScroll){
@@ -3515,11 +3549,14 @@ function drawSheets(preserveScroll){
   tabs.innerHTML=SHEET_OUT.map((x,k)=>
     `<button class="${k===ACTIVE_SHEET?'active':''}" data-tab="${k}" title="${x.w.pathLabel}">${accLabel(x.w)}</button>`).join('');
   document.getElementById('sheetViews').innerHTML=SHEET_OUT.map((x,k)=>
-    `<div class="sheetwrap ${k===ACTIVE_SHEET?'':'hide'}" data-view="${k}">
-      <div class="btnrow no-print" style="justify-content:flex-start;margin:0 0 10px">${samplePrintControls(x.w)}<span class="sample-page-badge" data-page-badge="${k}"></span>${typeof sampleColumnToolsHTML==='function'?sampleColumnToolsHTML(x.w,k):''}<button class="confirm print-btn native-print-btn">چاپ / ذخیره PDF</button></div>
+    `<div class="sheetwrap ${k===ACTIVE_SHEET?'':'hide'}" data-view="${k}" data-raw-preview="${x.rawPreview?'1':'0'}">
+      <div class="btnrow no-print" style="justify-content:flex-start;margin:0 0 10px">${samplePrintControls(x.w)}<span class="sample-page-badge" data-page-badge="${k}"></span>${typeof sampleColumnToolsHTML==='function'?sampleColumnToolsHTML(x.w,k):''}${x.rawPreview?'<span class="raw-preview-tag">پیش‌نمایش خام</span>':'<button class="confirm print-btn native-print-btn">چاپ / ذخیره PDF</button>'}</div>
+      ${x.rawPreview?'<div class="raw-preview-banner no-print">همهٔ رویدادهای جاری حساب نمایش داده شده‌اند؛ هنوز نمونه‌گیری اعمال نشده است.</div>':''}
+      ${x.error?`<div class="err sample-output-error no-print">${esc(x.error)}</div>`:''}
+      ${samplePopulationHTML(x)}
       <div class="sheet-sampling-edit no-print"><label><span data-sheet-target-label>${x.cfg?.m==='top'?(x.cfg?.tmode==='p'?'درصد این حساب':'مبلغ هدف این حساب'):'تعداد نمونه این حساب'}</span><input class="custom-name sheet-samp-val" type="text" inputmode="decimal" value="${esc(x.target??SAMP_TARGET)}"></label><button type="button" class="confirm" data-apply-sheet-sample="${x.i}">اعمال به این کاربرگ</button></div>
-      ${printHint()}
-      <div class="scrollx" data-sheet-canvas="${k}">${sheetHTML(x.w,x.sel)}</div>
+      ${x.rawPreview?'':printHint()}
+      <div class="scrollx" data-sheet-canvas="${k}">${sheetHTML(x.w,x.sel,x.excludedRows)}</div>
     </div>`).join('');
   document.querySelectorAll('select[data-sample-orientation]').forEach(el=>el.addEventListener('change',()=>{SHEET_CFG.orientation=el.value;drawSheets(true);}));
   document.querySelectorAll('select[data-sample-density]').forEach(el=>el.addEventListener('change',()=>{SHEET_CFG.density=el.value;drawSheets(true);}));
@@ -3549,9 +3586,18 @@ function drawSheets(preserveScroll){
   document.querySelectorAll('.sheetwrap .print-btn').forEach(b=>b.addEventListener('click',()=>printSheet(b.closest('.sheetwrap'))));
   document.querySelectorAll('[data-apply-sheet-sample]').forEach(button=>button.addEventListener('click',()=>{
     const wrap=button.closest('.sheetwrap'),idx=Number(button.dataset.applySheetSample),target=wrap.querySelector('.sheet-samp-val').value;
-    const keep=SHEET_OUT.findIndex(item=>item.i===idx);if(keep>=0)ACTIVE_SHEET=keep;
-    runSampling(idx,SAMP_CFG,target);
-    if(SHEET_OUT.length)renderOutputStep();else gotoStep(5);
+    const sheetIndex=SHEET_OUT.findIndex(item=>item.i===idx);if(sheetIndex>=0)ACTIVE_SHEET=sheetIndex;
+    const item=SHEET_OUT[sheetIndex];runSampling(idx,SAMP_CFG,target,item?.excludedRows||[]);
+    renderOutputStep();
+  }));
+  document.querySelectorAll('[data-population-exclude]').forEach(input=>input.addEventListener('change',()=>{
+    const wrap=input.closest('.sheetwrap'),idx=Number(wrap.dataset.view),item=SHEET_OUT[idx],row=item?.rawRows?.[Number(input.dataset.populationExclude)];if(!item||!row)return;
+    const excluded=item.excludedRows||[];
+    if(input.checked&&!excluded.includes(row))excluded.push(row);
+    if(!input.checked){const at=excluded.indexOf(row);if(at>=0)excluded.splice(at,1);}
+    item.excludedRows=excluded;ACTIVE_SHEET=idx;
+    if(!item.rawPreview)runSampling(item.i,item.cfg,item.target,excluded);
+    renderOutputStep();
   }));
 
   document.querySelectorAll('.sheetwrap').forEach(v=>{
@@ -3572,7 +3618,7 @@ let SAMP_TARGET='';
 let LAST_CFG=null;        // تنظیماتی که کاربرگ‌های فعلی با آن ساخته شده‌اند
 const accLabel=w=>w.keyPath[w.keyPath.length-1].split('|')[1] || w.pathLabel;
 
-function sampleDocs(w){ return docLevelAgg(accountRows(w)); }
+function sampleDocs(w,excludedRows=[]){ return docLevelAgg(accountRows(w).filter(row=>!excludedRows.includes(row))); }
 function docCounters(w){
   const docs=sampleDocs(w);
   return {docs, n:docs.length, rows:docs.reduce((t,d)=>t+d.rows.length,0)};
@@ -3586,72 +3632,9 @@ function syncSamplingControls(root){
   const input=root.querySelector('.samp-val');
   if(input){input.placeholder=top?(pct?'۶۰':'۵۰۰۰۰۰۰۰۰'):'۲۵';input.removeAttribute('title');}
 }
-function renderSamplingStep(){
-  const area=document.getElementById('samplingArea');
-  if(!WORKSHEET_ACCOUNTS.length){
-    area.innerHTML='<div class="card"><div class="err">برای شروع نمونه‌گیری، در مرحله «انتخاب حساب» حداقل یک حساب را با تیک کنارش علامت بزنید.</div>'+
-      '<div class="btnrow"><button class="confirm" id="backToAcctBtn" '+
-      'style="background:var(--panel);color:var(--accent);border:1px dashed var(--accent);">بازگشت به انتخاب حساب</button></div></div>';
-    const b=area.querySelector('#backToAcctBtn');
-    if(b) b.addEventListener('click',()=>gotoStep(4));
-    return;
-  }
-  const opt=(v,l,cur)=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`;
-  area.innerHTML=`
-  <div class="card">
-    <h1>تنظیم نمونه‌گیری</h1>
-    <div class="setrow sample-settings-row">
-      <div class="fld"><label>روش نمونه‌گیری</label>
-        <select class="m-sel">${Object.entries(METHODS).map(([k,v])=>opt(k,v,SAMP_CFG.m)).join('')}</select></div>
-      <div class="fld top-only"><label>مبنای مبلغ</label>
-        <select class="base">${opt('d','ستون بدهکار',SAMP_CFG.base)}${opt('c','ستون بستانکار',SAMP_CFG.base)}${opt('b','بدهکار و بستانکار',SAMP_CFG.base)}</select></div>
-      <div class="fld top-only"><label>نوع هدف</label>
-        <select class="tmode">${opt('p','درصد از کل',SAMP_CFG.tmode)}${opt('a','مبلغ (ریال)',SAMP_CFG.tmode)}</select></div>
-      <div class="fld"><label data-sample-target-label>مقدار هدف</label>
-        <input class="custom-name samp-val" type="text" inputmode="decimal" placeholder="۶۰" value="${esc(SAMP_TARGET)}"></div>
-    </div>
-    <div class="scrollx">
-    <table class="smp">
-      <colgroup><col style="width:48%"><col style="width:13%"><col style="width:13%"><col style="width:18%"><col style="width:8%"></colgroup>
-      <thead><tr><th>حساب</th><th>سند یکتا</th><th>سطر</th><th>وضعیت</th><th></th></tr></thead>
-      <tbody>${WORKSHEET_ACCOUNTS.map((w,i)=>{
-        const c=docCounters(w);
-        return `<tr data-ws-idx="${i}">
-          <td class="acc">${w.pathLabel}</td>
-          <td class="cnt">${faNum(c.n)}</td>
-          <td class="cnt">${faNum(c.rows)}</td>
-          <td class="st">هنوز ساخته نشده</td>
-          <td class="act"><button class="restore-btn ws-remove-btn2" data-idx="${i}"
-            style="background:var(--bad);" title="حذف این حساب از فهرست کاربرگ نمونه">حذف</button></td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>
-    </div>
-    <div class="btnrow">
-      <button class="confirm" id="runAllBtn">ساخت کاربرگ برای همه حساب‌ها</button>
-      <button class="confirm" id="backToAcctBtn"
-        style="background:var(--panel);color:var(--accent);border:1px dashed var(--accent);">بازگشت به انتخاب حساب</button>
-    </div>
-  </div>`;
-
-  // هر حساب از همین مرحله هم قابل حذف است؛ لازم نیست کاربر برگردد و دستی پیدایش کند
-  area.querySelectorAll('.ws-remove-btn2').forEach(btn=>{
-    btn.addEventListener('click',()=>removeWorksheetAccount(Number(btn.dataset.idx)));
-  });
-  const backBtn=area.querySelector('#backToAcctBtn');
-  if(backBtn) backBtn.addEventListener('click',()=>gotoStep(4));
-
-  const q=s=>area.querySelector(s);
-  q('.m-sel').addEventListener('change',e=>{SAMP_CFG.m=e.target.value;syncSamplingControls(area);});
-  q('.base').addEventListener('change',e=>{SAMP_CFG.base=e.target.value;syncSamplingControls(area);});
-  q('.tmode').addEventListener('change',e=>{SAMP_CFG.tmode=e.target.value;syncSamplingControls(area);});
-  q('.samp-val').addEventListener('input',e=>{SAMP_TARGET=e.target.value;});
-  q('#runAllBtn').addEventListener('click',runAllSampling);
-  syncSamplingControls(area);
-}
-function computeSample(i,cfg=SAMP_CFG,targetValue){
-  const w=WORKSHEET_ACCOUNTS[i], docs=sampleDocs(w);
-  const input=document.querySelector('#samplingArea .samp-val')||document.querySelector('#sampleOutputSettings .samp-val')||document.querySelector('.samp-val');
+function computeSample(i,cfg=SAMP_CFG,targetValue,excludedRows=[]){
+  const w=WORKSHEET_ACCOUNTS[i], docs=sampleDocs(w,excludedRows);
+  const input=document.querySelector('#sampleOutputSettings .samp-val')||document.querySelector('.samp-val');
   const m=cfg.m, v=parseAmount(targetValue??input?.value??SAMP_TARGET);
   if(!docs.length) return {err:'سندی در جامعه‌ی این حساب نمانده است'};
   if(!(v>0)) return {err:'مقدار هدف وارد نشده است'};
@@ -3735,26 +3718,22 @@ if(typeof document!=='undefined'&&typeof window!=='undefined'&&!window.__sampleR
     const wrap=button.closest('.sheetwrap');sampleRemoveRow(Number(wrap?.dataset.view),Number(button.dataset.sampleRemove));
   });
 }
-function runSampling(i,cfg=SAMP_CFG,targetValue){
-  const target=targetValue??document.querySelector('#samplingArea .samp-val')?.value??SAMP_TARGET;
-  const r=computeSample(i,cfg,target), row=document.querySelector(`tr[data-ws-idx="${i}"]`), st=row?.querySelector('.st');
-  if(r.err){ if(st){st.className='st warn';st.textContent=r.err;}SHEET_OUT=SHEET_OUT.filter(x=>x.i!==i);renderStepper();return false; }
-  if(st){st.className='st ok';st.textContent=sampleSelectionStatus({sel:r.res.sel,count:r.res.count,unit:r.res.unit});st.title=r.msg;}
-  const item={i,w:WORKSHEET_ACCOUNTS[i],sel:r.res.sel,count:r.res.count,unit:r.res.unit,msg:r.msg,cfg:{...cfg},target:String(target??'')};
+function runSampling(i,cfg=SAMP_CFG,targetValue,excludedRows){
+  const target=targetValue??document.querySelector('#sampleOutputSettings .samp-val')?.value??SAMP_TARGET;
+  const old=SHEET_OUT.find(item=>item.i===i),excluded=excludedRows??old?.excludedRows??[],rawRows=old?.rawRows??accountRows(WORKSHEET_ACCOUNTS[i]);
+  const r=computeSample(i,cfg,target,excluded);
+  if(r.err){
+    if(old){old.rawPreview=true;old.sel=docLevelAgg(rawRows);old.count=rawRows.length;old.unit='row';old.error=r.err;old.cfg={...cfg};old.target=String(target??'');old.excludedRows=excluded;}
+    renderStepper();return false;
+  }
+  const item={...old,i,w:WORKSHEET_ACCOUNTS[i],sel:r.res.sel,count:r.res.count,unit:r.res.unit,msg:r.msg,cfg:{...cfg},target:String(target??''),rawRows,excludedRows:excluded,rawPreview:false,error:''};
   const ex=SHEET_OUT.findIndex(x=>x.i===i);
   if(ex>=0)SHEET_OUT[ex]=item;else SHEET_OUT.push(item);
   LAST_CFG=JSON.stringify(cfg);
   renderStepper();
   return true;
 }
-function runAllSampling(){
-  SAMP_TARGET=document.querySelector('#samplingArea .samp-val')?.value??SAMP_TARGET;
-  let ok=0, fail=0;
-  WORKSHEET_ACCOUNTS.forEach((_,i)=>{ runSampling(i,SAMP_CFG,SAMP_TARGET)?ok++:fail++; });
-  if(fail && !ok) return;
-  if(fail) alert(`${faNum(ok)} کاربرگ ساخته شد. ${faNum(fail)} حساب به دلیل خطا ساخته نشد — ستون «وضعیت» را ببینید.`);
-  gotoStep(6);
-}
+
 
 // ===================================================================
 //  ماژول ۲ — موتور آنالیز و رسیدگی به حساب
@@ -7177,7 +7156,7 @@ if(typeof window!=='undefined'&&!window.__sampleDirectPrintBound){
  let directRule=null,directTitle='';
  window.addEventListener('beforeprint',()=>{
   if(document.body.classList.contains('printing'))return;
-  const activeWrap=document.querySelector('.stage.active[data-stage="6"] .sheetwrap:not(.hide)');
+  const activeWrap=document.querySelector('.stage.active[data-stage="5"] .sheetwrap:not(.hide)');
   const ph=document.getElementById('printHost');
   if(!activeWrap||!ph)return;
   const idx=Number(activeWrap.dataset.view);
