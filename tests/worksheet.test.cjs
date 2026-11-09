@@ -9,6 +9,15 @@ const o={a:{title:'آزمایشی',code:'123'},A,sec:{'ماهیت':{text:'شرح
 const cats=reportAggregate({groups:[{category:'گردش',basis:'شرح',refs:data.groups.map(x=>x.id)}]},data);o.report={data,categories:cats,prepared:true,busy:false};ANA.out=[o];ANA.active=0;ANA.aiBy={};
 renderAnalysisOutput();const root=document.querySelector('#anaSheet .audit-template');
 function ok(v,msg){if(!v)throw Error(msg)}
+const capDocs=[{id:'54',amount:54},{id:'47',amount:47},{id:'20',amount:20},{id:'5',amount:5}],capped=selTop(capDocs,50,d=>d.amount,true);
+ok(capped.sum===47&&capped.sel.map(d=>d.id).join(',')==='47','percentage selection must skip documents that exceed the cap');
+ok(sampleCoveragePercent(579,1000)===57.9,'actual percentage rounds down to one decimal');
+ok(selTop([{amount:54}],50,d=>d.amount).sum===54,'fixed-amount target keeps existing reach/overshoot behavior');
+const oldSampleDocs=sampleDocs,oldSampleAccounts=WORKSHEET_ACCOUNTS,oldSampleCfg={...SAMP_CFG},pctInput=document.createElement('input');pctInput.className='samp-val';pctInput.value='50';document.body.append(pctInput);
+sampleDocs=()=>capDocs.map(d=>({doc:d.id,debit:d.amount,credit:0,rows:[]}));WORKSHEET_ACCOUNTS=[{}];SAMP_CFG={m:'top',base:'d',tmode:'p'};const sampleResult=computeSample(0);
+ok(sampleResult.res.sum===59&&sampleResult.msg.includes('۴۶٫۸٪')&&sampleResult.msg.includes('سقف درخواستی ۵۰٪'),'percentage run caps selected amount and reports rounded-down actual coverage');
+sampleDocs=oldSampleDocs;WORKSHEET_ACCOUNTS=oldSampleAccounts;SAMP_CFG=oldSampleCfg;pctInput.remove();
+ok(!METHOD_HELP.top.li[2].includes('تا رسیدن به ۶۰٪')&&METHOD_HELP.top.li[2].includes('پوشش واقعی ممکن است کمتر باشد'),'percentage help describes a cap');
 ok(root.querySelector('[data-unit-header]').textContent.includes('ریال'),'rial header');ok(root.querySelectorAll('.descs tbody tr').length===9,'rows');ok(!root.querySelector('.acct-meta-strip')&&!root.querySelector('[data-account-code]'),'removed account metadata');ok(!root.querySelector('.c-id')&&!root.textContent.includes('عطف'),'removed analysis reference column');ok(o.unitMode==='rial','rial default');ok(!document.querySelector('#anaUnitMode'),'no million-rial option');
 ok([...root.querySelectorAll('.compact-note .body')].map(e=>e.dataset.field).join(',')==='issues,follow-up,conclusion','order');
 let x=root.querySelector('[data-row-index="1"][data-amount="dr"]');x.textContent='۲٬۰۰۰٬۰۰۰';x.dispatchEvent(new Event('input',{bubbles:true}));ok(root.querySelector('[data-amount="sumdr"]').textContent==='۲٬۰۰۰٬۰۰۰','sum in full rials');ok(root.querySelector('[data-amount="baldr"]').textContent==='۱٬۶۰۰٬۰۰۰','balance in full rials');

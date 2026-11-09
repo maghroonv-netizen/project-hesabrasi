@@ -3148,10 +3148,16 @@ function docLevelAgg(rows){
   });
   return [...m.values()];
 }
-function selTop(docs,target,amt){
+function sampleCoveragePercent(sum,total){return total>0?Math.floor((sum/total*100+1e-10)*10)/10:0;}
+function selTop(docs,target,amt,capAtTarget=false){
   const arr=docs.filter(d=>amt(d)>0).sort((a,b)=>amt(b)-amt(a));
   const sel=[]; let sum=0;
-  for(const d of arr){ if(sum>=target) break; sel.push(d); sum+=amt(d); }
+  for(const d of arr){
+    if(sum>=target) break;
+    const value=amt(d);
+    if(capAtTarget&&sum+value>target+Math.max(1e-9,Math.abs(target)*1e-12))continue;
+    sel.push(d);sum+=value;
+  }
   return {sel,sum};
 }
 function selMus(docs,n){
@@ -3249,11 +3255,11 @@ function pctTxt(x,tot){ return tot>0 ? (Math.round(x/tot*1000)/10).toLocaleStrin
 // ---- راهنمای هر گزینه در بخش نمونه‌گیری: دقیقاً چه کاری باید انجام شود ----
 const METHOD_HELP = {
   top:{
-    head:'روش «اقلام کلیدی» — کاربرگ بر چه اساسی نمونه‌گیری می‌شود؟ انتخاب از بزرگ‌ترین مبلغ به سمت کوچک‌تر، تا رسیدن به هدف مبلغی.',
+    head:'روش «اقلام کلیدی» — کاربرگ بر چه اساسی نمونه‌گیری می‌شود؟ انتخاب از بزرگ‌ترین مبلغ به سمت کوچک‌تر، با هدف مبلغی یا سقف درصدیِ بدون عبور.',
     li:[
       'در «مبنای مبلغ» تعیین کنید بزرگی سند بر اساس کدام عدد سنجیده شود: ستون <b>بدهکار</b>، ستون <b>بستانکار</b>، یا <b>مجموع هر دو</b>.',
       'در «نوع هدف» انتخاب کنید هدف به‌صورت <b>درصد از مجموع همان مبنا</b> است یا <b>مبلغ ثابت به ریال</b>.',
-      'در کادر مقدار، عدد را بدون کاما و جداکننده بنویسید. مثال: <b>۶۰</b> در حالت درصدی یعنی «تا رسیدن به ۶۰٪ مجموع بدهکار»؛ در حالت مبلغی <b>۵۰۰۰۰۰۰۰۰</b> یعنی ۵۰۰ میلیون ریال.',
+      'در کادر مقدار، عدد را بدون کاما و جداکننده بنویسید. مثال: <b>۶۰</b> در حالت درصدی یعنی سقف تقریبیِ ۶۰٪ از مجموع بدهکار؛ سندی که باعث عبور از این سقف شود انتخاب نمی‌شود و پوشش واقعی ممکن است کمتر باشد. در حالت مبلغی <b>۵۰۰۰۰۰۰۰۰</b> یعنی هدف ۵۰۰ میلیون ریال.',
       'انتخاب اشتباه مبنا کل نتیجه را جابه‌جا می‌کند: برای حساب‌های فروش معمولاً ستون <b>بستانکار</b> و برای حساب‌های خرید و هزینه ستون <b>بدهکار</b> ملاک است.'
     ],
     warn:'سند ابتدای سال هرگز وارد نمونه‌گیری نمی‌شود؛ فقط در جدول «تفکیک گردش و مانده» پایین کاربرگ می‌آید.'
@@ -3558,9 +3564,9 @@ function updateSamplingHelp(){
   help.innerHTML=helpHtml(m);
   area.querySelectorAll('.top-only').forEach(el=>el.style.display = m==='top'?'':'none');
   const val=area.querySelector('.samp-val');
-  val.placeholder = m==='top' ? (pct?'درصدی که نمونه باید پوشش دهد — مثال: ۶۰':'مبلغ هدف به ریال — مثال: ۵۰۰۰۰۰۰۰۰')
+  val.placeholder = m==='top' ? (pct?'سقف درصد پوشش — مثال: ۶۰':'مبلغ هدف به ریال — مثال: ۵۰۰۰۰۰۰۰۰')
                               : 'تعداد سند نمونه — مثال: ۲۵';
-  val.title = m==='top' ? (pct?'درصدی از مجموع ستون مبنا که اسناد منتخب باید پوشش دهند (عددی بین ۱ تا ۱۰۰).'
+  val.title = m==='top' ? (pct?'سقف درصدی از مجموع ستون مبنا؛ انتخاب از آن عبور نمی‌کند و پوشش واقعی ممکن است کمتر باشد (۱ تا ۱۰۰).'
                              : 'مبلغ ثابت به ریال که مجموع اسناد منتخب باید به آن برسد.')
                       : 'تعداد اسنادی که می‌خواهید نمونه شوند. اگر بیشتر از تعداد اسناد جامعه باشد، همه انتخاب می‌شوند.';
 }
@@ -3633,6 +3639,7 @@ function computeSample(i){
   const m=SAMP_CFG.m, v=parseAmount(document.querySelector('.samp-val').value);
   if(!docs.length) return {err:'سندی در جامعه‌ی این حساب نمانده است'};
   if(!(v>0)) return {err:'مقدار هدف وارد نشده است'};
+  if(m==='top'&&SAMP_CFG.tmode==='p'&&(v<1||v>100))return {err:'درصد هدف باید عددی بین ۱ تا ۱۰۰ باشد'};
   let res, msg='';
   if(m==='top'){
     const base=SAMP_CFG.base, pct=SAMP_CFG.tmode==='p';
@@ -3646,9 +3653,11 @@ function computeSample(i){
                 : 'جمع مبنای انتخابی صفر است';
       return {err:'مبنای مبلغ نادرست — '+why};
     }
-    res=selTop(docs, pct?total*v/100:v, amt);
+    res=selTop(docs, pct?total*v/100:v, amt, pct);
+    if(!res.sel.length)return {err:pct?'هیچ سندی بدون عبور از درصد هدف قابل انتخاب نیست؛ درصد را افزایش دهید.':'هیچ سندی بدون عبور از مبلغ هدف انتخاب نشد.'};
     const baseName = base==='d'?'بدهکار':base==='c'?'بستانکار':'بدهکار و بستانکار';
-    msg = pct ? `پوشش ${(Math.round(res.sum/total*1000)/10).toLocaleString('fa-IR')}٪ از مجموع ستون ${baseName}`
+    const actualPct=sampleCoveragePercent(res.sum,total);
+    msg = pct ? `پوشش واقعی ${actualPct.toLocaleString('fa-IR')}٪ از مجموع ستون ${baseName}؛ سقف درخواستی ${v.toLocaleString('fa-IR')}٪ و بدون عبور`
               : `رسیدن به مبلغ ${fmt(v)} ریال از ستون ${baseName}`;
   } else {
     let n=Math.round(v);
