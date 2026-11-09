@@ -32,15 +32,15 @@ const { PDFDocument } = require('pdf-lib');
       const hidden=canvas.dataset.paginated;
       document.body.classList.remove('meta-stage-active');document.getElementById('projectMeta').hidden=true;
       document.querySelectorAll('.stage').forEach(x=>x.classList.remove('active'));document.querySelector('[data-stage="6"]').classList.add('active');
-      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length};
+      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:canvas.querySelectorAll('.refcircle').length};
     });
-    assert.deepStrictEqual(initial,{hidden:'1',buttons:38});
+    assert.deepStrictEqual(initial,{hidden:'1',buttons:38,refMarkers:0});
     await page.evaluate(() => {
       const canvas=document.querySelector('.sheetwrap:not(.hide) [data-sheet-canvas]');
       for(const anchor of canvas.querySelectorAll('.cp-ws-anchor'))if(!anchor.closest('.p'))throw Error('Evidence button is not after the account name');
       const row=canvas.querySelector('tr.item'),anchor=row.querySelector('.cp-ws-anchor'),parent=anchor.parentElement,h=row.getBoundingClientRect().height;
       anchor.remove();if(Math.abs(row.getBoundingClientRect().height-h)>0.1)throw Error('Evidence changes row height');parent.append(anchor);
-      canvas.querySelector('.cp-ws-anchor button').click();
+      const evButton=canvas.querySelector('.cp-ws-anchor button');evButton.click();
       const dialog=document.getElementById('cpWorksheetDialog'),lines=[...dialog.querySelectorAll('.cp-ws-evidence tbody tr')],totals=[...dialog.querySelectorAll('.cp-ws-evidence tfoot td')];
       if(lines.length!==2||!lines[0].textContent.includes('حساب نمونه')||!lines[1].textContent.includes('طرف حساب'))throw Error('Evidence must place debit before credit');
       if(totals[1].textContent!=='۱٬۰۰۰٬۰۰۰'||totals[2].textContent!=='۱٬۰۰۰٬۰۰۰')throw Error('Evidence totals are incorrect');dialog.close();
@@ -54,6 +54,17 @@ const { PDFDocument } = require('pdf-lib');
       if(cpWorksheetExactSum(['9007199254740993','1','3'])!=='۹٬۰۰۷٬۱۹۹٬۲۵۴٬۷۴۰٬۹۹۷')throw Error('Integer totals were rounded');
       if(cpWorksheetExactText('-1234567.0500',false)!=='-۱٬۲۳۴٬۵۶۷٫۰۵۰۰'||cpWorksheetExactSum(['-1.25','3.5'])!=='۲٫۲۵')throw Error('Signed/decimal source amounts were changed');
       const firstCells=[...body[0].cells].map(c=>c.getBoundingClientRect().left);if(getComputedStyle(document.querySelector('#cpWorksheetDialog .cp-ws-evidence table')).direction!=='rtl'||firstCells[0]<=firstCells.at(-1))throw Error('Evidence columns are not visually right-to-left');document.getElementById('cpWorksheetDialog').close();
+      const bundle=(code,line,d,c)=>({'شماره سند':'901','ردیف سند':String(line),'تاریخ':'1403/01/02','شرح سند':'سند یک‌به‌چند','کد حساب':code,'عنوان حساب':'حساب '+code,'شرح ردیف':'رویداد '+line,'بدهکار':d,'بستانکار':c});
+      const many=[bundle('SAMPLE',1,'100','0'),...Array.from({length:10},(_,i)=>bundle('EVENT-'+i,i+2,'0','10'))];
+      FULL_ROWS=many;CP_LAB_META={...CP_LAB_META,source:many};const manyCtx=cpLabContext(many);CP_WS_CONTEXT=manyCtx;cpWorksheetOpen(many[0],manyCtx);
+      const summary=document.querySelector('#cpWorksheetDialog .cp-ws-reconcile'),matched=document.querySelectorAll('#cpWorksheetDialog [data-counterpart="true"]'),tail=[...document.querySelectorAll('#cpWorksheetDialog .cp-ws-evidence tfoot tr')];
+      if(matched.length!==10||!summary?.textContent.includes('۱۰ ردیف')||!summary?.textContent.includes('برابر است'))throw Error('One-to-many counterparty aggregate is not clear: '+(summary?.textContent||document.getElementById('cpWorksheetDialog')?.innerHTML||'no dialog'));
+      if(tail.length!==2||tail[1].cells[2].textContent.trim()!=='۱۰۰')throw Error('Counterparty side subtotal is missing or wrong');document.getElementById('cpWorksheetDialog').close();
+      const ordered=(line,code,d,c)=>({'شماره سند':'902','ردیف سند':String(line),'تاریخ':'1403/01/03','شرح سند':'دو بخش پی‌درپی','کد حساب':code,'عنوان حساب':'حساب '+code,'شرح ردیف':'رویداد '+line,'بدهکار':d,'بستانکار':c});
+      const blocks=[ordered(1,'SAMPLE-A','100','0'),ordered(2,'CREDIT-A1','0','60'),ordered(3,'CREDIT-A2','0','40'),ordered(4,'SAMPLE-B','50','0'),ordered(5,'CREDIT-B1','0','20'),ordered(6,'CREDIT-B2','0','30')];
+      FULL_ROWS=blocks;CP_LAB_META={...CP_LAB_META,source:blocks};const blockCtx=cpLabContext(blocks);CP_WS_CONTEXT=blockCtx;cpWorksheetOpen(blocks[0],blockCtx);
+      const blockSummary=document.querySelector('#cpWorksheetDialog .cp-ws-reconcile'),blockRows=document.querySelectorAll('#cpWorksheetDialog [data-counterpart="true"]');
+      if(blockRows.length!==2||!blockSummary.textContent.includes('مرزبندی')||!blockSummary.textContent.includes('برابر است'))throw Error('Voucher row-number sequence was not shown as a qualified structural grouping: '+blockSummary?.textContent);document.getElementById('cpWorksheetDialog').close();
     });
     for(const [orientation,density] of [['landscape','normal'],['landscape','compact'],['portrait','normal']]){
       await page.evaluate(([orientation,density])=>{
