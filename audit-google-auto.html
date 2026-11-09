@@ -1949,6 +1949,7 @@ body.meta-stage-active .wrap{display:none!important;}
 .raw-preview-banner{padding:9px 12px;margin:0 0 10px;border-inline-start:3px solid var(--accent);background:var(--bg);color:var(--muted);font-size:.82rem;}
 .raw-preview-tag{padding:6px 10px;border-radius:8px;background:var(--ok-bg);color:var(--ok);font-size:.8rem;font-weight:700;}
 .sample-output-error{margin:0 0 10px;}
+.xfer-opt{display:flex;align-items:flex-start;gap:8px;margin:12px 0 0;font-size:.84rem;font-weight:600;line-height:1.7;cursor:pointer;}.xfer-opt input{margin-top:6px;flex:none;}
 .sample-population-manager{margin:0 0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);}
 .sample-population-manager summary{padding:10px 12px;cursor:pointer;font-weight:700;font-size:.84rem;}
 .sample-population-tools{padding:0 12px 12px;}
@@ -2452,7 +2453,7 @@ function handleFile(file){
   TYPE_OVERRIDES = new Map();
   currentHeaders = []; currentRows = []; FULL_ROWS = [];
   ACCOUNT_LEVELS = []; SELECTED_BY_LEVEL = []; ACCOUNT_ROWS = []; WORKSHEET_ACCOUNTS = [];
-  SHEET_OUT = []; ACTIVE_SHEET = 0; SAMP_TARGET=''; SAMP_CFG={m:'top',base:'d',tmode:'p'}; LAST_CFG=null;
+  SHEET_OUT = []; ACTIVE_SHEET = 0; SAMP_TARGET=''; SAMP_CFG={m:'top',base:'d',tmode:'p',xfer:true}; LAST_CFG=null;
   ANA.accounts=[]; ANA.pickerPath=[]; ANA.out=[]; ANA.active=0;
   ANA.nextRows=[]; ANA.nextLoaded=false; ANA.nextName='';
   ANA.materiality=null; ANA.periodLabel=''; ANA.finProvided=false;
@@ -3455,27 +3456,44 @@ function printSheet(host){
 
 function ensureRawPreviews(){
   const current=SHEET_OUT.length===WORKSHEET_ACCOUNTS.length&&SHEET_OUT.every((item,i)=>!item.w||item.w===WORKSHEET_ACCOUNTS[i]);
-  if(current){SHEET_OUT.forEach((item,i)=>{item.i=i;item.w=WORKSHEET_ACCOUNTS[i];item.rawRows??=accountRows(item.w);item.excludedRows??=[];item.cfg??={...SAMP_CFG};item.target??=SAMP_TARGET;if(item.rawPreview===undefined)item.rawPreview=false;});return;}
+  if(current){SHEET_OUT.forEach((item,i)=>{item.i=i;item.w=WORKSHEET_ACCOUNTS[i];item.rawRows??=accountRows(item.w);item.excludedRows??=[];item.keptRows??=[];item.cfg??={...SAMP_CFG};item.target??=SAMP_TARGET;if(item.rawPreview===undefined)item.rawPreview=false;});return;}
   SHEET_OUT=WORKSHEET_ACCOUNTS.map((w,i)=>{
     const rawRows=accountRows(w),sel=docLevelAgg(rawRows);
-    return {i,w,sel,count:rawRows.length,unit:'row',msg:'پیش‌نمایش خام گردش حساب؛ نمونه‌گیری هنوز اعمال نشده است.',cfg:{...SAMP_CFG},target:SAMP_TARGET,rawRows,excludedRows:[],rawPreview:true};
+    return {i,w,sel,count:rawRows.length,unit:'row',msg:'پیش‌نمایش خام گردش حساب؛ نمونه‌گیری هنوز اعمال نشده است.',cfg:{...SAMP_CFG},target:SAMP_TARGET,rawRows,excludedRows:[],keptRows:[],rawPreview:true};
   });
   ACTIVE_SHEET=0;
 }
 function sampleTransferReason(row){
-  const text=[row['شرح سند'],row['شرح ردیف'],row['نوع سند']].join(' ');
-  return /انتقال|مانده\s*(انتقال|تسویه)|تسویه\s*(مانده|حساب)|بستن\s*حساب|اصلاح\s*حساب/.test(text)?'احتمال انتقال/تسویه':'';
+  // فقط انتقال/تسویهٔ «مانده» و «حساب» تشخیص داده می‌شود؛ «انتقال وجه» و پرداخت/دریافت عادی نباید کنار برود.
+  const text=[row['شرح سند'],row['شرح ردیف'],row['نوع سند']].join(' ').replace(/[\u200c\u200f\u200e]/g,' ');
+  if(/انتقال\s*(مانده|حساب|بالانس|بدهی|بستانکاری|به\s*حساب|از\s*حساب)|(انتقال|منتقل)[^\n.،]{0,25}مانده|مانده\s*(انتقال|منتقل|تسویه)|تسویه\s*(مانده|حساب)|بستن\s*حساب|اصلاح\s*حساب|جابه\s*جایی\s*مانده|جابجایی\s*مانده/.test(text))return 'احتمال انتقال/تسویه';
+  return '';
+}
+// جامعهٔ مؤثر نمونه‌گیری = رویدادهای دستی‌کنارگذاشته + (در صورت روشن‌بودن گزینه) انتقال‌مانده‌های تشخیص‌داده‌شده، منهای مواردی که کاربر دستی نگه داشته است
+function sampleEffectiveExcluded(rawRows,manual,kept,cfg){
+  const set=new Set(manual||[]);
+  if(!cfg||cfg.xfer!==false){const keep=new Set(kept||[]);(rawRows||[]).forEach(r=>{if(!keep.has(r)&&sampleTransferReason(r))set.add(r);});}
+  return [...set];
 }
 function samplePopulationHTML(item){
-  const rows=item.rawRows||accountRows(item.w),excluded=item.excludedRows||[],suspects=rows.filter(sampleTransferReason).length;
+  const rows=item.rawRows||accountRows(item.w),cfgUse=item.rawPreview?SAMP_CFG:(item.cfg||SAMP_CFG),excluded=new Set(sampleEffectiveExcluded(rows,item.excludedRows,item.keptRows,cfgUse)),suspects=rows.filter(sampleTransferReason).length;
+  if(!suspects)return '';
+  const note=cfgUse.xfer!==false
+    ?'کنارگذاری خودکار انتقال‌مانده روشن است: موارد احتمالی انتقال/تسویه از جامعهٔ نمونه‌گیری کنار می‌روند و در «سایر اقلام (رسیدگی‌نشده)» می‌آیند. برای هر رویداد می‌توانید تیک را بردارید یا بگذارید.'
+    :'کنارگذاری خودکار انتقال‌مانده خاموش است؛ فقط ردیف‌هایی که تیک بزنید از جامعهٔ نمونه‌گیری کنار می‌روند.';
   return `<details class="sample-population-manager no-print" ${item.rawPreview&&suspects?'open':''}>
-    <summary>جامعهٔ نمونه و انتقال‌مانده‌ها — ${faNum(rows.length)} رویداد، ${faNum(suspects)} مورد احتمالی، ${faNum(excluded.length)} مورد کنارگذاشته</summary>
-    <div class="sample-population-tools"><span>موارد انتقالی خودکار حذف نمی‌شوند؛ با تیک‌زدن هر ردیف، فقط همان رویداد از جامعهٔ نمونه‌گیری کنار می‌رود و فایل منبع تغییر نمی‌کند.</span>
-      <div class="scrollx"><table><thead><tr><th>جامعه</th><th>تاریخ</th><th>سند</th><th>ردیف</th><th>بدهکار</th><th>بستانکار</th><th>شرح / تشخیص</th></tr></thead><tbody>
-      ${rows.map((r,index)=>{const reason=sampleTransferReason(r),off=excluded.includes(r);return `<tr class="${reason?'transfer-candidate':''} ${off?'excluded':''}"><td><input type="checkbox" data-population-exclude="${index}" ${off?'checked':''} aria-label="کنارگذاری این رویداد از جامعهٔ نمونه‌گیری"></td><td>${esc(sampleDisplayDigits(r['تاریخ']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره سند']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره ردیف']??''))}</td><td>${fmt(parseAmount(r['بدهکار']))}</td><td>${fmt(parseAmount(r['بستانکار']))}</td><td>${esc(r['شرح ردیف']||r['شرح سند']||'')}${reason?` <b>— ${reason}</b>`:''}</td></tr>`;}).join('')}
+    <summary>جامعهٔ نمونه و انتقال‌مانده‌ها — ${faNum(rows.length)} رویداد، ${faNum(suspects)} مورد احتمالی انتقال/تسویه، ${faNum(excluded.size)} مورد کنارگذاشته از جامعهٔ نمونه‌گیری</summary>
+    <div class="sample-population-tools"><span>${note} فایل منبع تغییر نمی‌کند.</span>
+      <div class="scrollx"><table><thead><tr><th>کنارگذاری</th><th>تاریخ</th><th>سند</th><th>ردیف</th><th>بدهکار</th><th>بستانکار</th><th>شرح / تشخیص</th></tr></thead><tbody>
+      ${rows.map((r,index)=>{const reason=sampleTransferReason(r),off=excluded.has(r);return `<tr class="${reason?'transfer-candidate':''} ${off?'excluded':''}"><td><input type="checkbox" data-population-exclude="${index}" ${off?'checked':''} aria-label="کنارگذاری این رویداد از جامعهٔ نمونه‌گیری"></td><td>${esc(sampleDisplayDigits(r['تاریخ']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره سند']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره ردیف']??''))}</td><td>${fmt(parseAmount(r['بدهکار']))}</td><td>${fmt(parseAmount(r['بستانکار']))}</td><td>${esc(r['شرح ردیف']||r['شرح سند']||'')}${reason?` <b>— ${reason}</b>`:''}</td></tr>`;}).join('')}
       </tbody></table></div>
     </div>
   </details>`;
+}
+function syncTransferOptionForActive(){
+  const option=document.querySelector('#sampleOutputSettings .xfer-opt'),item=SHEET_OUT[ACTIVE_SHEET];if(!option)return;
+  const rows=item?.rawRows|| (item?accountRows(item.w):[]);
+  option.style.display=rows.some(sampleTransferReason)?'':'none';
 }
 // ===================== پیش‌نمایش و نمونه‌گیری =====================
 function renderOutputStep(){
@@ -3485,7 +3503,6 @@ function renderOutputStep(){
     area.innerHTML='<div class="card"><div class="err">برای نمایش پیش‌نمایش، ابتدا از مرحلهٔ «انتخاب حساب» یک یا چند حساب انتخاب کنید.</div></div>';
     return;
   }
-  const cfg=[['company','نام واحد مورد رسیدگی'],['year','تاریخ ترازنامه'],['prep','تهیه‌کننده'],['rev','بررسی‌کننده'],['date','تاریخ تهیه']];
   area.innerHTML=`
   <div class="card sample-output-settings" id="sampleOutputSettings">
     <h1>تنظیم و اعمال نمونه‌گیری</h1>
@@ -3494,15 +3511,10 @@ function renderOutputStep(){
       <div class="fld top-only"><label>مبنای مبلغ</label><select class="base">${[['d','ستون بدهکار'],['c','ستون بستانکار'],['b','بدهکار و بستانکار']].map(([k,v])=>`<option value="${k}" ${SAMP_CFG.base===k?'selected':''}>${v}</option>`).join('')}</select></div>
       <div class="fld top-only"><label>نوع هدف</label><select class="tmode"><option value="p" ${SAMP_CFG.tmode==='p'?'selected':''}>درصد از کل</option><option value="a" ${SAMP_CFG.tmode==='a'?'selected':''}>مبلغ (ریال)</option></select></div>
       <div class="fld"><label data-sample-target-label>مقدار هدف</label><input class="custom-name samp-val" type="text" inputmode="decimal" placeholder="۶۰" value="${esc(SAMP_TARGET)}"></div>
+      <div class="fld"><label>تعداد ستون‌های کنترل</label><input class="custom-name" type="number" min="1" max="15" data-cfg="ctrl" title="${CFG_HELP.ctrl}" value="${SHEET_CFG.ctrl}"></div>
     </div>
+    <label class="xfer-opt"><input type="checkbox" class="xfer-chk" ${SAMP_CFG.xfer!==false?'checked':''}><span>انتقال‌مانده‌ها و اسناد تسویه/بستن حساب از جامعهٔ نمونه‌گیری کنار گذاشته شوند و جزو «سایر اقلام (رسیدگی‌نشده)» بیایند، تا نمونه‌گیری (مثلاً ۶۰٪) روی رویدادهای اصلی سال انجام شود.</span></label>
     <div class="btnrow"><button type="button" class="confirm" id="applyAllSamplesBtn">اعمال و بازسازی همهٔ کاربرگ‌ها</button></div>
-  </div>
-  <div class="card">
-    <h1>مشخصات سربرگ کاربرگ</h1>
-    <p class="sub">این مقادیر در سربرگ کاربرگ چاپی درج می‌شوند. روی هر کادر نگه دارید تا توضیح آن را ببینید.</p>
-    <div class="cfg">${cfg.map(([k,l])=>
-      `<input class="custom-name" data-cfg="${k}" placeholder="${l}" title="${CFG_HELP[k]}" value="${esc(SHEET_CFG[k])}">`).join('')}
-      <input class="custom-name" type="number" min="1" max="15" data-cfg="ctrl" title="${CFG_HELP.ctrl}" value="${SHEET_CFG.ctrl}"></div>
   </div>
   <div class="card">
     <h1>پیش‌نمایش حساب‌ها</h1>
@@ -3516,6 +3528,7 @@ function renderOutputStep(){
   settings.querySelector('.m-sel').addEventListener('change',e=>{SAMP_CFG.m=e.target.value;syncSamplingControls(settings);checkStale();});
   settings.querySelector('.base').addEventListener('change',e=>{SAMP_CFG.base=e.target.value;syncSamplingControls(settings);checkStale();});
   settings.querySelector('.tmode').addEventListener('change',e=>{SAMP_CFG.tmode=e.target.value;syncSamplingControls(settings);checkStale();});
+  settings.querySelector('.xfer-chk').addEventListener('change',e=>{SAMP_CFG.xfer=e.target.checked;checkStale();});
   settings.querySelector('.samp-val').addEventListener('input',e=>{SAMP_TARGET=e.target.value;});
   settings.querySelector('#applyAllSamplesBtn').addEventListener('click',()=>{
     SAMP_TARGET=settings.querySelector('.samp-val').value;
@@ -3530,11 +3543,12 @@ function renderOutputStep(){
     drawSheets(true);
   }));
   drawSheets();
+  syncTransferOptionForActive();
 }
 function checkStale(){
   const box=document.getElementById('staleBox'); if(!box) return;
   const stale=SHEET_OUT.some(item=>!item.rawPreview&&JSON.stringify(item.cfg||{})!==JSON.stringify(SAMP_CFG));
-  box.innerHTML=stale?'<div class="err" style="margin-bottom:12px">تنظیمات کلی تغییر کرده است؛ برای بازسازی همهٔ کاربرگ‌ها دکمهٔ «اعمال و بازسازی همهٔ کاربرگ‌ها» را بزنید. می‌توانید فقط کاربرگ فعال را هم جداگانه به‌روز کنید.</div>':'';
+  box.innerHTML=stale?'<div class="err" style="margin-bottom:12px">تنظیمات کلی تغییر کرده است؛ برای بازسازی همهٔ کاربرگ‌ها دکمهٔ «اعمال و بازسازی همهٔ کاربرگ‌ها» را بزنید.</div>':'';
 }
 function drawSheets(preserveScroll){
   const prevY=preserveScroll?window.scrollY:null;
@@ -3554,7 +3568,6 @@ function drawSheets(preserveScroll){
       ${x.rawPreview?'<div class="raw-preview-banner no-print">همهٔ رویدادهای جاری حساب نمایش داده شده‌اند؛ هنوز نمونه‌گیری اعمال نشده است.</div>':''}
       ${x.error?`<div class="err sample-output-error no-print">${esc(x.error)}</div>`:''}
       ${samplePopulationHTML(x)}
-      <div class="sheet-sampling-edit no-print"><label><span data-sheet-target-label>${x.cfg?.m==='top'?(x.cfg?.tmode==='p'?'درصد این حساب':'مبلغ هدف این حساب'):'تعداد نمونه این حساب'}</span><input class="custom-name sheet-samp-val" type="text" inputmode="decimal" value="${esc(x.target??SAMP_TARGET)}"></label><button type="button" class="confirm" data-apply-sheet-sample="${x.i}">اعمال به این کاربرگ</button></div>
       ${x.rawPreview?'':printHint()}
       <div class="scrollx" data-sheet-canvas="${k}">${sheetHTML(x.w,x.sel,x.excludedRows)}</div>
     </div>`).join('');
@@ -3574,6 +3587,7 @@ function drawSheets(preserveScroll){
   }));
   tabs.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{
     ACTIVE_SHEET=+b.dataset.tab;
+    syncTransferOptionForActive();
     tabs.querySelectorAll('[data-tab]').forEach(y=>y.classList.toggle('active', +y.dataset.tab===ACTIVE_SHEET));
     document.querySelectorAll('.sheetwrap').forEach(v=>{
       v.classList.toggle('hide', +v.dataset.view!==ACTIVE_SHEET);
@@ -3584,18 +3598,17 @@ function drawSheets(preserveScroll){
     });
   }));
   document.querySelectorAll('.sheetwrap .print-btn').forEach(b=>b.addEventListener('click',()=>printSheet(b.closest('.sheetwrap'))));
-  document.querySelectorAll('[data-apply-sheet-sample]').forEach(button=>button.addEventListener('click',()=>{
-    const wrap=button.closest('.sheetwrap'),idx=Number(button.dataset.applySheetSample),target=wrap.querySelector('.sheet-samp-val').value;
-    const sheetIndex=SHEET_OUT.findIndex(item=>item.i===idx);if(sheetIndex>=0)ACTIVE_SHEET=sheetIndex;
-    const item=SHEET_OUT[sheetIndex];runSampling(idx,SAMP_CFG,target,item?.excludedRows||[]);
-    renderOutputStep();
-  }));
   document.querySelectorAll('[data-population-exclude]').forEach(input=>input.addEventListener('change',()=>{
     const wrap=input.closest('.sheetwrap'),idx=Number(wrap.dataset.view),item=SHEET_OUT[idx],row=item?.rawRows?.[Number(input.dataset.populationExclude)];if(!item||!row)return;
-    const excluded=item.excludedRows||[];
-    if(input.checked&&!excluded.includes(row))excluded.push(row);
-    if(!input.checked){const at=excluded.indexOf(row);if(at>=0)excluded.splice(at,1);}
-    item.excludedRows=excluded;ACTIVE_SHEET=idx;
+    const cfgUse=item.rawPreview?SAMP_CFG:(item.cfg||SAMP_CFG),excluded=item.excludedRows||[],kept=item.keptRows||[],auto=cfgUse.xfer!==false&&!!sampleTransferReason(row);
+    if(input.checked){
+      if(!excluded.includes(row))excluded.push(row);
+      const k=kept.indexOf(row);if(k>=0)kept.splice(k,1);
+    }else{
+      const at=excluded.indexOf(row);if(at>=0)excluded.splice(at,1);
+      if(auto&&!kept.includes(row))kept.push(row);   // کاربر این مورد انتقالی را عمداً در جامعه نگه داشته است
+    }
+    item.excludedRows=excluded;item.keptRows=kept;ACTIVE_SHEET=idx;
     if(!item.rawPreview)runSampling(item.i,item.cfg,item.target,excluded);
     renderOutputStep();
   }));
@@ -3613,12 +3626,12 @@ function drawSheets(preserveScroll){
   }
 }
 // ---------- تنظیمات مشترک نمونه‌گیری ----------
-let SAMP_CFG={m:'top', base:'d', tmode:'p'};
+let SAMP_CFG={m:'top', base:'d', tmode:'p', xfer:true};
 let SAMP_TARGET='';
 let LAST_CFG=null;        // تنظیماتی که کاربرگ‌های فعلی با آن ساخته شده‌اند
 const accLabel=w=>w.keyPath[w.keyPath.length-1].split('|')[1] || w.pathLabel;
 
-function sampleDocs(w,excludedRows=[]){ return docLevelAgg(accountRows(w).filter(row=>!excludedRows.includes(row))); }
+function sampleDocs(w,excludedRows=[]){ const off=new Set(excludedRows); return docLevelAgg(accountRows(w).filter(row=>!off.has(row))); }
 function docCounters(w){
   const docs=sampleDocs(w);
   return {docs, n:docs.length, rows:docs.reduce((t,d)=>t+d.rows.length,0)};
@@ -3636,7 +3649,7 @@ function computeSample(i,cfg=SAMP_CFG,targetValue,excludedRows=[]){
   const w=WORKSHEET_ACCOUNTS[i], docs=sampleDocs(w,excludedRows);
   const input=document.querySelector('#sampleOutputSettings .samp-val')||document.querySelector('.samp-val');
   const m=cfg.m, v=parseAmount(targetValue??input?.value??SAMP_TARGET);
-  if(!docs.length) return {err:'سندی در جامعه‌ی این حساب نمانده است'};
+  if(!docs.length) return {err:'سندی در جامعه‌ی این حساب نمانده است؛ اگر همهٔ رویدادها انتقال‌مانده تشخیص داده شده‌اند، تیک کنارگذاری را از جدول «جامعهٔ نمونه» بردارید یا گزینهٔ کنارگذاری انتقال‌مانده را خاموش کنید.'};
   if(!(v>0)) return {err:'مقدار هدف وارد نشده است'};
   if(m==='top'&&cfg.tmode==='p'&&(v<1||v>100))return {err:'درصد هدف باید عددی بین ۱ تا ۱۰۰ باشد'};
   let res, msg='';
@@ -3720,13 +3733,14 @@ if(typeof document!=='undefined'&&typeof window!=='undefined'&&!window.__sampleR
 }
 function runSampling(i,cfg=SAMP_CFG,targetValue,excludedRows){
   const target=targetValue??document.querySelector('#sampleOutputSettings .samp-val')?.value??SAMP_TARGET;
-  const old=SHEET_OUT.find(item=>item.i===i),excluded=excludedRows??old?.excludedRows??[],rawRows=old?.rawRows??accountRows(WORKSHEET_ACCOUNTS[i]);
+  const old=SHEET_OUT.find(item=>item.i===i),manual=excludedRows??old?.excludedRows??[],rawRows=old?.rawRows??accountRows(WORKSHEET_ACCOUNTS[i]),kept=old?.keptRows??[],excluded=sampleEffectiveExcluded(rawRows,manual,kept,cfg);
   const r=computeSample(i,cfg,target,excluded);
   if(r.err){
-    if(old){old.rawPreview=true;old.sel=docLevelAgg(rawRows);old.count=rawRows.length;old.unit='row';old.error=r.err;old.cfg={...cfg};old.target=String(target??'');old.excludedRows=excluded;}
+    if(old){old.rawPreview=true;old.sel=docLevelAgg(rawRows);old.count=rawRows.length;old.unit='row';old.error=r.err;old.cfg={...cfg};old.target=String(target??'');old.excludedRows=manual;old.keptRows=kept;}
     renderStepper();return false;
   }
-  const item={...old,i,w:WORKSHEET_ACCOUNTS[i],sel:r.res.sel,count:r.res.count,unit:r.res.unit,msg:r.msg,cfg:{...cfg},target:String(target??''),rawRows,excludedRows:excluded,rawPreview:false,error:''};
+  const item={...old,i,w:WORKSHEET_ACCOUNTS[i],sel:r.res.sel,count:r.res.count,unit:r.res.unit,msg:r.msg,cfg:{...cfg},target:String(target??''),rawRows,excludedRows:manual,keptRows:kept,rawPreview:false,error:''};
+  {const moved=cfg.xfer!==false?excluded.filter(sampleTransferReason).length:0;if(moved)item.msg=(item.msg?item.msg+' · ':'')+faNum(moved)+' رویداد انتقال/تسویه از جامعهٔ نمونه‌گیری کنار گذاشته شد و در «سایر اقلام (رسیدگی‌نشده)» آمده است.';}
   const ex=SHEET_OUT.findIndex(x=>x.i===i);
   if(ex>=0)SHEET_OUT[ex]=item;else SHEET_OUT.push(item);
   LAST_CFG=JSON.stringify(cfg);
