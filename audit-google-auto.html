@@ -1711,6 +1711,23 @@ body.is-col-resizing,body.is-col-resizing *{cursor:col-resize!important;user-sel
  .sampling-template tr.sample-oversize,.sampling-template tr.sample-oversize td{break-inside:auto;page-break-inside:auto}
  .sampling-template .cp-ws-action,.sampling-template .cp-ws-status,.sampling-template .cp-ws-footnote{display:none!important}
 }
+
+/* Neutralize stage-level subtitle spacing in both preview and print. */
+.sheet.sampling-template .sub.sample-desc-text{margin:1px 0 0;max-width:none}
+.sheet.sampling-template[data-sample-density="compact"] .sub.sample-desc-text{margin-top:0}
+
+/* Evidence is an out-of-flow affordance anchored after the final account name. It
+   must never contribute to row height or change the page breaks used for PDF. */
+.sampling-template td.cp{position:relative}
+.sampling-template .cp-ws-anchor{display:inline-block;position:relative;width:0;height:0;vertical-align:baseline;overflow:visible}
+.sampling-template .cp-ws-anchor.cp-ws-empty-anchor{position:absolute;right:5px;top:50%}
+.sampling-template .cp-ws-anchor .cp-ws-action{position:absolute;right:2px;bottom:-4px;z-index:3;display:block;margin:0;padding:1px 3px;white-space:nowrap;border-radius:4px;font:9px/1.3 Tahoma,sans-serif;background:#e9f4fb;color:#174c65;box-shadow:0 0 0 1px #fff}
+.sampling-template .cp-ws-anchor .cp-ws-action:focus-visible{outline:2px solid #0070c0}
+#cpWorksheetDialog .cp-ws-evidence table{min-width:850px;direction:rtl}
+#cpWorksheetDialog .cp-ws-evidence th{background:#edf4f7;white-space:nowrap}
+#cpWorksheetDialog .cp-ws-evidence td.cp-evidence-num,#cpWorksheetDialog .cp-ws-evidence tfoot td.cp-evidence-num{direction:ltr;text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+#cpWorksheetDialog .cp-ws-evidence tfoot td{background:#eaf2f6;font-weight:bold;border-top:2px solid #526a78}
+
 /* SAMPLING-TEMPLATE-CSS-END */
 
 /* ===== FLAT-LAYOUT-BEGIN =====
@@ -3365,6 +3382,17 @@ function schedulePrintRestore(restore){
     window.addEventListener('keydown',onInteract,{once:true,capture:true});
   },1500);
 }
+// Print the exact already-paginated preview, never a separately reflowed copy.
+function sampleCopyPreviewForPrint(host,target){
+ const canvas=host?.querySelector('[data-sheet-canvas]');
+ if(!canvas||canvas.dataset.paginated!=='1')throw new Error('صفحه‌بندی پیش‌نمایش آماده نیست؛ کاربرگ را دوباره باز کنید.');
+ if(canvas.querySelector('.sample-number-overflow'))throw new Error('مبلغ در ستون جا نمی‌گیرد؛ عرض ستون را بیشتر کنید.');
+ const boxes=[...canvas.children].filter(e=>e.classList.contains('sample-paper-box'));
+ if(!boxes.length)throw new Error('صفحات پیش‌نمایش در دسترس نیست؛ چاپ متوقف شد.');
+ target.replaceChildren(...boxes.map(box=>box.cloneNode(true)));
+ target.querySelectorAll('.col-resize-handle,.cp-ws-anchor').forEach(el=>el.remove());
+ if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(target);
+}
 function printSheet(host){
   if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
   const ph=document.getElementById('printHost');
@@ -3380,7 +3408,8 @@ function printSheet(host){
     if(pageRule)pageRule.remove();window.removeEventListener('afterprint',restore);
   };
   try{
-  ph.innerHTML=sheetItem?sheetHTML(sheetItem.w,sheetItem.sel):host.querySelector('.sheet').outerHTML;
+  if(isSampling)sampleCopyPreviewForPrint(host,ph);
+  else ph.innerHTML=host.querySelector('.sheet').outerHTML;
   ph.querySelectorAll('.col-resize-handle').forEach(el=>el.remove());
 // <<<CP-WS-PRINT-BEGIN>>>
   if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(ph);
@@ -3395,9 +3424,9 @@ function printSheet(host){
     document.head.appendChild(pageRule);
   }
   document.body.classList.add('printing');
-  shrinkDesc(ph);
+  if(!isSampling)shrinkDesc(ph);
 // <<<SAMPLE-TEMPLATE-PRINT-BEGIN>>>
-  if(typeof sampleTemplatePreparePrint==='function')sampleTemplatePreparePrint(ph,{worksheet:sheetItem?.w});
+  // Sampling pages are copied from the preview, not paginated a second time.
 // <<<SAMPLE-TEMPLATE-PRINT-END>>>
 
   document.title=' ';
@@ -6690,6 +6719,11 @@ function sampleTemplatePreparePrint(host,opts){
  const source=host.querySelector('.sampling-template');if(!source)return [];
  const options=opts||{};
  const layout=samplePrintLayout(options.worksheet),savedStyle=host.getAttribute('style');
+ const evidenceControls=new Map();
+ if(options.screenMode){
+  source.querySelectorAll('tr.item[data-sample-row]').forEach(row=>{const button=row.querySelector('.cp-ws-action');if(button)evidenceControls.set(row.dataset.sampleRow,{button:button.cloneNode(true),status:row.querySelector('.cp-ws-status')?.textContent||''});});
+  if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(source);
+ }
  host.classList.add('sample-measuring');
  host.style.cssText+=';display:block!important;position:absolute;left:-100000px;top:0;width:'+layout.paperWidth+'mm;visibility:hidden;';
  let pages=[];
@@ -6914,11 +6948,28 @@ function sampleTemplatePreparePrint(host,opts){
   if(options.screenMode)sampleFitNumbers(host);
   if(!options.screenMode&&pages.some(overflow))throw new Error('محتوای صفحه از کادر چاپ بیرون می‌زند؛ چاپ متوقف شد تا اطلاعات حذف نشود.');
   pages.forEach(p=>sampleUniformRows(p));
+  if(options.screenMode){
+   for(const [number,control] of evidenceControls){
+    const fragments=[...host.querySelectorAll('tr.item[data-sample-row],tr.sample-continuation[data-sample-continuation]')].filter(r=>(r.dataset.sampleRow||r.dataset.sampleContinuation)===number);
+    const last=fragments.at(-1),cell=last?.cells[4];if(!cell)continue;
+    const text=cell.querySelector('.cp-txt'),name=text?.querySelector('.p:last-child');
+    const anchor=document.createElement('span');anchor.className='cp-ws-anchor no-print';
+    const action=control.button;action.title=[action.textContent,control.status].filter(Boolean).join(' — ');action.setAttribute('aria-label',action.title);action.textContent='شواهد';anchor.appendChild(action);
+    if(name)name.appendChild(anchor);else if(text&&text.textContent.trim())text.appendChild(anchor);else{anchor.classList.add('cp-ws-empty-anchor');cell.appendChild(anchor);}
+   }
+  }
  }finally{
   host.classList.remove('sample-measuring');
   if(savedStyle===null)host.removeAttribute('style');else host.setAttribute('style',savedStyle);
  }
  return pages;
+}
+function samplePositionEvidence(root){
+ root.querySelectorAll('.cp-ws-anchor .cp-ws-action').forEach(button=>{
+  button.style.transform='';const cell=button.closest('td'),r=button.getBoundingClientRect(),c=cell?.getBoundingClientRect();
+  if(!c||!c.width)return;const shift=r.left<c.left+1?c.left+1-r.left:r.right>c.right-1?c.right-1-r.right:0;
+  if(shift)button.style.transform='translateX('+shift+'px)';
+ });
 }
 function sampleRenderOnScreenPages(viewEl){
  if(!viewEl)return;
@@ -6932,14 +6983,22 @@ function sampleRenderOnScreenPages(viewEl){
   if(badge&&count)badge.textContent=`صفحه‌بندی خودکار: ${faNum(count)} صفحه (${lay.orientation==='landscape'?'افقی':'عمودی'}${lay.density==='compact'?' · فشرده':''})`;
   return;
  }
+ // Stage 6 is often built before it becomes visible. Measuring in a hidden
+ // ancestor silently falls back to estimated heights and produces wrong PDFs.
+ // Use an actual laid-out offscreen stage, then move its finished pages here.
+ const measure=document.createElement('div');measure.className='stage active';measure.innerHTML=canvas.innerHTML;
+ measure.style.cssText='position:absolute;left:-100000px;top:0;visibility:hidden;display:block;width:'+lay.paperWidth+'mm';document.body.appendChild(measure);
  try{
-  const pages=sampleTemplatePreparePrint(canvas,{screenMode:true,worksheet:ws});
-  canvas.dataset.paginated='1';
+  const pages=sampleTemplatePreparePrint(measure,{screenMode:true,worksheet:ws});
+  if(!pages.length)throw new Error('هیچ صفحه‌ای ساخته نشد.');
+  canvas.replaceChildren(...measure.childNodes);canvas.dataset.paginated='1';samplePositionEvidence(canvas);
+  requestAnimationFrame(()=>{if(canvas.isConnected)samplePositionEvidence(canvas);});
   const badge=viewEl.querySelector('[data-page-badge]');
   if(badge)badge.textContent=`صفحه‌بندی خودکار: ${faNum(pages.length||1)} صفحه (${lay.orientation==='landscape'?'افقی':'عمودی'}${lay.density==='compact'?' · فشرده':''})`;
  }catch(e){
-  shrinkDesc(viewEl);sampleFitNumbers(viewEl);sampleUniformRows(viewEl.querySelector('.sampling-template'));
- }
+  canvas.dataset.paginated='0';
+  const badge=viewEl.querySelector('[data-page-badge]');if(badge)badge.textContent='خطا در صفحه‌بندی؛ چاپ متوقف است: '+(e.message||'لطفاً کاربرگ را دوباره باز کنید.');
+ }finally{measure.remove();}
 }
 // Live interactive column drag-to-resize on preview headers + automatic re-pagination on release
 function sampleApplyLiveVectorToDOM(wrapEl,vec,n){
@@ -7043,18 +7102,18 @@ if(typeof window!=='undefined'&&!window.__sampleDirectPrintBound){
   if(!item)return;
   try{
    directTitle=document.title;
-   ph.innerHTML=sheetHTML(item.w,item.sel);
-   ph.querySelectorAll('.col-resize-handle').forEach(el=>el.remove());
-   if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(ph);
+   sampleCopyPreviewForPrint(activeWrap,ph);
    const layout=samplePrintLayout(item.w);
    directRule=document.createElement('style');directRule.dataset.temporaryPrint='direct';
    directRule.textContent=`@page{size:A4 ${layout.orientation};margin:0!important}@media print{html,body{width:100%!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important}body.printing #printHost{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}}`;
    document.head.appendChild(directRule);
    document.body.classList.add('printing');
-   shrinkDesc(ph);
-   sampleTemplatePreparePrint(ph,{worksheet:item.w});
    document.title=' ';
-  }catch(_){}
+  }catch(error){
+   ph.textContent='چاپ متوقف شد: '+(error.message||'صفحه‌بندی پیش‌نمایش در دسترس نیست.');
+   document.body.classList.add('printing');
+   if(!directRule){directRule=document.createElement('style');directRule.textContent='@media print{body.printing #printHost{display:block!important}}';document.head.appendChild(directRule);}
+  }
  });
  window.addEventListener('afterprint',()=>{
   if(!directRule)return;
@@ -7216,6 +7275,28 @@ if(typeof document!=='undefined'){
 // <<<COUNTERPARTY-CHOOSER-BEGIN>>>
 // Compact accounting-oriented chooser. No source codes in presentation.
 function cpWorksheetAmountText(value){const n=cpLabAmount(value);return n===null?String(value??''):cpLabNumber(n);}
+function cpWorksheetExactAmount(value){
+ let raw=String(value??'').trim();if(raw===''||raw==='-')return{units:0n,scale:0};
+ let normalized=cpLabText(raw).replace(/[,٬\s]/g,'').replace(/٫/g,'.');
+ const m=normalized.match(/^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);if(!m)return null;
+ let digits=(m[2]+(m[3]||'' )).replace(/^0+(?=\d)/,'');let scale=(m[3]||'').length-(Number(m[4])||0);
+ if(scale<0){digits+='0'.repeat(-scale);scale=0;}
+ return{units:(m[1]==='-'?-1n:1n)*BigInt(digits||'0'),scale};
+}
+function cpWorksheetExactText(value,trimFraction){
+ const raw=String(value??'');if(raw.trim()===''||raw.trim()==='-')return raw;
+ const part=cpWorksheetExactAmount(value);if(!part)return raw;
+ let units=part.units,negative=units<0n;if(negative)units=-units;
+ let digits=units.toString().padStart(part.scale+1,'0'),integer=part.scale?digits.slice(0,-part.scale):digits,fraction=part.scale?digits.slice(-part.scale):'';
+ if(trimFraction)fraction=fraction.replace(/0+$/,'');
+ integer=integer.replace(/\B(?=(\d{3})+(?!\d))/g,'٬');
+ return(negative?'-':'')+(integer+(fraction?'٫'+fraction:'' )).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+}
+function cpWorksheetExactSum(values){
+ const parts=values.map(cpWorksheetExactAmount);if(parts.some(x=>!x))return'نامعتبر — قابل جمع نیست';
+ const scale=Math.max(0,...parts.map(x=>x.scale));const total=parts.reduce((sum,x)=>sum+x.units*10n**BigInt(scale-x.scale),0n);
+ return cpWorksheetExactText((total<0n?'-':'')+(total<0n?-total:total).toString().padStart(scale+1,'0').replace(new RegExp(scale?`(\\d{${scale}})$`:'(?!)'),scale?'.$1':''),true);
+}
 function cpWorksheetSide(row){const d=cpLabAmount(row['بدهکار']),c=cpLabAmount(row['بستانکار']);return d>0&&c===0?'debit':c>0&&d===0?'credit':'both';}
 function cpWorksheetEntry(row,extraClass=''){
  const side=cpWorksheetSide(row),amounts=side==='debit'?`<span>بدهکار</span><b>${esc(cpWorksheetAmountText(row['بدهکار']))}</b>`:side==='credit'?`<span>بستانکار</span><b>${esc(cpWorksheetAmountText(row['بستانکار']))}</b>`:`<span>بدهکار ${esc(cpWorksheetAmountText(row['بدهکار']))} · بستانکار ${esc(cpWorksheetAmountText(row['بستانکار']))}</span>`;
@@ -7237,9 +7318,14 @@ function cpWorksheetOpen(row,ctx){
  const m=cpWorksheetModel(row,ctx),e=m.evidence,choose=m.kind==='ambiguous'||m.kind==='manual'||m.referenceAuto||m.heuristicAuto;
  const ownSide=cpWorksheetSide(row),otherSide=ownSide==='debit'?'credit':'debit',otherLabel=otherSide==='credit'?'بستانکار':'بدهکار';
  let d=document.getElementById('cpWorksheetDialog');if(!d){d=document.createElement('dialog');d.id='cpWorksheetDialog';d.dir='rtl';document.body.appendChild(d);}
- const columns=rows=>rows.map(r=>`<tr><td>${esc(ctx.rowIds.get(r))}<small>${esc(cpLabLocation(ctx.meta?.locations.get(r)))}</small></td><td>${esc(cpWorksheetName(r))}</td><td>${esc(String(r['شرح سند']??''))}<br>${esc(String(r['شرح ردیف']??''))}</td><td>${esc(cpWorksheetAmountText(r['بدهکار']))}</td><td>${esc(cpWorksheetAmountText(r['بستانکار']))}</td></tr>`).join('');
+ const evidenceRows=[...e.document].map((r,i)=>({r,i,d:cpLabAmount(r['بدهکار']),c:cpLabAmount(r['بستانکار'])}));
+ const rank=x=>x.d===null||x.c===null?3:x.d!==0&&x.c===0?0:x.d!==0&&x.c!==0?1:x.c!==0?2:3;
+ evidenceRows.sort((a,b)=>rank(a)-rank(b)||a.i-b.i);
+ const columns=evidenceRows.map(({r})=>{const ds=String(r['شرح سند']??'').trim(),line=String(r['شرح ردیف']??'').trim();return `<tr><td>${esc(ctx.rowIds.get(r))}<small>${esc(cpLabLocation(ctx.meta?.locations.get(r)))}</small></td><td>${esc(String(r['شماره سند']??''))}</td><td>${esc(String(r['تاریخ']??''))}</td><td>${esc(cpWorksheetName(r))}</td><td>${[ds,line!==ds?line:''].filter(Boolean).map(esc).join('<br>')||'—'}</td><td class="cp-evidence-num">${esc(cpWorksheetExactText(r['بدهکار'],false))}</td><td class="cp-evidence-num">${esc(cpWorksheetExactText(r['بستانکار'],false))}</td></tr>`;}).join('');
+ const sum=side=>cpWorksheetExactSum(evidenceRows.map(x=>x.r[side==='d'?'بدهکار':'بستانکار']));
+
  const history=CP_WS_HISTORY.get(row)||[];
- d.innerHTML=`<header><div><b>${choose?'طرف حساب این ردیف را انتخاب کنید':'طرف حساب این ردیف'}</b><small>سند ${esc(String(row['شماره سند']??''))} · ${esc(String(row['تاریخ']??''))}</small></div><button type="button" id="cpWsClose" aria-label="بستن">×</button></header><section class="cp-sample-box"><div class="cp-section-label">ردیف نمونه شما</div>${cpWorksheetEntry(row,'cp-sample-entry')}</section>${(m.referenceAuto||m.heuristicAuto)?`<p class="cp-ws-note">${esc(m.reason)}</p>`:''}${choose?`<form id="cpWsForm"><div class="cp-options-heading"><b>گزینه‌های ${otherLabel}</b><span>یک حساب یا چند حساب را انتخاب کنید.</span></div><div class="cp-ws-options">${m.groups.map((g,i)=>`<label class="cp-ws-option"><input type="checkbox" name="account" value="${i}" ${(m.decision?.keys||m.autoKeys||[]).includes(g.key)?'checked':''}><span class="cp-option-content"><span class="cp-option-heading"><span class="cp-option-index">گزینه ${cpLabNumber(i+1)}</span><span class="cp-option-side">${otherLabel} · ${cpLabNumber(cpWorksheetGroupTotal(g,otherSide))}</span></span><strong class="cp-option-name">${esc(g.name)}</strong>${m.supplemental?.support.find(s=>s.key===g.key)?.labels.map(label=>`<small class="cp-option-evidence">${esc(label)}</small>`).join('')||''}${g.rows.length>1?`<span class="cp-option-count">${cpLabNumber(g.rows.length)} ردیف ثبت در همین حساب</span>`:''}<span class="cp-option-lines">${g.rows.map(r=>`<span>${esc(String(r['شرح ردیف']||r['شرح سند']||'شرحی ثبت نشده'))}${g.rows.length>1?` <em>— ${esc(cpWorksheetAmountText(r[otherSide==='credit'?'بستانکار':'بدهکار']))}</em>`:''}</span>`).join('')}</span></span></label>`).join('')}</div><section id="cpWsSelection" class="cp-selection-box" aria-live="polite"></section><details class="cp-optional-note"><summary>افزودن یادداشت (اختیاری)</summary><textarea id="cpWsNote" rows="2" aria-label="یادداشت بررسی شما"></textarea></details><p id="cpWsError" role="alert"></p><footer><button type="submit" id="cpWsApply">ثبت طرف حساب</button>${m.decision?'<button type="button" id="cpWsClear">پاک‌کردن انتخاب</button>':''}<button type="button" id="cpWsCancel">انصراف</button></footer></form>`:`<section class="cp-resolved-box"><div class="cp-section-label">${m.kind==='unresolved'?'نتیجه بررسی':'طرف حساب'}</div>${m.kind==='unresolved'?`<p>${esc(m.reason)}</p>`:m.groups.filter(g=>m.names.includes(g.name)).map(g=>`<div class="cp-resolved-account"><b>${esc(g.name)}</b><span>${otherLabel} · ${cpLabNumber(cpWorksheetGroupTotal(g,otherSide))}</span></div>`).join('')}<small>${esc(m.badge)}</small></section>`}<details class="cp-support-details"><summary>جزئیات سند و محدودیت بررسی</summary><p class="cp-ws-note">${esc(m.reason)} کامل‌بودن سند مستقل از توازن، نامعلوم است. انتخاب شما تأیید خودکار رابطه یا تسویه نیست.</p><div class="cp-ws-evidence"><table><thead><tr><th>ردیف / منشأ</th><th>حساب</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th></tr></thead><tbody>${columns(e.document)}</tbody></table></div>${history.length?`<details><summary>تاریخچه انتخاب در این جلسه</summary>${history.map(h=>`<p>${esc(h.timestamp)} · ${h.action==='select'?'ثبت انتخاب':'پاک‌کردن انتخاب'}${h.note?' · '+esc(h.note):''}</p>`).join('')}</details>`:''}<small>انتخاب‌ها تا زمانی که صفحه باز است حفظ می‌شوند؛ برای نگهداری، PDF بگیرید.</small></details>`;
+ d.innerHTML=`<header><div><b>${choose?'طرف حساب این ردیف را انتخاب کنید':'طرف حساب این ردیف'}</b><small>سند ${esc(String(row['شماره سند']??''))} · ${esc(String(row['تاریخ']??''))}</small></div><button type="button" id="cpWsClose" aria-label="بستن">×</button></header><section class="cp-sample-box"><div class="cp-section-label">ردیف نمونه شما</div>${cpWorksheetEntry(row,'cp-sample-entry')}</section>${(m.referenceAuto||m.heuristicAuto)?`<p class="cp-ws-note">${esc(m.reason)}</p>`:''}${choose?`<form id="cpWsForm"><div class="cp-options-heading"><b>گزینه‌های ${otherLabel}</b><span>یک حساب یا چند حساب را انتخاب کنید.</span></div><div class="cp-ws-options">${m.groups.map((g,i)=>`<label class="cp-ws-option"><input type="checkbox" name="account" value="${i}" ${(m.decision?.keys||m.autoKeys||[]).includes(g.key)?'checked':''}><span class="cp-option-content"><span class="cp-option-heading"><span class="cp-option-index">گزینه ${cpLabNumber(i+1)}</span><span class="cp-option-side">${otherLabel} · ${cpLabNumber(cpWorksheetGroupTotal(g,otherSide))}</span></span><strong class="cp-option-name">${esc(g.name)}</strong>${m.supplemental?.support.find(s=>s.key===g.key)?.labels.map(label=>`<small class="cp-option-evidence">${esc(label)}</small>`).join('')||''}${g.rows.length>1?`<span class="cp-option-count">${cpLabNumber(g.rows.length)} ردیف ثبت در همین حساب</span>`:''}<span class="cp-option-lines">${g.rows.map(r=>`<span>${esc(String(r['شرح ردیف']||r['شرح سند']||'شرحی ثبت نشده'))}${g.rows.length>1?` <em>— ${esc(cpWorksheetAmountText(r[otherSide==='credit'?'بستانکار':'بدهکار']))}</em>`:''}</span>`).join('')}</span></span></label>`).join('')}</div><section id="cpWsSelection" class="cp-selection-box" aria-live="polite"></section><details class="cp-optional-note"><summary>افزودن یادداشت (اختیاری)</summary><textarea id="cpWsNote" rows="2" aria-label="یادداشت بررسی شما"></textarea></details><p id="cpWsError" role="alert"></p><footer><button type="submit" id="cpWsApply">ثبت طرف حساب</button>${m.decision?'<button type="button" id="cpWsClear">پاک‌کردن انتخاب</button>':''}<button type="button" id="cpWsCancel">انصراف</button></footer></form>`:`<section class="cp-resolved-box"><div class="cp-section-label">${m.kind==='unresolved'?'نتیجه بررسی':'طرف حساب'}</div>${m.kind==='unresolved'?`<p>${esc(m.reason)}</p>`:m.groups.filter(g=>m.names.includes(g.name)).map(g=>`<div class="cp-resolved-account"><b>${esc(g.name)}</b><span>${otherLabel} · ${cpLabNumber(cpWorksheetGroupTotal(g,otherSide))}</span></div>`).join('')}<small>${esc(m.badge)}</small></section>`}<details class="cp-support-details"><summary>جزئیات سند و محدودیت بررسی</summary><p class="cp-ws-note">${esc(m.reason)} کامل‌بودن سند مستقل از توازن، نامعلوم است. انتخاب شما تأیید خودکار رابطه یا تسویه نیست.</p><p>ردیف‌های بدهکارِ صرف ابتدا، سپس مختلط، بعد بستانکارِ صرف و در پایان ردیف‌های صفر یا نامعتبر نمایش داده می‌شوند؛ ترتیب هر گروه از منبع حفظ شده است. مقادیر به ریال‌اند.</p><div class="cp-ws-evidence"><table><thead><tr><th>ردیف / منشأ</th><th>شماره سند</th><th>تاریخ سند</th><th>حساب</th><th>شرح سند و ردیف</th><th>بدهکار (ریال)</th><th>بستانکار (ریال)</th></tr></thead><tbody>${columns}</tbody><tfoot><tr><td colspan="5">جمع ردیف‌های سند نمایش‌داده‌شده</td><td class="cp-evidence-num">${esc(sum('d'))}</td><td class="cp-evidence-num">${esc(sum('c'))}</td></tr></tfoot></table></div>${history.length?`<details><summary>تاریخچه انتخاب در این جلسه</summary>${history.map(h=>`<p>${esc(h.timestamp)} · ${h.action==='select'?'ثبت انتخاب':'پاک‌کردن انتخاب'}${h.note?' · '+esc(h.note):''}</p>`).join('')}</details>`:''}<small>انتخاب‌ها تا زمانی که صفحه باز است حفظ می‌شوند؛ برای نگهداری، PDF بگیرید.</small></details>`;
  d.querySelector('#cpWsClose').onclick=()=>d.close();
  if(choose){
   d.querySelector('#cpWsNote').value=m.decision?.note||'';
