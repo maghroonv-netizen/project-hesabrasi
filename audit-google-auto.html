@@ -1226,38 +1226,50 @@
 /* WORKSHEET-VIEW-CSS-BEGIN */
 .audit-template *{box-sizing:border-box}
 .audit-template{margin:0;background:#e9e9e9;font-family:"B Nazanin","Vazirmatn","Tahoma",sans-serif;font-size:13px;font-weight:bold;color:#000}
-.audit-template.sheet{width:198mm;min-height:285mm;margin:8px auto;background:#fff;padding:3mm 3mm 3mm 11mm;position:relative}
+.audit-template.sheet{width:198mm;min-height:285mm;margin:8px auto;background:#fff;padding:2.5mm 3mm 2.5mm 10.5mm;position:relative}
 .audit-template .side{position:absolute;left:2mm;bottom:38mm;top:auto;width:7mm;height:128mm;background:#e2efda;writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:10px;display:flex;align-items:center;justify-content:center}
-.audit-template .box{border:1px solid #c00000;border-radius:12px;margin-bottom:6px;overflow:hidden}
-.audit-template .bar{display:flex;justify-content:space-between;align-items:center;padding:4px 12px;color:#c00000;background:#fff2cc;font-size:13px}
-.audit-template .body{padding:6px 12px;min-height:46px;border-top:1px solid #f0d9a8;font-size:12.5px;line-height:1.9;white-space:pre-wrap}
-.audit-template .head{display:grid;grid-template-columns:30mm 1.55fr 1fr;gap:16px;align-items:center;padding:8px}
-.audit-template .refbox{height:20mm;border:1px solid #c00000;border-radius:10px;background:#ddebf7}
-.audit-template .hl div{padding:7px 0;font-size:12px;white-space:nowrap}
-.audit-template .hl.right{padding-right:6px}
+.audit-template .box{border:1px solid #c00000;border-radius:10px;margin-bottom:4px;overflow:hidden}
+.audit-template .bar{display:flex;justify-content:space-between;align-items:center;padding:3px 10px;color:#c00000;background:#fff2cc;font-size:12.5px}
+.audit-template .body{padding:5px 10px;min-height:38px;border-top:1px solid #f0d9a8;font-size:12px;line-height:1.75;white-space:pre-wrap}
+.audit-template .box.compact-note .body,.audit-template.v2 .box.compact-note .body{min-height:24px;padding:3px 10px;line-height:1.65}
+.audit-template .head{display:grid;grid-template-columns:24mm minmax(0,1.6fr) minmax(0,1fr);gap:10px;align-items:center;padding:6px 8px}
+.audit-template .refbox{height:17mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7;display:flex;align-items:center;justify-content:center;text-align:center;padding:3px;font-size:12px}
+.audit-template .hl div{padding:4px 0;font-size:11.8px;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+.audit-template .hl.right{padding-right:4px}
+.audit-template .acct-meta-strip{display:flex;align-items:stretch;border:1px solid #c00000;border-radius:9px;margin-bottom:4px;overflow:hidden;background:#fff;font-size:11px}
+.audit-template .acct-meta-label{background:#fff2cc;color:#c00000;padding:3px 8px;border-left:1px solid #c00000;display:flex;align-items:center;white-space:nowrap;font-size:11.5px}
+.audit-template .acct-meta-items{display:flex;flex:1;align-items:center;justify-content:space-between;gap:6px;padding:2px 8px;flex-wrap:wrap}
+.audit-template .acct-meta-item{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.audit-template .acct-meta-item b{color:#333;font-weight:bold}
+.audit-template .acct-meta-pill{display:inline-block;min-width:12mm;min-height:17px;padding:0 5px;border:1px solid #b5c7d9;border-radius:4px;background:#f2f7fc;text-align:center;font-size:11px;line-height:16px;color:#000}
 .audit-template table{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed}
-.audit-template .grid{display:flex;gap:4px;align-items:stretch}
-.audit-template .grid table th,.audit-template .grid table td{border-bottom:1px solid #bbb;padding:3px 4px;height:30px;text-align:center;font-size:12px}
-.audit-template .grid .col{border:1px solid #c00000;border-radius:12px;overflow:hidden}
-.audit-template .c-desc{flex:0 0 31%}
-.audit-template .c-sum{flex:0 0 36%}
-.audit-template .c-id{flex:1}
+.audit-template .grid{display:flex;gap:4px;align-items:stretch;margin-bottom:4px}
+.audit-template .grid table th,.audit-template .grid table td{border-bottom:1px solid #bbb;padding:2px 4px;height:26px;text-align:center;font-size:11.5px}
+.audit-template .grid .col{border:1px solid #c00000;border-radius:10px;overflow:hidden}
+.audit-template .c-desc{flex:1 1 54%}
+.audit-template .c-sum{flex:0 0 37%}
+.audit-template .c-id{flex:0 0 9%}
+.audit-template .c-sum .sum-head-top{height:24px;padding:1px 4px;font-size:11.5px;line-height:1.25;color:#8a0000}
+.audit-template .c-sum .sum-head-top .sum-unit-badge{font-size:10.5px;color:#000;font-weight:bold;margin-right:3px}
+.audit-template .c-sum .sum-head-sub th{height:24px}
 .audit-template th{background:#fff}
 .audit-template td.num{direction:ltr;text-align:center;font-variant-numeric:tabular-nums}
 .audit-template td.desc{text-align:center}
-.audit-template td.ttl{text-align:right;border-left:1px solid #c00000;white-space:nowrap;font-size:11.5px;width:62%}
+.audit-template td.ref{text-align:center;font-size:11px;padding:2px}
 .audit-template td.gap{display:none}
 .audit-template .tot td{border-top:2px solid #333;background:transparent}
-.audit-template .tot td.lbl{text-align:center;font-size:10.5px;white-space:nowrap;padding:2px}
+.audit-template .tot td.lbl{text-align:center;font-size:11px;white-space:nowrap;padding:2px}
 .audit-template .unit{font-size:12px;color:#000}
 .audit-template .empty{background:#e7e6e6}
-.audit-template [contenteditable]:focus{outline:2px solid #0070c0;outline-offset:-2px}
+.audit-template [contenteditable]:focus{outline:2px solid #0070c0;outline-offset:-2px;background-color:#f0f8ff!important}
+.audit-template [contenteditable]:hover{background-color:rgba(0,112,192,.035)}
+.audit-template .d-txt{display:inline-block;min-width:65%;min-height:16px;outline:none}
 .audit-template.v2 .bar{background:#fff2cc}
 .audit-template.v2 .grid thead th{background:#fff2cc}
 .audit-template.v2 tr.open td{background:#fff2cc}
 .audit-template.v2 .rows tr:nth-child(even):not(.open) td.desc,.audit-template.v2 .rows tr:nth-child(even):not(.open) td.num{background:#f7f7f7}
 .audit-template.v2 .tot td{background:#f2f2f2}
-.audit-template.v2 .body{min-height:60px}
+.audit-template.v2 .body{min-height:38px}
 .audit-template.v2 .grid table{border-collapse:collapse}
 .audit-template.v2 .grid td,.audit-template.v2 .grid th{border:1px solid #7f7f7f!important}
 .audit-template.v2 .grid table tr>*:first-child{border-right:0!important}
@@ -1269,27 +1281,53 @@
 .audit-template.v2 .box .body{border-top:1px solid #c00000}
 .audit-template.v2 .head .hl div{border-bottom:1px dotted #bbb}
 .audit-template.v1 .bar{background:#fff}
-.audit-template.v1 .body{border-top:0}.audit-template.sheet{font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif;font-size:13px;font-weight:bold;color:#000;border:0;border-radius:0;box-shadow:0 8px 28px #14282814;direction:rtl;max-width:none;overflow:visible}
-.audit-template .hl div{white-space:normal;overflow-wrap:anywhere;line-height:1.6}
-.audit-template .head{grid-template-columns:26mm minmax(0,1.55fr) minmax(0,1fr);gap:10px}
-.audit-template .grid td,.audit-template .grid th{white-space:normal;overflow-wrap:anywhere;line-height:1.6}
-.audit-template .grid td{height:30px;vertical-align:middle}
-.audit-template .grid .ttl{white-space:normal}
-.audit-template .grid td.num{font-size:11px;white-space:nowrap}
-.audit-template .grid .d{font-size:12px;text-align:center}
-.audit-template .template-evidence{border:0;background:none;font:10px Tahoma;color:#0070c0;padding:0;cursor:pointer}
+.audit-template.v1 .body{border-top:0}
+.audit-template.sheet{font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif;font-size:13px;font-weight:bold;color:#000;border:0;border-radius:0;box-shadow:0 8px 28px #14282814;direction:rtl;max-width:none;overflow:visible}
+.audit-template .grid td,.audit-template .grid th{white-space:normal;overflow-wrap:anywhere;line-height:1.45}
+.audit-template .grid td{height:26px;vertical-align:middle}
+.audit-template .grid td.num{font-size:11.5px;white-space:nowrap}
+.audit-template .grid .d{font-size:11.8px;text-align:center}
+.audit-template .template-evidence{border:0;background:#eef6fc;border-radius:4px;font:10px Tahoma;color:#005a9e;padding:1px 4px;margin-right:3px;cursor:pointer}
 .audit-template .body{overflow-wrap:anywhere}
 .audit-template .template-page-number{position:absolute;bottom:1mm;left:11mm;right:3mm;text-align:center;font:10px Tahoma}
 #printHost.template-measuring{display:block!important;position:absolute;left:-12000px;top:0;width:198mm;visibility:hidden}
 .audit-template.template-print-page{height:285mm!important;min-height:285mm!important;max-height:285mm!important;position:relative;overflow:hidden;margin:0;break-after:page;page-break-after:always}
 .audit-template.template-print-page:last-child{break-after:auto;page-break-after:auto}
 .audit-template .template-page-body{overflow:visible;position:relative}
+.ana-model-rerun-bar,.ana-sheet-tools{border:1px solid var(--line,#cdd7df);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--panel,#fff);display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.ana-model-rerun-bar label,.ana-sheet-tools label{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
+.ana-model-rerun-bar select,.ana-model-rerun-bar input,.ana-sheet-tools select{padding:6px 8px;border:1px solid var(--line,#b8c7d1);border-radius:7px;background:var(--bg,#f8fafb);color:var(--ink,#172126);font:12px/1.4 Tahoma,sans-serif}
+.ana-model-rerun-bar select{max-width:min(360px,80vw)}
+.ana-model-rerun-bar input{width:210px}
+.ana-rerun-btns,.ana-sheet-tool-btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ana-rerun-btns button,.ana-sheet-tool-btns button{padding:7px 11px;border-radius:7px;border:1px solid var(--line,#b8c7d1);background:var(--panel,#fff);color:var(--ink,#172126);font:600 12px/1.4 "Vazirmatn",Tahoma,sans-serif;cursor:pointer}
+.ana-rerun-btns button.is-primary{background:var(--accent,#115e59);color:var(--accent-ink,#fff);border-color:transparent}
+.ana-rerun-btns button:disabled{opacity:.55;cursor:not-allowed}
+.ana-sheet-hint{font-size:11.5px;color:var(--muted,#546670);flex-basis:100%}
+.ana-cat-breakdown{margin:14px 0 22px;border:1px solid var(--line,#cdd7df);border-radius:12px;padding:14px;background:var(--panel,#fff);direction:rtl}
+.ana-cat-breakdown-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.ana-cat-breakdown-head h3{margin:0;font-size:14.5px}
+.ana-cat-card{border:1px solid var(--line,#d5dfe6);border-radius:9px;margin-bottom:8px;overflow:hidden;background:var(--bg,#fbfcfd)}
+.ana-cat-card>summary{cursor:pointer;padding:9px 12px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;font-size:12.8px;font-weight:700;background:var(--panel,#fff)}
+.ana-cat-badges{display:inline-flex;flex-wrap:wrap;gap:6px;font-size:11.5px;font-weight:600}
+.ana-cat-badge{padding:2px 8px;border-radius:999px;background:#eef5f9;color:#124559;border:1px solid #cbe0ec}
+.ana-cat-basis{padding:5px 12px;font-size:11.5px;color:var(--muted,#526570);border-top:1px dashed var(--line,#dce5ec);background:var(--panel,#fff)}
+.ana-vouchers-scroll{overflow-x:auto}
+.ana-vouchers-table{width:100%;border-collapse:collapse;font:12px/1.65 "Vazirmatn",Tahoma,sans-serif;direction:rtl}
+.ana-vouchers-table th,.ana-vouchers-table td{border:1px solid var(--line,#d6e0e7);padding:6px 8px;vertical-align:top;text-align:right}
+.ana-vouchers-table thead th{background:#f1f5f8;font-weight:700;white-space:nowrap;text-align:center;color:#1b2a32}
+.ana-vouchers-table tbody tr:nth-child(even){background:rgba(0,0,0,.018)}
+.ana-vouchers-table td.v-idx,.ana-vouchers-table td.v-doc,.ana-vouchers-table td.v-date{text-align:center;white-space:nowrap}
+.ana-vouchers-table td.v-amt,.ana-vouchers-table tfoot td.v-amt{direction:ltr;text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.ana-vouchers-table tfoot td{background:#eef4f7;font-weight:700}
+.ana-vouchers-table .v-subdesc{display:block;font-size:11px;color:var(--muted,#5a6d78);margin-top:2px}
 @media print{
- body.printing .audit-template.sheet{width:198mm!important;padding:3mm 3mm 3mm 11mm!important;margin:0!important;border:0!important;box-shadow:none!important;max-width:none!important}
+ body.printing .audit-template.sheet{width:198mm!important;padding:2.5mm 3mm 2.5mm 10.5mm!important;margin:0!important;border:0!important;box-shadow:none!important;max-width:none!important}
  body.printing .audit-template.template-print-page{height:285mm!important;break-inside:avoid!important}
  .audit-template,.audit-template *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
- .audit-template .template-evidence{display:none!important}
- .audit-template [contenteditable]{outline:none}
+ .audit-template .template-evidence,.ana-model-rerun-bar,.ana-sheet-tools,.ana-cat-breakdown{display:none!important}
+ .audit-template [contenteditable]{outline:none;background-color:transparent!important}
+ .audit-template .acct-meta-pill{background:#f8fbfe}
 }
 /* Prevent the sampling sheet's 1060px minimum from changing the supplied A4 form. */
 .audit-template.sheet{min-width:0;box-sizing:border-box}
@@ -4229,7 +4267,7 @@ function renderAnalysisOutput(){
       <div class="ana-output-actions"><button class="btn ghost" id="anaBackToAccounts">← بازگشت به انتخاب</button><button class="btn primary" id="anaPrint">چاپ / ذخیره PDF</button></div>
     </header>
     ${ANA.out.length>1?`<div class="ana-account-switcher">${ANA.out.map((o,i)=>`<button type="button" class="ana-account-switch ${i===ANA.active?'on':''}" data-i="${i}">${fa(i+1)} · ${esc(o.a.title||o.a.pathLabel)}</button>`).join('')}</div>`:''}
-    <div id="anaAIBox"></div><div id="reportControls"></div><div id="auditDebugBox"></div><div id="anaSheet"></div>
+    <div id="anaAIBox"></div><div id="reportControls"></div><div id="auditDebugBox"></div><div id="anaQuickTools"></div><div id="anaSheet"></div><div id="anaCategorizedDocs"></div>
   </section>`;
   el.querySelectorAll('.ana-account-switch').forEach(t=>t.addEventListener('click',()=>{
     ANA.active=Number(t.dataset.i); const sl=anaAISlot();
@@ -4241,6 +4279,7 @@ function renderAnalysisOutput(){
   anaPaintAI(); anaPaintSheet();
   const reportHost=document.getElementById('reportControls');
   if(reportHost){reportHost.innerHTML=reportControlsHTML(ANA.out[ANA.active]);document.getElementById('reportRun').addEventListener('click',()=>reportRun());}if(window.HesabrasiDebug)HesabrasiDebug.paint();
+  auditWorksheetControls(ANA.out[ANA.active]);auditCategorizedDocs(ANA.out[ANA.active]);
 }
 
 // ---- خودِ کاربرگ ----
@@ -5875,7 +5914,7 @@ const REPORT_CLASSIFY_SYSTEM=`وظیفه تو طبقه‌بندی دقیق، ح�
 - برگشت از خرید/فروش و تخفیفات تجاری را در گروه مستقل قرار بده.
 - پیش‌پرداخت، علی‌الحساب، شارژ یا تسویه تنخواه، کارمزد بانکی، مالیات و عوارض ارزش افزوده، کسورات قانونی (بیمه، مالیات تکلیفی، سپرده حسن انجام کار)، تسعیر ارز، تهاتر/انتقال بین حساب‌ها، اصلاح ثبت اشتباه، و بستن حساب در پایان دوره (سند اختتامیه) هرکدام در صورت وجود باید عنوان دقیق و متمایز خود را بگیرند.
 - اختصارات متداول حسابداری ایران («ف» یا «ف ش» = فاکتور، «چ» = چک، «ح» = حواله، «ع» = علی‌الحساب، «ش س» = شماره سند) را در کنار عنوان حساب هدف و بدهکار/بستانکار بودن ردیف درست تفسیر کن.
-۳. یکپارچگی عنوان گروه‌ها: تفاوت شماره فاکتور، شماره چک، کد پیگیری، تاریخ، وزن/تعداد یا نام شعبه بانک دلیل ساخت گروه جدا نیست؛ تمام ردیف‌های هم‌ماهیت را در یک گروه واحد با عنوان کوتاه، رسمی و روشن فارسی جمع کن (شماره سند، تاریخ و مبلغ را داخل عنوان گروه ننویس).
+۳. یکپارچگی عنوان گروه‌ها و ظرفیت استاندارد کاربرگ (حداکثر ۶ گروه جاری در حالت معمول): جدول آنالیز کاربرگ رسیدگی با احتساب ردیف افتتاحیه معمولاً ۷ ردیف ظرفیت استاندارد دارد؛ بنابراین تفاوت شماره فاکتور، شماره چک، کد پیگیری، تاریخ، نوع زیرکالا (مثلاً میلگرد و شمش در یک حساب تجاری واحد)، وزن/تعداد یا نام شعبه بانک دلیل ساخت گروه جدا نیست. تمام ردیف‌های هم‌ماهیت را در یک گروه واحد با عنوان کوتاه، رسمی و روشن فارسی جمع کن تا تعداد گروه‌های جاری در حالت معمول از ۶ گروه فراتر نرود؛ اما اگر واقعاً بیش از ۶ ماهیت حسابداری کاملاً متمایز و ناهمگون در حساب وجود دارد، ادغام نادرست نکن و ساخت گروه بیشتر مجاز است (شماره سند، تاریخ و مبلغ را داخل عنوان گروه ننویس).
 ۴. عدم حدس و پوشش کامل شناسه‌ها: اگر هر دو شرح سند و شرح ردیف واقعاً خالی یا کاملاً فاقد هرگونه نشانه از نوع عملیات بودند، در گروه «شرح نامشخص / نیازمند بررسی» قرار بده و معامله اختراع نکن. هر id ورودی در rows باید دقیقاً یک‌بار در refs بیاید (بدون حذف، تکرار، بازه یا سه‌نقطه). نرم‌افزار جمع بدهکار و بستانکار هر گروه را محلی محاسبه می‌کند؛ تو خالص‌سازی یا جمع عددی انجام نده.
 
 خروجی فقط JSON معتبر با ساختار {"groups":[{"category":"عنوان دقیق و کوتاه گروه","basis":"مبنای مستند از شرح‌های ورودی","refs":["R2","R3"]}]} باشد و هیچ متن یا توضیحی بیرون JSON ننویس.`;
@@ -5919,13 +5958,45 @@ function reportControlsHTML(o){
 }
 
 function reportNumber(n){return n===null||n===undefined?'—':Number(n).toLocaleString('fa-IR',{maximumFractionDigits:6});}
+function auditVoucherTable(data,ids){
+ const digits=x=>String(x??'').replace(/[۰-۹٠-٩]/g,c=>{const n='۰۱۲۳۴۵۶۷۸۹'.indexOf(c);return n<0?'٠١٢٣٤٥٦٧٨٩'.indexOf(c):n;});
+ // Accounting voucher number first, then date; original order resolves ties.
+ const entries=ids.map((id,i)=>({id,i,r:data.rowMap.get(id)})).filter(x=>x.r);
+ entries.sort((a,b)=>digits(a.r['شماره سند']).localeCompare(digits(b.r['شماره سند']),'en',{numeric:true})||digits(a.r['تاریخ']).localeCompare(digits(b.r['تاریخ']),'en',{numeric:true})||a.i-b.i);
+ let dr=0,cr=0;
+ const rows=entries.map((x,i)=>{const r=x.r,d=n0(r['بدهکار']),c=n0(r['بستانکار']);dr+=d;cr+=c;const doc=String(r['شرح سند']??r['توضیحات']??'').trim(),line=String(r['شرح ردیف']??'').trim();const description=[doc,line&&line!==doc?line:''].filter(Boolean).map(esc).join('<span class="v-subdesc">')+(doc&&line&&doc!==line?'</span>':'');return `<tr><td class="v-idx" title="${esc(x.id)}">${reportNumber(i+1)}</td><td class="v-doc">${esc(String(r['شماره سند']??''))}</td><td class="v-date">${esc(String(r['تاریخ']??''))}</td><td>${description||'—'}</td><td class="v-amt">${reportNumber(d)}</td><td class="v-amt">${reportNumber(c)}</td></tr>`;}).join('');
+ return `<div class="ana-vouchers-scroll"><table class="ana-vouchers-table"><thead><tr><th>ردیف</th><th>شماره سند</th><th>تاریخ سند</th><th>شرح سند و ردیف</th><th>بدهکار (ریال)</th><th>بستانکار (ریال)</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="4">جمع (${reportNumber(entries.length)} ردیف)</td><td class="v-amt">${reportNumber(dr)}</td><td class="v-amt">${reportNumber(cr)}</td></tr></tfoot></table></div>`;
+}
+function auditCategorizedDocs(o){
+ const host=document.getElementById('anaCategorizedDocs'),s=reportState(o);if(!host||!s.prepared||!s.data)return;
+ host.innerHTML=`<section class="ana-cat-breakdown"><div class="ana-cat-breakdown-head"><h3>اسناد دسته‌بندی‌شده حساب</h3><small>مبالغ منبع به ریال؛ دسته‌بندی نیازمند بازبینی حسابرس است.</small></div>${s.categories.map((c,i)=>`<details class="ana-cat-card" data-cat="${i}"><summary><span>${esc(c.label)}</span><span class="ana-cat-badges"><span class="ana-cat-badge">${reportNumber(c.rows.length)} ردیف</span><span class="ana-cat-badge">بدهکار ${reportNumber(c.debit)}</span><span class="ana-cat-badge">بستانکار ${reportNumber(c.credit)}</span></span></summary><div class="ana-cat-basis">${esc(c.basis||'')}</div><div data-voucher-content></div></details>`).join('')}</section>`;
+ host.querySelectorAll('details[data-cat]').forEach(d=>d.addEventListener('toggle',()=>{if(d.open&&!d.dataset.loaded){d.querySelector('[data-voucher-content]').innerHTML=auditVoucherTable(s.data,s.categories[Number(d.dataset.cat)].rows);d.dataset.loaded='1';}}));
+}
 function reportOpenReference(ref){
-  const o=ANA.out[ANA.active];if(!o)return;const s=reportState(o),d=s.data||reportBuild(o.A);
-  const group=s.categories.find(c=>c.id===ref)||d.groups.find(c=>c.id===ref)||d.monthly.find(m=>m.id===ref)||d.top.find(m=>m.id===ref);
-  const ids=ref==='S0'?[...d.rowMap.keys()]:(group&&group.rows)||[];
-  let dialog=document.getElementById('reportEvidence');if(!dialog){dialog=document.createElement('dialog');dialog.id='reportEvidence';document.body.appendChild(dialog);}
-  dialog.innerHTML=`<header><b>مستندات ${esc(ref)} · فقط حساب انتخابی</b><button type="button" id="reportEvidenceClose">بستن ×</button></header><small>شناسه R شمارهٔ ردیف داخلی دادهٔ بارگذاری‌شده است، نه شمارهٔ قطعی ردیف Excel. تا ۲۰۰ ردیف در این پنجره نمایش داده می‌شود؛ تعداد کل: ${reportNumber(ids.length)}.</small><div class="report-evidence-scroll"><table><thead><tr><th>شناسه</th><th>سند</th><th>تاریخ</th><th>شرح سند</th><th>شرح ردیف</th><th>بدهکار</th><th>بستانکار</th></tr></thead><tbody>${ids.slice(0,200).map(id=>{const r=d.rowMap.get(id);return `<tr>${[id,r['شماره سند'],r['تاریخ'],r['شرح سند'],r['شرح ردیف'],reportNumber(n0(r['بدهکار'])),reportNumber(n0(r['بستانکار']))].map(v=>`<td>${esc(String(v??''))}</td>`).join('')}</tr>`;}).join('')}</tbody></table></div>`;
-  document.getElementById('reportEvidenceClose').onclick=()=>dialog.close();dialog.showModal();
+ const o=ANA.out[ANA.active];if(!o)return;const s=reportState(o),d=s.data||reportBuild(o.A);const group=s.categories.find(c=>c.id===ref)||d.groups.find(c=>c.id===ref)||d.monthly.find(m=>m.id===ref)||d.top.find(m=>m.id===ref);
+ const ids=ref==='S0'?[...d.rowMap.keys()]:(group&&group.rows)||[];
+ let dialog=document.getElementById('reportEvidence');if(!dialog){dialog=document.createElement('dialog');dialog.id='reportEvidence';document.body.appendChild(dialog);}
+ dialog.innerHTML=`<header><b>مستندات ${esc(group?.label||ref)} · حساب انتخابی</b><button type="button" id="reportEvidenceClose">بستن ×</button></header><small>تمام ردیف‌های منبع؛ مبالغ به ریال. ردیف داخلی در عنوان هر شماره قابل مشاهده است.</small>${auditVoucherTable(d,ids)}`;
+ document.getElementById('reportEvidenceClose').onclick=()=>dialog.close();dialog.showModal();
+}
+function auditWorksheetControls(o){
+ const host=document.getElementById('anaQuickTools');if(!host)return;const q=window.HesabrasiAI?.quickModelList(),models=q?.models||[],busy=Object.values(ANA.aiBy||{}).some(x=>x.busy)||ANA.out.some(x=>x.report?.busy);o.unitMode=o.unitMode||'million';
+ host.innerHTML=`<div class="ana-model-rerun-bar"><label>مدل فعال (${esc(q?.providerName||'سرویس')}): <select id="anaQuickModelSelect">${models.map(m=>`<option value="${esc(m.id)}" ${m.id===q.activeModel?'selected':''}>${esc(m.label)}</option>`).join('')}<option value="__custom">مدل دیگر…</option></select></label><input id="anaQuickModelCustom" dir="ltr" placeholder="شناسه مدل در همین سرویس" hidden><div class="ana-rerun-btns"><button data-rerun="nature" ${busy?'disabled':''}>اجرای مجدد شرح ماهیت</button><button data-rerun="analysis" ${busy?'disabled':''}>اجرای مجدد آنالیز حساب</button><button data-rerun="both" ${busy?'disabled':''}>اجرای مجدد کامل کاربرگ</button></div><small class="ana-sheet-hint">تغییر مدل مربوط به سرویس فعال است؛ هر اجرا با تأیید جداگانه و فقط برای حساب انتخابی انجام می‌شود. مدل جایگزین سرویس پشتیبان ممکن است در صورت خطا به کار رود.</small></div><div class="ana-sheet-tools"><label>واحد مبالغ کاربرگ: <select id="anaUnitMode"><option value="million" ${o.unitMode==='million'?'selected':''}>میلیون ریال</option><option value="rial" ${o.unitMode==='rial'?'selected':''}>ریال</option></select></label><div class="ana-sheet-tool-btns"><button id="anaAddRow">+ افزودن ردیف به جدول آنالیز</button><button id="anaResetRows">↺ بازنشانی ویرایش‌های جدول</button></div><small class="ana-sheet-hint">ارقام میلیون ریالی گرد می‌شوند؛ مجموع از ارقام نمایش‌داده‌شده محاسبه می‌شود. برای دقت کامل ریال را انتخاب کنید. ویرایش‌های جدول محلی و مستقل از داده‌های منبع هستند.</small></div>`;
+ const select=host.querySelector('#anaQuickModelSelect'),custom=host.querySelector('#anaQuickModelCustom');select.onchange=()=>{custom.hidden=select.value!=='__custom';};
+ host.querySelector('#anaUnitMode').onchange=e=>{if(document.querySelector('#anaSheet [aria-invalid="true"]')){alert('ابتدا مبلغ نامعتبر را اصلاح کنید.');e.target.value=o.unitMode;return;}o.unitMode=e.target.value;anaPaintSheet();};
+ host.querySelector('#anaAddRow').onclick=()=>{const rows=auditTemplateRows(o);o.manualRowTarget=rows.length-2+1;anaPaintSheet();};
+ host.querySelector('#anaResetRows').onclick=()=>{if(!confirm('ویرایش شرح، ارقام و عطف ردیف‌های جدول بازنشانی شود؟'))return;o.templateRowEdits={};o.templateTotalEdits={};o.templateRefs={};o.manualRowTarget=7;anaPaintSheet();};
+ host.querySelectorAll('[data-rerun]').forEach(btn=>btn.onclick=async()=>{
+  if(ANA.out[ANA.active]!==o||Object.values(ANA.aiBy||{}).some(x=>x.busy)||ANA.out.some(x=>x.report?.busy))return;
+  const mode=btn.dataset.rerun,id=select.value==='__custom'?custom.value.trim():select.value;if(!id){alert('شناسه مدل معتبر را انتخاب کنید.');return;}
+  if(document.querySelector('#anaSheet [aria-invalid="true"]')){alert('ابتدا مبلغ نامعتبر را اصلاح کنید.');return;}
+  if((mode==='analysis'||mode==='both')&&Object.keys(o.templateRowEdits||{}).length&&!confirm('اجرای موفق آنالیز، ویرایش‌های ردیف‌های جدول را بازنشانی می‌کند؛ ادامه می‌دهید؟'))return;
+  if(!window.HesabrasiAI?.setActiveModel(id)){alert('شناسه مدل معتبر را انتخاب کنید.');return;}
+  if(mode==='nature'||mode==='both'){
+   const slot=anaAISlot(),before={...slot},oldSec=o.sec['ماهیت'];await anaAIRun();if(slot.error||(!slot.nature&&!slot.noEvidence)){const error=slot.error,detail=slot.detail;Object.assign(slot,before,{error,detail,busy:false});o.sec['ماهیت']=oldSec;if(ANA.out[ANA.active]===o)renderAnalysisOutput();if(mode==='both')return;}
+  }
+  if((mode==='analysis'||mode==='both')&&ANA.out[ANA.active]===o){const state=reportState(o),before={...state};await reportRun();if(!state.prepared){const error=state.error;Object.assign(state,before,{error,busy:false});}else{o.templateRowEdits={};o.templateTotalEdits={};o.templateRefs={};o.manualRowTarget=7;}if(ANA.out[ANA.active]===o)renderAnalysisOutput();}
+ });
 }
 // <<<ACCOUNT-ANALYSIS-END>>>
 
@@ -6129,32 +6200,41 @@ function usageDownload(){
 // <<<AI-USAGE-END>>>
 
 // <<<WORKSHEET-VIEW-BEGIN>>>
-const AUDIT_TEMPLATE_HTML="<div class=\"sheet v2 audit-template ana-page\">\n<div class=\"side\">موسسه حسابرسی و خدمات مدیریت ارقام نگر آریا (حسابداران رسمی)</div>\n\n<div class=\"box head\">\n  <div class=\"refbox\" data-field=\"ref-box\" contenteditable=\"true\"></div>\n  <div class=\"hl right\">\n    <div data-field=\"company\">شرکت مورد رسیدگی : {{نام شرکت مورد رسیدگی}}</div>\n    <div data-field=\"subject\">كاربرگ تعيين ماهيت حساب و آناليز {{نوع حساب}} * {{نام حساب}} *</div>\n    <div data-field=\"fiscal-year\">دوره مالی منتهی به {{تاریخ پایان دوره مالی}}</div>\n  </div>\n  <div class=\"hl\">\n    <div data-field=\"prepared-date\">تاریخ تهیه : {{تاریخ تهیه}}</div>\n    <div data-field=\"preparer\">تهیه کننده : {{نام تهیه کننده}}</div>\n    <div data-field=\"reviewer\">بررسی کننده : {{نام بررسی کننده}}</div>\n  </div>\n</div>\n\n<div class=\"box\"><div class=\"bar\">ماهیـت حساب :</div>\n<div class=\"body\" data-field=\"nature\" contenteditable=\"true\">{{شرح ماهیت حساب}}</div></div>\n\n<div class=\"box\"><div class=\"bar\"><span>حساب فوق بشرح ذیل آنالیز گردیده است :</span><span class=\"unit\">مبالغ به ریال</span></div></div>\n\n<div class=\"grid\">\n <div class=\"col c-desc\"><table><thead><tr><th style=\"height:60px\">شــــــرح</th></tr></thead></table>\n  <table class=\"descs\"><tbody>\n  <tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\">افتتاحیه</td></tr><tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td></tr><tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td></tr><tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td></tr><tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td></tr><tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td></tr><tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td></tr><tr><td class=\"d\" style=\"text-align:center;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td></tr>\n  <tr class=\"tot\"><td class=\"lbl\" style=\"height:34px\">جمع گردش در {{تاریخ پایان دوره مالی}}</td></tr>\n  <tr class=\"tot\"><td class=\"lbl\" style=\"height:34px\">مانده طبق دفاتر در {{تاریخ پایان دوره مالی}}</td></tr></tbody></table></div>\n <div class=\"col c-sum\"><table><thead><tr><th colspan=\"2\" style=\"height:30px\">خلاصه گردش حساب</th></tr><tr><th style=\"height:30px\">بدهکار</th><th>بستانکار</th></tr></thead></table>\n  <table class=\"rows\"><tbody id=\"sumrows\">\n  <tr class=\"open\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr class=\"\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr class=\"\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr class=\"\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr class=\"\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr class=\"\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr class=\"\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr class=\"\"><td class=\"num dr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb;height:30px\"></td><td class=\"num cr\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr>\n  <tr class=\"tot\"><td class=\"num\" id=\"sumdr\" style=\"height:34px\">0</td><td class=\"num\" id=\"sumcr\">0</td></tr>\n  <tr class=\"tot\"><td class=\"num\" id=\"baldr\" style=\"height:34px\">0</td><td class=\"num\" id=\"balcr\">0</td></tr></tbody></table></div>\n <div class=\"col c-id\"><table><colgroup><col style=\"width:62%\"><col style=\"width:38%\"></col></colgroup><thead><tr><th colspan=\"2\" style=\"height:30px\">مشخصات حساب</th></tr><tr><th style=\"height:30px\">عنوان</th><th>عطف</th></tr></thead></table>\n  <table><colgroup><col style=\"width:62%\"><col style=\"width:38%\"></col></colgroup><tbody>\n  <tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\">گردش حساب</td><td class=\"ref\" data-field=\"ref0\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\">کاربرگ رسیدگی</td><td class=\"ref\" data-field=\"ref1\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\">کنترل های حسابرسی</td><td class=\"ref\" data-field=\"ref2\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\">تراز تفصیل</td><td class=\"ref\" data-field=\"ref3\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td><td class=\"ref\" data-field=\"ref4\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td><td class=\"ref\" data-field=\"ref5\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td><td class=\"ref\" data-field=\"ref6\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:30px\" contenteditable=\"true\"></td><td class=\"ref\" data-field=\"ref7\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr>\n  <tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:34px\" contenteditable=\"true\"></td><td class=\"ref\" data-field=\"ref8\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr><tr><td class=\"ttl\" style=\"text-align:right;border-bottom:1px solid #bbb;height:34px\" contenteditable=\"true\"></td><td class=\"ref\" data-field=\"ref9\" contenteditable=\"true\" style=\"border-bottom:1px solid #bbb\"></td></tr></tbody></table></div>\n</div>\n\n<div class=\"box\" style=\"margin-top:6px\"><div class=\"bar\">پیگیری سال آتـی :</div>\n<div class=\"body\" data-field=\"follow-up\" contenteditable=\"true\">{{پیگیری سال مالی بعد}}</div></div>\n<div class=\"box\"><div class=\"bar\">شرح ایراد :</div>\n<div class=\"body\" data-field=\"issues\" contenteditable=\"true\" style=\"min-height:34mm\">{{شرح ایرادات}}</div></div>\n<div class=\"box\"><div class=\"bar\">نتیجه گیری :</div>\n<div class=\"body\" data-field=\"conclusion\" contenteditable=\"true\">{{نتیجه‌گیری}}</div></div>\n</div>";
+const AUDIT_TEMPLATE_HTML="<div class=\"sheet v2 audit-template ana-page\">\n<div class=\"side\">موسسه حسابرسی و خدمات مدیریت ارقام نگر آریا (حسابداران رسمی)</div>\n<div class=\"box head\"><div class=\"refbox\" data-field=\"ref-box\" contenteditable=\"true\"></div><div class=\"hl right\"><div data-field=\"company\"></div><div data-field=\"subject\"></div><div data-field=\"fiscal-year\"></div></div><div class=\"hl\"><div data-field=\"prepared-date\"></div><div data-field=\"preparer\"></div><div data-field=\"reviewer\"></div></div></div>\n<div class=\"acct-meta-strip\"><div class=\"acct-meta-label\">مشخصات حساب</div><div class=\"acct-meta-items\"><span class=\"acct-meta-item\"><b>کد حساب:</b><span data-account-code></span></span><span class=\"acct-meta-item\"><b>گردش حساب:</b><span class=\"acct-meta-pill\" data-field=\"meta0\" contenteditable=\"true\"></span></span><span class=\"acct-meta-item\"><b>کاربرگ رسیدگی:</b><span class=\"acct-meta-pill\" data-field=\"meta1\" contenteditable=\"true\"></span></span><span class=\"acct-meta-item\"><b>کنترل‌های حسابرسی:</b><span class=\"acct-meta-pill\" data-field=\"meta2\" contenteditable=\"true\"></span></span><span class=\"acct-meta-item\"><b>تراز تفصیل:</b><span class=\"acct-meta-pill\" data-field=\"meta3\" contenteditable=\"true\"></span></span></div></div>\n<div class=\"box\"><div class=\"bar\">ماهیت حساب :</div><div class=\"body\" data-field=\"nature\" contenteditable=\"true\"></div></div>\n<div class=\"box\"><div class=\"bar\">حساب فوق به شرح ذیل آنالیز گردیده است :</div></div>\n<div class=\"grid\"><div class=\"col c-desc\"><table><thead><tr><th style=\"height:48px\">شرح</th></tr></thead></table><table class=\"descs\"><tbody></tbody></table></div><div class=\"col c-sum\"><table><thead><tr><th colspan=\"2\" class=\"sum-head-top\">آنالیز حساب <span class=\"sum-unit-badge\" data-unit-header></span></th></tr><tr class=\"sum-head-sub\"><th>بدهکار</th><th>بستانکار</th></tr></thead></table><table class=\"rows\"><tbody></tbody></table></div><div class=\"col c-id\"><table><thead><tr><th style=\"height:48px\">عطف</th></tr></thead></table><table><tbody></tbody></table></div></div>\n<div class=\"box compact-note\"><div class=\"bar\">شرح ایراد :</div><div class=\"body\" data-field=\"issues\" contenteditable=\"true\"></div></div>\n<div class=\"box compact-note\"><div class=\"bar\">پیگیری سال مالی بعد :</div><div class=\"body\" data-field=\"follow-up\" contenteditable=\"true\"></div></div>\n<div class=\"box compact-note\"><div class=\"bar\">نتیجه گیری :</div><div class=\"body\" data-field=\"conclusion\" contenteditable=\"true\"></div></div></div>";
 function auditTemplateRoot(){const shell=document.createElement('div');shell.innerHTML=AUDIT_TEMPLATE_HTML;const root=shell.firstElementChild;root.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));return root;}
+function auditTemplateFactor(o){return o.unitMode==='rial'?1:1000000;}
+function auditTemplateParse(text){
+ const s=String(text||'').replace(/[۰-۹٠-٩]/g,c=>{let n='۰۱۲۳۴۵۶۷۸۹'.indexOf(c);return n<0?'٠١٢٣٤٥٦٧٨٩'.indexOf(c):n;}).replace(/[٬,\s]/g,'').replace(/٫/g,'.').replace(/−/g,'-');
+ if(!s)return null;return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s)&&Number.isFinite(Number(s))?Number(s):NaN;
+}
+function auditTemplateDisplay(o,v){if(v===null||v===undefined)return '';const n=v/auditTemplateFactor(o);return reportNumber(o.unitMode==='rial'?n:Math.round(n));}
 function auditTemplateRows(o){
-  const m=reportTModel(o),state=reportState(o),rows=[];
-  rows.push({description:'افتتاحیه',dr:m.opening>=0?m.opening:null,cr:m.opening<0?-m.opening:null,kind:'opening',ref:'O1'});
-  if(state.prepared)for(const g of state.categories.filter(g=>!g.opening))rows.push({description:g.label,dr:g.debit===0?null:g.debit,cr:g.credit===0?null:g.credit,ref:g.id,unclassified:!!g.unclassified});
-  while(rows.length<8)rows.push({description:'',dr:null,cr:null});
-  rows.push({description:'جمع گردش دوره',dr:m.debit,cr:m.credit,kind:'total'});
-  rows.push({description:'مانده طبق دفاتر',dr:m.closing>=0?m.closing:null,cr:m.closing<0?-m.closing:null,kind:'balance'});
-  return rows.map((r,index)=>({...r,index}));
+ const m=reportTModel(o),state=reportState(o),rows=[{description:'افتتاحیه',dr:m.opening>=0?m.opening:null,cr:m.opening<0?-m.opening:null,kind:'opening',ref:'O1'}];
+ if(state.prepared)for(const g of state.categories.filter(g=>!g.opening))rows.push({description:g.label,dr:g.debit===0?null:g.debit,cr:g.credit===0?null:g.credit,ref:g.id});
+ while(rows.length<Math.max(7,o.manualRowTarget||7))rows.push({description:'',dr:null,cr:null});
+ rows.forEach((r,i)=>{const e=(o.templateRowEdits||{})[i]||{};if(e.description!==undefined)r.description=e.description;if(e.dr!==undefined)r.dr=e.dr;if(e.cr!==undefined)r.cr=e.cr;});
+ // Sum what is visible, so rounded million-rial figures reconcile on the paper.
+ const value=v=>v==null?0:(o.unitMode==='rial'?v:Math.round(v/1000000)*1000000);
+ const dr=state.prepared||Object.values(o.templateRowEdits||{}).some(e=>e.dr!==undefined||e.cr!==undefined)?rows.slice(1).reduce((a,r)=>a+value(r.dr),0):m.debit;
+ const cr=state.prepared||Object.values(o.templateRowEdits||{}).some(e=>e.dr!==undefined||e.cr!==undefined)?rows.slice(1).reduce((a,r)=>a+value(r.cr),0):m.credit;
+ const tot=o.templateTotalEdits||{},sumdr=tot.sumdr!==undefined?tot.sumdr:dr,sumcr=tot.sumcr!==undefined?tot.sumcr:cr;
+ const balance=value(rows[0].dr)-value(rows[0].cr)+value(sumdr)-value(sumcr);
+ rows.push({description:'جمع گردش دوره',dr:sumdr,cr:sumcr,kind:'total'});
+ rows.push({description:'مانده طبق دفاتر',dr:tot.baldr!==undefined?tot.baldr:balance>=0?balance:null,cr:tot.balcr!==undefined?tot.balcr:balance<0?-balance:null,kind:'balance'});
+ return rows.map((r,index)=>({...r,index}));
 }
 function auditTemplateGrid(o,rows){
-  const grid=auditTemplateRoot().querySelector('.grid'),defaults=['گردش حساب','کاربرگ رسیدگی','کنترل های حسابرسی','تراز تفصیل'];
-  const desc=grid.querySelector('.descs tbody'),sum=grid.querySelector('.rows tbody'),id=grid.querySelector('.c-id table:last-child tbody');
-  desc.innerHTML='';sum.innerHTML='';id.innerHTML='';
-  const amount=v=>v===null||v===undefined?'':reportNumber(v);
-  for(const r of rows){
-    const cls=r.kind==='opening'?'open':r.kind==='total'||r.kind==='balance'?'tot':'';
-    const d=document.createElement('tr'),s=document.createElement('tr'),i=document.createElement('tr');d.className=s.className=cls;
-    d.dataset.templateIndex=s.dataset.templateIndex=i.dataset.templateIndex=String(r.index);
-    d.innerHTML=`<td class="d ${r.kind==='total'||r.kind==='balance'?'lbl':''}" data-column="description">${esc(r.description)}${r.ref&&reportState(o).prepared?` <button class="template-evidence" type="button" data-report-ref="${esc(r.ref)}" aria-label="مشاهده مستندات">↗</button>`:''}</td>`;
-    s.innerHTML=`<td class="num dr" data-value="${r.dr??''}" data-column="debit">${amount(r.dr)}</td><td class="num cr" data-value="${r.cr??''}" data-column="credit">${amount(r.cr)}</td>`;
-    const saved=o.templateRefs&&o.templateRefs[r.index]||{},title=r.continuation?'':saved.title??defaults[r.index]??'',reference=r.continuation?'':saved.ref??'';
-    i.innerHTML=`<td class="ttl" contenteditable="true" data-ref-index="${r.index}" data-ref-kind="title">${esc(title)}</td><td class="ref" contenteditable="true" data-ref-index="${r.index}" data-ref-kind="ref">${esc(reference)}</td>`;
-    desc.appendChild(d);sum.appendChild(s);id.appendChild(i);
-  }return grid;
+ const grid=auditTemplateRoot().querySelector('.grid');grid.querySelector('[data-unit-header]').textContent=o.unitMode==='rial'?'(مبالغ به ریال)':'(مبالغ به میلیون ریال)';
+ const desc=grid.querySelector('.descs tbody'),sum=grid.querySelector('.rows tbody'),id=grid.querySelector('.c-id table:last-child tbody');
+ for(const r of rows){
+  const cls=r.kind==='opening'?'open':r.kind==='total'||r.kind==='balance'?'tot':'';
+  const d=document.createElement('tr'),s=document.createElement('tr'),i=document.createElement('tr');d.className=s.className=i.className=cls;d.dataset.templateIndex=s.dataset.templateIndex=i.dataset.templateIndex=String(r.index);
+  d.innerHTML=`<td class="d ${cls==='tot'?'lbl':''}"><span class="d-txt" ${cls==='tot'?'':'contenteditable="true" data-row-description="'+r.index+'"'}>${esc(r.description)}</span>${r.ref&&reportState(o).prepared&&!r.continuation?` <button class="template-evidence" type="button" data-report-ref="${esc(r.ref)}" aria-label="مشاهده مستندات">↗</button>`:''}</td>`;
+  const k=r.kind==='total'?'sum':r.kind==='balance'?'bal':'';
+  s.innerHTML=`<td class="num dr" contenteditable="true" data-row-index="${r.index}" data-amount="${k?k+'dr':'dr'}">${auditTemplateDisplay(o,r.dr)}</td><td class="num cr" contenteditable="true" data-row-index="${r.index}" data-amount="${k?k+'cr':'cr'}">${auditTemplateDisplay(o,r.cr)}</td>`;
+  const saved=o.templateRefs&&o.templateRefs[r.index]||{};i.innerHTML=`<td class="ref" contenteditable="true" data-ref-index="${r.index}" data-ref-kind="ref">${esc(r.continuation?'':saved.ref||'')}</td>`;
+  desc.appendChild(d);sum.appendChild(s);id.appendChild(i);
+ }return grid;
 }
 function auditTemplateAlign(root){
   for(const grid of root.querySelectorAll('.grid')){
@@ -6162,7 +6242,7 @@ function auditTemplateAlign(root){
     const count=groups[0].rows.length;
     for(let i=0;i<count;i++){
       const list=groups.map(g=>g.rows[i]);list.forEach(r=>{r.style.height='';[...r.cells].forEach(c=>c.style.height='');});
-      const height=Math.ceil(Math.max(...list.map(r=>r.getBoundingClientRect().height),list[0].classList.contains('tot')?34:30));
+      const height=Math.ceil(Math.max(...list.map(r=>r.getBoundingClientRect().height),26));
       list.forEach(r=>{r.style.height=height+'px';[...r.cells].forEach(c=>c.style.height=height+'px');});
     }
   }
@@ -6176,25 +6256,29 @@ function auditTemplatePaint(o,host){
   text('fiscal-year','دوره مالی : '+(cfg.year||(A.period&&A.period.to)||ANA.periodLabel||'—'));
   text('prepared-date','تاریخ تهیه : '+(cfg.date||today));text('preparer','تهیه کننده : '+(cfg.prep||'—'));text('reviewer','بررسی کننده : '+(cfg.rev||'—'));
   text('nature',String(o.sec['ماهیت']?.text||''));
-  for(const field of ['ref-box','follow-up','issues','conclusion'])text(field,edits[field]||'');
+  for(const field of ['ref-box','follow-up','issues','conclusion','meta0','meta1','meta2','meta3'])text(field,edits[field]??'');
+  root.querySelector('[data-account-code]').textContent=o.a.code||o.a.accountCode||A.code||A['کد حساب']||'—';
   root.querySelector('.grid').replaceWith(auditTemplateGrid(o,auditTemplateRows(o)));
   host.replaceChildren(root);auditTemplateAlign(root);
   root.querySelectorAll('[data-report-ref]').forEach(button=>button.onclick=()=>reportOpenReference(button.dataset.reportRef));
   root.querySelectorAll('[contenteditable]').forEach(e=>{
     e.addEventListener('input',()=>{
-      if(e.dataset.refIndex!==undefined){o.templateRefs=o.templateRefs||{};const index=e.dataset.refIndex;o.templateRefs[index]=o.templateRefs[index]||{};o.templateRefs[index][e.dataset.refKind]=e.textContent;}
+      if(e.dataset.rowDescription!==undefined){o.templateRowEdits=o.templateRowEdits||{};const i=e.dataset.rowDescription;o.templateRowEdits[i]=o.templateRowEdits[i]||{};o.templateRowEdits[i].description=e.textContent;}
+      else if(e.dataset.amount){const n=auditTemplateParse(e.textContent);if(!Number.isNaN(n)){e.removeAttribute('aria-invalid');const key=e.dataset.amount,i=e.dataset.rowIndex;if(key.length>2){o.templateTotalEdits=o.templateTotalEdits||{};o.templateTotalEdits[key]=n===null?null:n*auditTemplateFactor(o);if(key.startsWith('sum')){delete o.templateTotalEdits.baldr;delete o.templateTotalEdits.balcr;const balance=auditTemplateRows(o).at(-1);for(const side of ['dr','cr']){const cell=root.querySelector('[data-amount="bal'+side+'"]');if(cell)cell.textContent=auditTemplateDisplay(o,balance[side]);}}}else{o.templateRowEdits=o.templateRowEdits||{};o.templateRowEdits[i]=o.templateRowEdits[i]||{};o.templateRowEdits[i][key]=n===null?null:n*auditTemplateFactor(o);o.templateTotalEdits={};const rows=auditTemplateRows(o);for(const row of rows.slice(-2)){const prefix=row.kind==='total'?'sum':'bal';for(const side of ['dr','cr']){const cell=root.querySelector('[data-amount="'+prefix+side+'"]');if(cell)cell.textContent=auditTemplateDisplay(o,row[side]);}}}}else e.setAttribute('aria-invalid','true');}
+      else if(e.dataset.refIndex!==undefined){o.templateRefs=o.templateRefs||{};const index=e.dataset.refIndex;o.templateRefs[index]=o.templateRefs[index]||{};o.templateRefs[index][e.dataset.refKind]=e.textContent;}
       else if(e.dataset.field==='nature'){
         o.sec['ماهیت']={...(o.sec['ماهیت']||{}),text:e.textContent};const slot=ANA.aiBy&&ANA.aiBy[ANA.active];if(slot){slot.nature=e.textContent;slot.noEvidence=false;}
       }else if(e.dataset.field){o.templateEdits=o.templateEdits||{};o.templateEdits[e.dataset.field]=e.textContent;}
       auditTemplateAlign(root);
     });
+    if(e.dataset.amount)e.addEventListener('blur',()=>{const n=auditTemplateParse(e.textContent);if(!Number.isNaN(n))e.textContent=n===null?'':reportNumber(n);});
     e.addEventListener('paste',event=>{event.preventDefault();document.execCommand('insertText',false,event.clipboardData.getData('text/plain'));});
   });
 }
 function auditTemplatePrintPages(o,source,target){
   target.innerHTML='';target.classList.add('template-measuring');const pages=[];let body,page;
   function next(){
-    page=source.cloneNode(false);page.classList.add('template-print-page');page.appendChild(source.querySelector('.side').cloneNode(true));page.appendChild(source.querySelector('.head').cloneNode(true));
+    page=source.cloneNode(false);page.classList.add('template-print-page');page.appendChild(source.querySelector('.side').cloneNode(true));page.appendChild(source.querySelector('.head').cloneNode(true));page.appendChild(source.querySelector('.acct-meta-strip').cloneNode(true));
     body=document.createElement('div');body.className='template-page-body';page.appendChild(body);const footer=document.createElement('footer');footer.className='template-page-number';page.appendChild(footer);target.appendChild(page);pages.push(page);
     const bottom=page.getBoundingClientRect().top+285*96/25.4-8*96/25.4;body.style.height=Math.floor(bottom-body.getBoundingClientRect().top)+'px';
   }
@@ -6219,13 +6303,13 @@ function auditTemplatePrintPages(o,source,target){
       pageRows.pop();update();if(!pageRows.length)holder.remove();next();startGrid();pageRows.push(r);update();if(overflow())throw new Error('ردیف آنالیز از ظرفیت صفحه بزرگ‌تر است؛ هیچ مبلغی حذف نشد.');
     }
   }
-  for(const field of ['follow-up','issues','conclusion'])blocks(source.querySelector(`[data-field="${field}"]`).closest('.box')).forEach(append);
+  for(const field of ['issues','follow-up','conclusion'])blocks(source.querySelector(`[data-field="${field}"]`).closest('.box')).forEach(append);
   pages.forEach((p,i)=>{p.querySelectorAll('[contenteditable]').forEach(e=>e.removeAttribute('contenteditable'));p.querySelectorAll('.template-evidence').forEach(e=>e.remove());p.querySelector('footer').textContent='صفحه '+reportNumber(i+1)+' از '+reportNumber(pages.length);});
   target.classList.remove('template-measuring');return pages;
 }
 function auditTemplatePrint(host){
   if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
-  const o=ANA.out[ANA.active],source=host.querySelector('.audit-template'),target=document.getElementById('printHost');if(!o||!source)return;
+  const o=ANA.out[ANA.active],source=host.querySelector('.audit-template'),target=document.getElementById('printHost');if(!o||!source)return;if(source.querySelector('[aria-invalid="true"]')){alert('ابتدا مبلغ نامعتبر را اصلاح کنید.');return;}
   let rule,done=false;const title=document.title;const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=title;document.body.classList.remove('printing');target.classList.remove('template-measuring');target.innerHTML='';if(rule)rule.remove();window.removeEventListener('afterprint',restore);};
   try{auditTemplatePrintPages(o,source,target);rule=document.createElement('style');rule.textContent='@page{size:A4 portrait;margin:0!important}@media print{body.printing #printHost{padding:6mm!important;box-sizing:border-box!important}}';document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';schedulePrintRestore(restore);window.print();}catch(error){restore();alert(error.message);}
 }
@@ -7364,7 +7448,7 @@ const AD_ROW_CLASSIFY_SYSTEM=`وظیفه تو دسته‌بندی بسیار د�
 - پیش‌پرداخت / علی‌الحساب ≠ تسویه یا تهاتر حساب‌ها / انتقال بین سرفصل‌ها.
 - کارمزد خدمات بانکی، مالیات و عوارض ارزش افزوده، کسورات قانونی (بیمه، مالیات تکلیفی، سپرده حسن انجام کار)، شارژ و تسویه تنخواه، ثبت اصلاحی/برگشت ثبت اشتباه، تسعیر ارز، و بستن حساب به سود و زیان یا تراز اختتامیه (سند اختتامیه) هرکدام در صورت مشاهده در شرح باید دستهٔ دقیق و شفاف خود را بگیرند.
 - اختصارات رایج حسابداری ایران را دقیق بازگشایی کن: «ف» یا «ف ش» (در متن فاکتور/شماره) = فاکتور، «چ» یا «چ ش» = چک، «ح» = حواله، «ع» = علی‌الحساب، «ط س» = طی سند.
-۳. یکپارچگی و تمیزی عناوین دسته‌ها: تفاوت شماره فاکتور، شماره چک، کد رهگیری، تاریخ، مقدار/وزن یا نام شعبه بانک نباید باعث ساخت دسته‌های تکراری شود. تمام ردیف‌های دارای یک ماهیت اقتصادی واحد را زیر یک category مشترک با عنوان رسمی، دقیق و کوتاه فارسی جمع کن (بدون درج شماره فاکتور، تاریخ یا مبلغ در title).
+۳. یکپارچگی عناوین دسته‌ها و ظرفیت استاندارد کاربرگ (حداکثر ۶ دستهٔ جاری در حالت معمول): جدول آنالیز کاربرگ رسیدگی با احتساب ردیف افتتاحیه معمولاً ۷ ردیف ظرفیت استاندارد دارد (۱ ردیف افتتاحیه + تا ۶ ردیف گردش جاری). بنابراین تفاوت شماره فاکتور، شماره چک، کد رهگیری، تاریخ، زیرنوع کالا (مثلاً میلگرد و شمش در یک حساب تجاری)، مقدار/وزن یا نام شعبه بانک نباید باعث ساخت دسته‌های تکراری و خرد شود. تمام ردیف‌های دارای یک ماهیت اقتصادی واحد را زیر یک category مشترک با عنوان رسمی، دقیق و کوتاه فارسی جمع کن تا در حالت معمول تعداد دسته‌های جاری حداکثر ۶ دسته باشد؛ با این حال اگر در حساب واقعاً بیش از ۶ ماهیت حسابداری کاملاً متمایز و غیرقابل ادغام وجود داشت، ساخت دستهٔ بیشتر کاملاً مجاز است (هرگز شماره فاکتور، تاریخ یا مبلغ را در title ننویس).
 ۴. قاعدهٔ U (نامشخص): فقط زمانی category_id برابر "U" بده که هم شرح سند و هم شرح ردیف واقعاً خالی یا کاملاً مبهم باشند (مثلاً صرفاً «شرح ندارد» یا «ثبت عادی» بدون هیچ نشانهٔ موضوعی) یا یک ردیف واقعاً چند رویداد ناهمگون را بدون امکان تفکیک در یک ثبت واحد جمع کرده باشد. وقتی شرح نوع عملیات را نشان می‌دهد، هرگز از سر احتیاط بی‌مورد U نده.
 
 قالب خروجی الزامی:
@@ -8030,7 +8114,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
       if (acc.analysis.categories && acc.analysis.categories.length) {
         lines.push('دسته‌ها:');
         acc.analysis.categories.forEach(function (c) {
-          var name = c.category || c.title || c.name || '?';
+          var name = c.label || c.category || c.title || c.name || '?';
           var count = (c.rows && c.rows.length) || (c.refs && c.refs.length) || c.count || '';
           lines.push(' • ' + name + (count !== '' ? ' (' + count + ')' : ''));
         });
@@ -11329,6 +11413,54 @@ el('routerForget').onclick=()=>{
     }
   }
 
+  function quickModelList() {
+    var slots = readySlots();
+    var primary = slots[0] || null;
+    var providerId = primary ? primary.id : 'open_router';
+    var activeModel = primary ? primary.model : (typeof ROUTER_MODEL === 'string' && ROUTER_MODEL ? ROUTER_MODEL : 'openai/gpt-5-mini');
+    var list = getDisplayModels(providerId);
+    var out = [];
+    var seen = {};
+    if (activeModel) {
+      seen[activeModel.toLowerCase()] = 1;
+      var curMatch = list.find(function (m) { return m.id.toLowerCase() === activeModel.toLowerCase(); });
+      out.push({ id: activeModel, label: curMatch ? formatOptionLabel(curMatch) : (activeModel + ' (مدل فعال)') });
+    }
+    for (var i = 0; i < list.length; i++) {
+      var k = list[i].id.toLowerCase();
+      if (seen[k]) continue;
+      seen[k] = 1;
+      out.push({ id: list[i].id, label: formatOptionLabel(list[i]) });
+    }
+    return {
+      providerId: providerId,
+      providerName: primary ? primary.name : 'OpenRouter',
+      activeModel: activeModel,
+      models: out
+    };
+  }
+
+  function setActiveModel(newModelId) {
+    var clean = cleanAsciiToken(newModelId);
+    if (!clean) return false;
+    var slots = readySlots();
+    var primary = slots[0] || null;
+    if (primary && state.slots[primary.id]) {
+      state.slots[primary.id].model = clean;
+      state.slots[primary.id].modelCustomized = true;
+      delete coolUntil[primary.id];
+      save();
+      var cardInput = document.querySelector('#hesabrasiAiHub [data-aihub-card="' + primary.id + '"] [data-f="model"]');
+      if (cardInput) cardInput.value = clean;
+      paintModelSelector(primary.id);
+      syncPrimary();
+      paintStatus();
+    } else {
+      try { if (typeof ROUTER_MODEL !== 'undefined') ROUTER_MODEL = clean; } catch (e) {}
+    }
+    return true;
+  }
+
   load();
 
   global.HesabrasiAI = {
@@ -11340,6 +11472,8 @@ el('routerForget').onclick=()=>{
     fetchModelsCatalog: fetchModelsCatalog,
     getCachedCatalog: getCachedCatalog,
     storeCachedCatalog: storeCachedCatalog,
+    quickModelList: quickModelList,
+    setActiveModel: setActiveModel,
     readySlots: readySlots,
     stampFrom: stampFrom,
     isGemini: isGemini,
