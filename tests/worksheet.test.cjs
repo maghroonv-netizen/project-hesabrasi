@@ -31,6 +31,11 @@ const bothRows=[
 sampleDocs=()=>docLevelAgg(bothRows);SAMP_CFG={m:'top',base:'b',tmode:'p'};const bothResult=computeSample(0),bothSelected=bothResult.res.sel.flatMap(unit=>unit.rows);
 ok(bothSelected.length===2&&bothSelected.includes(bothRows[0])&&bothSelected.includes(bothRows[1])&&!bothSelected.includes(bothRows[2])&&!bothSelected.includes(bothRows[3]),'both-side percentage samples debit and credit independently, then unions selected event identities');
 ok(bothResult.msg.includes('بدهکار')&&bothResult.msg.includes('بستانکار')&&bothResult.msg.includes('۸۰٫۹٪')&&bothResult.msg.includes('۳۸٫۴٪'),'both-side result reports separate actual coverage');
+const bothOversized=[
+ {'شماره سند':'10','ردیف سند':'1','تاریخ':'1403/01/01','بدهکار':100,'بستانکار':0},
+ {'شماره سند':'11','ردیف سند':'1','تاریخ':'1403/01/02','بدهکار':0,'بستانکار':100}
+];sampleDocs=()=>docLevelAgg(bothOversized);SAMP_CFG={m:'top',base:'b',tmode:'p'};const bothMinimum=computeSample(0);
+ok(bothMinimum.res.count===2&&bothMinimum.res.sel.flatMap(u=>u.rows).includes(bothOversized[0])&&bothMinimum.res.sel.flatMap(u=>u.rows).includes(bothOversized[1])&&bothMinimum.msg.includes('سمت بدهکار و بستانکار انتخاب شد'),'both-side percentage minimum is enforced independently for debit and credit');
 sampleDocs=oldSampleDocs;WORKSHEET_ACCOUNTS=oldSampleAccounts;SAMP_CFG=oldSampleCfg;pctInput.remove();
 ok(METHOD_HELP.top.li[2].includes('برای هر ستون جداگانه')&&METHOD_HELP.top.li[2].includes('انتخاب متوقف می‌شود'),'percentage help describes independent targets and stop-at-overshoot rule');
 ok(root.querySelector('[data-unit-header]').textContent.includes('ریال'),'rial header');ok(root.querySelectorAll('.descs tbody tr').length===9,'rows');ok(!root.querySelector('.acct-meta-strip')&&!root.querySelector('[data-account-code]'),'removed account metadata');ok(!root.querySelector('.c-id')&&!root.textContent.includes('عطف'),'removed analysis reference column');ok(o.unitMode==='rial','rial default');ok(!document.querySelector('#anaUnitMode'),'no million-rial option');
