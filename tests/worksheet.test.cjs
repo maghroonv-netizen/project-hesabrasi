@@ -37,7 +37,7 @@ const bothOversized=[
 ];sampleDocs=()=>docLevelAgg(bothOversized);SAMP_CFG={m:'top',base:'b',tmode:'p'};const bothMinimum=computeSample(0);
 ok(bothMinimum.res.count===2&&bothMinimum.res.sel.flatMap(u=>u.rows).includes(bothOversized[0])&&bothMinimum.res.sel.flatMap(u=>u.rows).includes(bothOversized[1])&&bothMinimum.msg.includes('سمت بدهکار و بستانکار انتخاب شد'),'both-side percentage minimum is enforced independently for debit and credit');
 sampleDocs=oldSampleDocs;WORKSHEET_ACCOUNTS=oldSampleAccounts;SAMP_CFG=oldSampleCfg;pctInput.remove();
-ok(METHOD_HELP.top.li[2].includes('برای هر ستون جداگانه')&&METHOD_HELP.top.li[2].includes('انتخاب متوقف می‌شود'),'percentage help describes independent targets and stop-at-overshoot rule');
+
 ok(root.querySelector('[data-unit-header]').textContent.includes('ریال'),'rial header');ok(root.querySelectorAll('.descs tbody tr').length===9,'rows');ok(!root.querySelector('.acct-meta-strip')&&!root.querySelector('[data-account-code]'),'removed account metadata');ok(!root.querySelector('.c-id')&&!root.textContent.includes('عطف'),'removed analysis reference column');ok(o.unitMode==='rial','rial default');ok(!document.querySelector('#anaUnitMode'),'no million-rial option');
 ok([...root.querySelectorAll('.compact-note .body')].map(e=>e.dataset.field).join(',')==='issues,follow-up,conclusion','order');
 let x=root.querySelector('[data-row-index="1"][data-amount="dr"]');x.textContent='۲٬۰۰۰٬۰۰۰';x.dispatchEvent(new Event('input',{bubbles:true}));ok(root.querySelector('[data-amount="sumdr"]').textContent==='۲٬۰۰۰٬۰۰۰','sum in full rials');ok(root.querySelector('[data-amount="baldr"]').textContent==='۱٬۶۰۰٬۰۰۰','balance in full rials');
@@ -51,6 +51,18 @@ ok(adNatureText('رویدادهای فروش و دریافت وجه در این 
 ok(ROUTER_MODEL==='anthropic/claude-haiku-4.5'&&HesabrasiAI.catalog.find(x=>x.id==='open_router').model==='anthropic/claude-haiku-4.5'&&HesabrasiAI.catalog.find(x=>x.id==='anthropic').model==='claude-haiku-4-5-20251001','Claude Haiku default');ok(HesabrasiAI.pickBestAnalyticalModel([{id:'openai/gpt-5-mini'},{id:'anthropic/claude-haiku-4.5'}])==='anthropic/claude-haiku-4.5','Claude default preference');
 ok(document.getElementById('anaCategorizedDocs').textContent.includes('گردش'),'categories');ok(document.getElementById('anaQuickModelSelect')&&document.querySelectorAll('[data-rerun]').length===3,'controls');
 const o2={...o,templateRowEdits:{}};ANA.out.push(o2);HesabrasiAI.setActiveModel('openai/gpt-5');ok(ANA.out[1]===o2&&o.templateRowEdits[1].description==='شرح دستی','model preserves');
+const oldLevels=ACCOUNT_LEVELS,oldRows=ACCOUNT_ROWS,oldAccounts=WORKSHEET_ACCOUNTS,oldOut=SHEET_OUT,oldTarget=SAMP_TARGET,oldCfg={...SAMP_CFG};
+ACCOUNT_LEVELS=[{code:'کد حساب',title:'عنوان حساب',label:'معین'}];const sampleW={levelIdx:0,key:'100|آزمایشی',code:'100',title:'آزمایشی',keyPath:['100|آزمایشی'],pathLabel:'معین: آزمایشی'};
+ACCOUNT_ROWS=[50,30,20].map((amount,i)=>({'شماره سند':String(i+1),'تاریخ':'1403/01/0'+(i+1),'شرح سند':'رویداد آزمایشی','شرح ردیف':'رویداد آزمایشی','نوع سند':'عمومی','کد حساب':'100','عنوان حساب':'آزمایشی','بدهکار':amount,'بستانکار':0}));
+WORKSHEET_ACCOUNTS=[sampleW];SHEET_OUT=[];SAMP_CFG={m:'top',base:'d',tmode:'p'};SAMP_TARGET='50';renderSamplingStep();
+ok(!document.querySelector('#samplingArea .help')&&!document.querySelector('#samplingArea .sub'),'sampling screen is compact without explanatory copy');
+ok(runSampling(0,SAMP_CFG,'50'),'initial sample built');renderOutputStep();
+ok(document.querySelector('#sampleOutputSettings .m-sel')&&document.querySelector('#sampleOutputSettings #applyAllSamplesBtn')&&document.querySelector('.sheet-samp-val'),'preview includes editable sampling controls');
+const sheetTarget=document.querySelector('.sheet-samp-val');sheetTarget.value='80';document.querySelector('[data-apply-sheet-sample]').click();
+ok(SHEET_OUT[0].count===2&&SHEET_OUT[0].target==='80','active worksheet can be resampled with a revised target in place');
+const globalTarget=document.querySelector('#sampleOutputSettings .samp-val');globalTarget.value='100';document.querySelector('#applyAllSamplesBtn').click();
+ok(SHEET_OUT[0].count===3&&SHEET_OUT[0].target==='100','global preview controls can rebuild every worksheet');
+ACCOUNT_LEVELS=oldLevels;ACCOUNT_ROWS=oldRows;WORKSHEET_ACCOUNTS=oldAccounts;SHEET_OUT=oldOut;SAMP_TARGET=oldTarget;SAMP_CFG=oldCfg;
 window.testResult='PASS';
 }catch(e){window.testResult=e.stack;}
 `;

@@ -1937,6 +1937,15 @@ body.meta-stage-active .wrap{display:none!important;}
 }
 }
 /* ===== FLAT-LAYOUT-END ===== */
+/* تنظیمات نمونه‌گیری فشرده کنار پیش‌نمایش */
+.sample-settings-row{align-items:end;margin:10px 0 0;}
+.sample-settings-row .fld{flex:1 1 190px;min-width:150px;}
+.sample-output-settings.card{padding:16px 20px;}
+.sample-output-settings .btnrow{margin-top:12px;padding-top:10px;}
+.sheet-sampling-edit{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);}
+.sheet-sampling-edit label{display:flex;align-items:center;gap:8px;flex:0 1 310px;font-size:.82rem;font-weight:600;}
+.sheet-sampling-edit input{max-width:170px;min-width:100px;}
+@media(max-width:700px){.sample-output-settings.card{padding:14px;}.sheet-sampling-edit label{flex:1 1 100%;justify-content:space-between;}.sheet-sampling-edit input{max-width:55%;}}
 </style>
 </head>
 <body class="meta-stage-active">
@@ -2079,7 +2088,7 @@ const MODULE_STEPS={
     {n:'3', title:'اسناد ابتدای سال'},
     {n:'4', title:'انتخاب حساب'},
     {n:'5', title:'نمونه‌گیری'},
-    {n:'6', title:'کاربرگ خروجی'}
+    {n:'6', title:'پیش‌نمایش و اصلاح کاربرگ'}
   ],
   analysis:[
     {n:'a2', title:'انتخاب حساب'},
@@ -2431,7 +2440,7 @@ function handleFile(file){
   TYPE_OVERRIDES = new Map();
   currentHeaders = []; currentRows = []; FULL_ROWS = [];
   ACCOUNT_LEVELS = []; SELECTED_BY_LEVEL = []; ACCOUNT_ROWS = []; WORKSHEET_ACCOUNTS = [];
-  SHEET_OUT = []; ACTIVE_SHEET = 0;
+  SHEET_OUT = []; ACTIVE_SHEET = 0; SAMP_TARGET=''; SAMP_CFG={m:'top',base:'d',tmode:'p'}; LAST_CFG=null;
   ANA.accounts=[]; ANA.pickerPath=[]; ANA.out=[]; ANA.active=0;
   ANA.nextRows=[]; ANA.nextLoaded=false; ANA.nextName='';
   ANA.materiality=null; ANA.periodLabel=''; ANA.finProvided=false;
@@ -3282,47 +3291,6 @@ function noteCp(reason, value){
 }
 function pctTxt(x,tot){ return tot>0 ? (Math.round(x/tot*1000)/10).toLocaleString('fa-IR')+'٪' : '—'; }
 
-// ---- راهنمای هر گزینه در بخش نمونه‌گیری: دقیقاً چه کاری باید انجام شود ----
-const METHOD_HELP = {
-  top:{
-    head:'روش «اقلام کلیدی» — کاربرگ بر چه اساسی نمونه‌گیری می‌شود؟ ردیف‌های سال جاری از بزرگ‌ترین مبلغ به کوچک‌تر مرتب می‌شوند و پوششی نزدیک به هدف انتخاب می‌شود.',
-    li:[
-      'در «مبنای مبلغ» تعیین کنید بزرگی سند بر اساس کدام عدد سنجیده شود: ستون <b>بدهکار</b>، ستون <b>بستانکار</b>، یا <b>مجموع هر دو</b>.',
-      'در «نوع هدف» انتخاب کنید هدف به‌صورت <b>درصد از مجموع همان مبنا</b> است یا <b>مبلغ ثابت به ریال</b>.',
-      'در کادر مقدار، عدد را بدون کاما و جداکننده بنویسید. مثال: <b>۶۰</b> در حالت درصدی یعنی انتخاب ردیف‌های سال جاری تا ۶۰٪ جمع مبنا؛ در مبنای «بدهکار و بستانکار»، این هدف برای هر ستون جداگانه محاسبه می‌شود. ردیف‌ها از بزرگ به کوچک وارد می‌شوند و با رسیدن به ردیفی که جمع را از هدف بالاتر می‌برد، انتخاب متوقف می‌شود؛ بنابراین ممکن است پوشش واقعی کمتر از هدف باشد. اگر مبنا یک ستون باشد و هیچ ردیفی زیر هدف جا نشود، بزرگ‌ترین رویداد همان ستون انتخاب می‌شود؛ در مبنای دو ستون، این حداقل برای هر سمت جداگانه اعمال می‌شود، حتی اگر از هدف بیشتر شود. در حالت مبلغی <b>۵۰۰۰۰۰۰۰۰</b> یعنی هدف ۵۰۰ میلیون ریال.',
-      'انتخاب اشتباه مبنا کل نتیجه را جابه‌جا می‌کند: برای حساب‌های فروش معمولاً ستون <b>بستانکار</b> و برای حساب‌های خرید و هزینه ستون <b>بدهکار</b> ملاک است.'
-    ],
-    warn:'سند ابتدای سال هرگز وارد نمونه‌گیری نمی‌شود؛ فقط در جدول «تفکیک گردش و مانده» پایین کاربرگ می‌آید.'
-  },
-  mus:{
-    head:'روش «نمونه‌گیری واحد پولی (MUS)» — احتمال انتخاب هر سند متناسب با مبلغ آن است.',
-    li:[
-      'فقط <b>تعداد سند</b> را در کادر مقدار وارد کنید؛ مبنا و نوع هدف در این روش کاربردی ندارد.',
-      'هرچه مبلغ سند بزرگ‌تر باشد، شانس انتخاب آن بیشتر است؛ بنابراین اسناد درشت تقریباً همیشه وارد نمونه می‌شوند.',
-      'مناسب برای جمعیت‌های بزرگ با مبالغ بسیار متنوع (مثلاً خرید، فروش، موجودی انبار).',
-      'سندهایی که مبلغ آن‌ها صفر است عملاً شانس انتخاب ندارند.'
-    ],
-    warn:'این روش نیازی به تعیین درصد یا مبلغ هدف ندارد.'
-  },
-  rand:{
-    head:'روش «انتخاب تصادفی ساده» — همه اسناد جامعه شانس برابر دارند.',
-    li:[
-      'فقط <b>تعداد سند</b> را وارد کنید؛ مبنا و نوع هدف در این روش کاربردی ندارد.',
-      'مناسب وقتی خطای خاصی را دنبال نمی‌کنید و صرفاً یک نمونه‌ی معرف از کل جامعه می‌خواهید.',
-      'با هر بار اجرای دوباره، نتیجه می‌تواند کاملاً متفاوت باشد.'
-    ],
-    warn:'این روش مبنای ریاضی برای محاسبه خطای نمونه‌گیری فراهم نمی‌کند.'
-  },
-  sys:{
-    head:'روش «انتخاب سیستماتیک» — اسناد مرتب می‌شوند و با فاصله‌ی ثابت و نقطه شروع تصادفی انتخاب می‌شوند.',
-    li:[
-      'فقط <b>تعداد سند</b> را وارد کنید؛ مبنا و نوع هدف در این روش کاربردی ندارد.',
-      'نرم‌افزار ابتدا اسناد را بر اساس <b>شماره سند</b> مرتب می‌کند، سپس یک نقطه شروع تصادفی می‌گیرد و با فاصله‌ی ثابت نمونه می‌گیرد.',
-      'مناسب وقتی می‌خواهید کل دوره، از ابتدا تا انتهای سال، به‌طور یکنواخت پوشش داده شود.'
-    ],
-    warn:'اگر شماره اسناد ترتیب زمانی منظمی نداشته باشند، نتیجه چندان معتبر نخواهد بود.'
-  }
-};
 const CFG_HELP = {
   company:'نام شرکت یا واحد مورد رسیدگی؛ در سربرگ کاربرگ چاپ می‌شود.',
   year:'تاریخ ترازنامه‌ای که کاربرگ بابت آن تهیه شده است (مثلاً ۱۴۰۳/۱۲/۳۰).',
@@ -3331,10 +3299,6 @@ const CFG_HELP = {
   date:'تاریخ تهیه کاربرگ.',
   ctrl:'تعداد ستون‌های «کنترل‌های حسابرسی» در انتهای جدول. جهت چاپ عمودی یا افقی از کنار دکمهٔ چاپ انتخاب می‌شود؛ عرض ستون‌ها متناسب با جهت انتخابی است. (۱ تا ۱۵)'
 };
-function helpHtml(m){
-  const h=METHOD_HELP[m];
-  return `<b>${h.head}</b><ol>${h.li.map(x=>`<li>${x}</li>`).join('')}</ol><div class="warn">${h.warn}</div>`;
-}
 function printHint(){
   return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند. برای حذف رویداد ناخواسته، × کنار شماره ردیف را بزنید؛ فقط همان ردیف حذف می‌شود، حتی اگر شماره سند تکراری باشد. فایل اصلی اکسل تغییر نمی‌کند.</p>';
 }
@@ -3489,6 +3453,16 @@ function renderOutputStep(){
   }
   const cfg=[['company','نام واحد مورد رسیدگی'],['year','تاریخ ترازنامه'],['prep','تهیه‌کننده'],['rev','بررسی‌کننده'],['date','تاریخ تهیه']];
   area.innerHTML=`
+  <div class="card sample-output-settings" id="sampleOutputSettings">
+    <h1>تنظیم و اعمال نمونه‌گیری</h1>
+    <div class="setrow sample-settings-row">
+      <div class="fld"><label>روش نمونه‌گیری</label><select class="m-sel">${Object.entries(METHODS).map(([k,v])=>`<option value="${k}" ${SAMP_CFG.m===k?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="fld top-only"><label>مبنای مبلغ</label><select class="base">${[['d','ستون بدهکار'],['c','ستون بستانکار'],['b','بدهکار و بستانکار']].map(([k,v])=>`<option value="${k}" ${SAMP_CFG.base===k?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="fld top-only"><label>نوع هدف</label><select class="tmode"><option value="p" ${SAMP_CFG.tmode==='p'?'selected':''}>درصد از کل</option><option value="a" ${SAMP_CFG.tmode==='a'?'selected':''}>مبلغ (ریال)</option></select></div>
+      <div class="fld"><label data-sample-target-label>مقدار هدف</label><input class="custom-name samp-val" type="text" inputmode="decimal" placeholder="۶۰" value="${esc(SAMP_TARGET)}"></div>
+    </div>
+    <div class="btnrow"><button type="button" class="confirm" id="applyAllSamplesBtn">اعمال و بازسازی همهٔ کاربرگ‌ها</button></div>
+  </div>
   <div class="card">
     <h1>مشخصات سربرگ کاربرگ</h1>
     <p class="sub">این مقادیر در سربرگ کاربرگ چاپی درج می‌شوند. روی هر کادر نگه دارید تا توضیح آن را ببینید.</p>
@@ -3503,6 +3477,18 @@ function renderOutputStep(){
     <div class="tabs" id="sheetTabs"></div>
     <div id="sheetViews"></div>
   </div>`;
+  syncSamplingControls(area.querySelector('#sampleOutputSettings'));
+  const settings=area.querySelector('#sampleOutputSettings');
+  settings.querySelector('.m-sel').addEventListener('change',e=>{SAMP_CFG.m=e.target.value;syncSamplingControls(settings);checkStale();});
+  settings.querySelector('.base').addEventListener('change',e=>{SAMP_CFG.base=e.target.value;syncSamplingControls(settings);checkStale();});
+  settings.querySelector('.tmode').addEventListener('change',e=>{SAMP_CFG.tmode=e.target.value;syncSamplingControls(settings);checkStale();});
+  settings.querySelector('.samp-val').addEventListener('input',e=>{SAMP_TARGET=e.target.value;});
+  settings.querySelector('#applyAllSamplesBtn').addEventListener('click',()=>{
+    SAMP_TARGET=settings.querySelector('.samp-val').value;
+    let ok=0,fail=0;WORKSHEET_ACCOUNTS.forEach((_,i)=>runSampling(i,SAMP_CFG,SAMP_TARGET)?ok++:fail++);
+    if(fail)window.alert(`${faNum(ok)} کاربرگ به‌روز شد؛ ${faNum(fail)} حساب نیاز به بررسی مقدار یا مبنای هدف دارد.`);
+    if(SHEET_OUT.length)renderOutputStep();else gotoStep(5);
+  });
   checkStale();
   area.querySelectorAll('[data-cfg]').forEach(el=>el.addEventListener('input',()=>{
     const k=el.dataset.cfg;
@@ -3511,13 +3497,10 @@ function renderOutputStep(){
   }));
   drawSheets();
 }
-// اگر تنظیمات نمونه‌گیری بعد از ساخت کاربرگ‌ها عوض شده باشد، کاربرگ‌ها دیگر معتبر نیستند (بند ۱۴ سند)
 function checkStale(){
   const box=document.getElementById('staleBox'); if(!box) return;
-  const now=JSON.stringify(SAMP_CFG);
-  box.innerHTML = (LAST_CFG && LAST_CFG!==now)
-    ? `<div class="err" style="margin-bottom:12px">تنظیمات نمونه‌گیری را بعد از ساخت این کاربرگ‌ها تغییر داده‌اید، پس این کاربرگ‌ها با معیار قبلی ساخته شده‌اند و با انتخاب فعلی هم‌خوان نیستند. به مرحله «نمونه‌گیری» برگردید و «ساخت کاربرگ برای همه حساب‌ها» را بزنید.</div>`
-    : '';
+  const stale=SHEET_OUT.some(item=>JSON.stringify(item.cfg||{})!==JSON.stringify(SAMP_CFG));
+  box.innerHTML=stale?'<div class="err" style="margin-bottom:12px">تنظیمات کلی تغییر کرده است؛ برای بازسازی همهٔ کاربرگ‌ها دکمهٔ «اعمال و بازسازی همهٔ کاربرگ‌ها» را بزنید. می‌توانید فقط کاربرگ فعال را هم جداگانه به‌روز کنید.</div>':'';
 }
 function drawSheets(preserveScroll){
   const prevY=preserveScroll?window.scrollY:null;
@@ -3534,6 +3517,7 @@ function drawSheets(preserveScroll){
   document.getElementById('sheetViews').innerHTML=SHEET_OUT.map((x,k)=>
     `<div class="sheetwrap ${k===ACTIVE_SHEET?'':'hide'}" data-view="${k}">
       <div class="btnrow no-print" style="justify-content:flex-start;margin:0 0 10px">${samplePrintControls(x.w)}<span class="sample-page-badge" data-page-badge="${k}"></span>${typeof sampleColumnToolsHTML==='function'?sampleColumnToolsHTML(x.w,k):''}<button class="confirm print-btn native-print-btn">چاپ / ذخیره PDF</button></div>
+      <div class="sheet-sampling-edit no-print"><label><span data-sheet-target-label>${x.cfg?.m==='top'?(x.cfg?.tmode==='p'?'درصد این حساب':'مبلغ هدف این حساب'):'تعداد نمونه این حساب'}</span><input class="custom-name sheet-samp-val" type="text" inputmode="decimal" value="${esc(x.target??SAMP_TARGET)}"></label><button type="button" class="confirm" data-apply-sheet-sample="${x.i}">اعمال به این کاربرگ</button></div>
       ${printHint()}
       <div class="scrollx" data-sheet-canvas="${k}">${sheetHTML(x.w,x.sel)}</div>
     </div>`).join('');
@@ -3563,6 +3547,12 @@ function drawSheets(preserveScroll){
     });
   }));
   document.querySelectorAll('.sheetwrap .print-btn').forEach(b=>b.addEventListener('click',()=>printSheet(b.closest('.sheetwrap'))));
+  document.querySelectorAll('[data-apply-sheet-sample]').forEach(button=>button.addEventListener('click',()=>{
+    const wrap=button.closest('.sheetwrap'),idx=Number(button.dataset.applySheetSample),target=wrap.querySelector('.sheet-samp-val').value;
+    const keep=SHEET_OUT.findIndex(item=>item.i===idx);if(keep>=0)ACTIVE_SHEET=keep;
+    runSampling(idx,SAMP_CFG,target);
+    if(SHEET_OUT.length)renderOutputStep();else gotoStep(5);
+  }));
 
   document.querySelectorAll('.sheetwrap').forEach(v=>{
     if(!v.classList.contains('hide')){
@@ -3578,6 +3568,7 @@ function drawSheets(preserveScroll){
 }
 // ---------- تنظیمات مشترک نمونه‌گیری ----------
 let SAMP_CFG={m:'top', base:'d', tmode:'p'};
+let SAMP_TARGET='';
 let LAST_CFG=null;        // تنظیماتی که کاربرگ‌های فعلی با آن ساخته شده‌اند
 const accLabel=w=>w.keyPath[w.keyPath.length-1].split('|')[1] || w.pathLabel;
 
@@ -3586,20 +3577,14 @@ function docCounters(w){
   const docs=sampleDocs(w);
   return {docs, n:docs.length, rows:docs.reduce((t,d)=>t+d.rows.length,0)};
 }
-// راهنمای زنده — یک‌بار نمایش داده می‌شود، نه برای هر حساب
-function updateSamplingHelp(){
-  const area=document.getElementById('samplingArea');
-  const help=area.querySelector('.help');
-  if(!help) return;
-  const m=SAMP_CFG.m, pct=SAMP_CFG.tmode==='p';
-  help.innerHTML=helpHtml(m);
-  area.querySelectorAll('.top-only').forEach(el=>el.style.display = m==='top'?'':'none');
-  const val=area.querySelector('.samp-val');
-  val.placeholder = m==='top' ? (pct?'درصد تقریبی نمونه — مثال: ۶۰':'مبلغ هدف به ریال — مثال: ۵۰۰۰۰۰۰۰۰')
-                              : 'تعداد سند نمونه — مثال: ۲۵';
-  val.title = m==='top' ? (pct?'درصد تقریبی از جمع مبنای اقلام سال جاری؛ انتخاب ردیف‌محور است و پوشش واقعی ممکن است کمی کمتر یا بیشتر باشد (۱ تا ۱۰۰).'
-                             : 'مبلغ ثابت به ریال که مجموع اسناد منتخب باید به آن برسد.')
-                      : 'تعداد اسنادی که می‌خواهید نمونه شوند. اگر بیشتر از تعداد اسناد جامعه باشد، همه انتخاب می‌شوند.';
+function syncSamplingControls(root){
+  if(!root)return;
+  const top=SAMP_CFG.m==='top',pct=SAMP_CFG.tmode==='p';
+  root.querySelectorAll('.top-only').forEach(el=>el.style.display=top?'':'none');
+  const label=root.querySelector('[data-sample-target-label]');
+  if(label)label.textContent=top?(pct?'درصد هدف':'مبلغ هدف (ریال)'):'تعداد نمونه';
+  const input=root.querySelector('.samp-val');
+  if(input){input.placeholder=top?(pct?'۶۰':'۵۰۰۰۰۰۰۰۰'):'۲۵';input.removeAttribute('title');}
 }
 function renderSamplingStep(){
   const area=document.getElementById('samplingArea');
@@ -3614,19 +3599,17 @@ function renderSamplingStep(){
   const opt=(v,l,cur)=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`;
   area.innerHTML=`
   <div class="card">
-    <h1>نمونه‌گیری</h1>
-    <p class="sub">روش نمونه‌گیری، مبنای مبلغ و مقدار هدف را یک‌بار اینجا تعیین کنید؛ همین تنظیمات روی همه حساب‌های انتخابی اعمال می‌شود و کاربرگ هر حساب جداگانه ساخته می‌شود.</p>
-    <div class="setrow">
+    <h1>تنظیم نمونه‌گیری</h1>
+    <div class="setrow sample-settings-row">
       <div class="fld"><label>روش نمونه‌گیری</label>
         <select class="m-sel">${Object.entries(METHODS).map(([k,v])=>opt(k,v,SAMP_CFG.m)).join('')}</select></div>
       <div class="fld top-only"><label>مبنای مبلغ</label>
         <select class="base">${opt('d','ستون بدهکار',SAMP_CFG.base)}${opt('c','ستون بستانکار',SAMP_CFG.base)}${opt('b','بدهکار و بستانکار',SAMP_CFG.base)}</select></div>
       <div class="fld top-only"><label>نوع هدف</label>
         <select class="tmode">${opt('p','درصد از کل',SAMP_CFG.tmode)}${opt('a','مبلغ (ریال)',SAMP_CFG.tmode)}</select></div>
-      <div class="fld"><label>مقدار هدف</label>
-        <input class="custom-name samp-val" type="text" placeholder="مثال: ۶۰"></div>
+      <div class="fld"><label data-sample-target-label>مقدار هدف</label>
+        <input class="custom-name samp-val" type="text" inputmode="decimal" placeholder="۶۰" value="${esc(SAMP_TARGET)}"></div>
     </div>
-    <div class="help"></div>
     <div class="scrollx">
     <table class="smp">
       <colgroup><col style="width:48%"><col style="width:13%"><col style="width:13%"><col style="width:18%"><col style="width:8%"></colgroup>
@@ -3659,21 +3642,23 @@ function renderSamplingStep(){
   if(backBtn) backBtn.addEventListener('click',()=>gotoStep(4));
 
   const q=s=>area.querySelector(s);
-  q('.m-sel').addEventListener('change',e=>{SAMP_CFG.m=e.target.value; updateSamplingHelp();});
-  q('.base').addEventListener('change',e=>{SAMP_CFG.base=e.target.value; updateSamplingHelp();});
-  q('.tmode').addEventListener('change',e=>{SAMP_CFG.tmode=e.target.value; updateSamplingHelp();});
+  q('.m-sel').addEventListener('change',e=>{SAMP_CFG.m=e.target.value;syncSamplingControls(area);});
+  q('.base').addEventListener('change',e=>{SAMP_CFG.base=e.target.value;syncSamplingControls(area);});
+  q('.tmode').addEventListener('change',e=>{SAMP_CFG.tmode=e.target.value;syncSamplingControls(area);});
+  q('.samp-val').addEventListener('input',e=>{SAMP_TARGET=e.target.value;});
   q('#runAllBtn').addEventListener('click',runAllSampling);
-  updateSamplingHelp();
+  syncSamplingControls(area);
 }
-function computeSample(i){
+function computeSample(i,cfg=SAMP_CFG,targetValue){
   const w=WORKSHEET_ACCOUNTS[i], docs=sampleDocs(w);
-  const m=SAMP_CFG.m, v=parseAmount(document.querySelector('.samp-val').value);
+  const input=document.querySelector('#samplingArea .samp-val')||document.querySelector('#sampleOutputSettings .samp-val')||document.querySelector('.samp-val');
+  const m=cfg.m, v=parseAmount(targetValue??input?.value??SAMP_TARGET);
   if(!docs.length) return {err:'سندی در جامعه‌ی این حساب نمانده است'};
   if(!(v>0)) return {err:'مقدار هدف وارد نشده است'};
-  if(m==='top'&&SAMP_CFG.tmode==='p'&&(v<1||v>100))return {err:'درصد هدف باید عددی بین ۱ تا ۱۰۰ باشد'};
+  if(m==='top'&&cfg.tmode==='p'&&(v<1||v>100))return {err:'درصد هدف باید عددی بین ۱ تا ۱۰۰ باشد'};
   let res, msg='';
   if(m==='top'){
-    const base=SAMP_CFG.base, pct=SAMP_CFG.tmode==='p';
+    const base=cfg.base, pct=cfg.tmode==='p';
     const amt=d=>base==='d'?d.debit:base==='c'?d.credit:d.debit+d.credit;
     const total=docs.reduce((t,d)=>t+amt(d),0);
     if(!(total>0)){
@@ -3750,22 +3735,22 @@ if(typeof document!=='undefined'&&typeof window!=='undefined'&&!window.__sampleR
     const wrap=button.closest('.sheetwrap');sampleRemoveRow(Number(wrap?.dataset.view),Number(button.dataset.sampleRemove));
   });
 }
-function runSampling(i){
-  const r=computeSample(i), row=document.querySelector(`tr[data-ws-idx="${i}"]`), st=row.querySelector('.st');
-  if(r.err){ st.className='st warn'; st.textContent=r.err; SHEET_OUT=SHEET_OUT.filter(x=>x.i!==i); renderStepper(); return false; }
-  st.className='st ok';
-  st.textContent=sampleSelectionStatus({sel:r.res.sel,count:r.res.count,unit:r.res.unit});
-  st.title=r.msg;
-  const item={i, w:WORKSHEET_ACCOUNTS[i], sel:r.res.sel, count:r.res.count, unit:r.res.unit, msg:r.msg};
+function runSampling(i,cfg=SAMP_CFG,targetValue){
+  const target=targetValue??document.querySelector('#samplingArea .samp-val')?.value??SAMP_TARGET;
+  const r=computeSample(i,cfg,target), row=document.querySelector(`tr[data-ws-idx="${i}"]`), st=row?.querySelector('.st');
+  if(r.err){ if(st){st.className='st warn';st.textContent=r.err;}SHEET_OUT=SHEET_OUT.filter(x=>x.i!==i);renderStepper();return false; }
+  if(st){st.className='st ok';st.textContent=sampleSelectionStatus({sel:r.res.sel,count:r.res.count,unit:r.res.unit});st.title=r.msg;}
+  const item={i,w:WORKSHEET_ACCOUNTS[i],sel:r.res.sel,count:r.res.count,unit:r.res.unit,msg:r.msg,cfg:{...cfg},target:String(target??'')};
   const ex=SHEET_OUT.findIndex(x=>x.i===i);
-  if(ex>=0) SHEET_OUT[ex]=item; else SHEET_OUT.push(item);
-  LAST_CFG=JSON.stringify(SAMP_CFG);
+  if(ex>=0)SHEET_OUT[ex]=item;else SHEET_OUT.push(item);
+  LAST_CFG=JSON.stringify(cfg);
   renderStepper();
   return true;
 }
 function runAllSampling(){
+  SAMP_TARGET=document.querySelector('#samplingArea .samp-val')?.value??SAMP_TARGET;
   let ok=0, fail=0;
-  WORKSHEET_ACCOUNTS.forEach((_,i)=>{ runSampling(i)?ok++:fail++; });
+  WORKSHEET_ACCOUNTS.forEach((_,i)=>{ runSampling(i,SAMP_CFG,SAMP_TARGET)?ok++:fail++; });
   if(fail && !ok) return;
   if(fail) alert(`${faNum(ok)} کاربرگ ساخته شد. ${faNum(fail)} حساب به دلیل خطا ساخته نشد — ستون «وضعیت» را ببینید.`);
   gotoStep(6);
