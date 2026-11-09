@@ -1728,6 +1728,18 @@ body.is-col-resizing,body.is-col-resizing *{cursor:col-resize!important;user-sel
 #cpWorksheetDialog .cp-ws-evidence td.cp-evidence-num,#cpWorksheetDialog .cp-ws-evidence tfoot td.cp-evidence-num{direction:ltr;text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
 #cpWorksheetDialog .cp-ws-evidence tfoot td{background:#eaf2f6;font-weight:bold;border-top:2px solid #526a78}
 
+/* Slightly larger sampling worksheet text, kept consistent in preview and print. */
+.sampling-template tbody td,.sampling-template .cols th{font-size:10.7px}
+.sampling-template .sample-desc-text,.sampling-template .cp .cp-txt,.sampling-template td.desc,.sampling-template td.cp{font-size:10.5px}
+.sampling-template tbody td.num,.sampling-template tbody td.date,.sampling-template .rownum{font-size:10.4px}
+.sampling-template .recap td,.sampling-template .recap th{font-size:10.8px}
+.sheet.sampling-template[data-sample-density="compact"] .cols th{font-size:10.1px}
+.sheet.sampling-template[data-sample-density="compact"] tbody td{font-size:9.9px}
+.sheet.sampling-template[data-sample-density="compact"] .sample-desc-text,.sheet.sampling-template[data-sample-density="compact"] .cp .cp-txt,.sheet.sampling-template[data-sample-density="compact"] td.desc,.sheet.sampling-template[data-sample-density="compact"] td.cp{font-size:9.8px}
+.sheet.sampling-template[data-sample-density="compact"] tbody td.num,.sheet.sampling-template[data-sample-density="compact"] tbody td.date{font-size:9.8px}
+.sheet.sampling-template[data-sample-density="compact"] .sub{font-size:9.1px}
+.sheet.sampling-template[data-sample-density="compact"] .recap td,.sheet.sampling-template[data-sample-density="compact"] .recap th{font-size:10.2px}
+
 /* SAMPLING-TEMPLATE-CSS-END */
 
 /* ===== FLAT-LAYOUT-BEGIN =====
