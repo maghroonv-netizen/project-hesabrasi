@@ -3166,6 +3166,15 @@ function selTop(docs,target,amt,capAtTarget=false){
   }
   return {sel,sum};
 }
+// Account rows are indivisible: prefer the lower sorted selection, but allow a closer overshoot within five percentage points of the population.
+function selTopApprox(docs,target,amt,population){
+  const below=selTop(docs,target,amt,true);if(below.sum>=target)return below;
+  const tolerance=Math.max(1e-9,population*0.05),included=new Set(below.sel);
+  const above=docs.filter(d=>!included.has(d)&&amt(d)>0).map(d=>({d,sum:below.sum+amt(d)}))
+   .filter(candidate=>candidate.sum>target&&candidate.sum<=target+tolerance)
+   .sort((a,b)=>(a.sum-target)-(b.sum-target))[0];
+  return above&&above.sum-target<target-below.sum?{sel:[...below.sel,above.d],sum:above.sum}:below;
+}
 function sampleEventUnits(docs){
   let sourceIndex=0;
   return docs.flatMap(d=>(d.rows||[]).map(row=>({doc:d.doc,rows:[row],debit:parseAmount(row['بدهکار']),credit:parseAmount(row['بستانکار']),sourceIndex:sourceIndex++})));
@@ -3288,11 +3297,11 @@ function pctTxt(x,tot){ return tot>0 ? (Math.round(x/tot*1000)/10).toLocaleStrin
 // ---- راهنمای هر گزینه در بخش نمونه‌گیری: دقیقاً چه کاری باید انجام شود ----
 const METHOD_HELP = {
   top:{
-    head:'روش «اقلام کلیدی» — کاربرگ بر چه اساسی نمونه‌گیری می‌شود؟ انتخاب از بزرگ‌ترین مبلغ به سمت کوچک‌تر، با هدف مبلغی یا سقف درصدیِ بدون عبور.',
+    head:'روش «اقلام کلیدی» — کاربرگ بر چه اساسی نمونه‌گیری می‌شود؟ ردیف‌های سال جاری از بزرگ‌ترین مبلغ به کوچک‌تر مرتب می‌شوند و پوششی نزدیک به هدف انتخاب می‌شود.',
     li:[
       'در «مبنای مبلغ» تعیین کنید بزرگی سند بر اساس کدام عدد سنجیده شود: ستون <b>بدهکار</b>، ستون <b>بستانکار</b>، یا <b>مجموع هر دو</b>.',
       'در «نوع هدف» انتخاب کنید هدف به‌صورت <b>درصد از مجموع همان مبنا</b> است یا <b>مبلغ ثابت به ریال</b>.',
-      'در کادر مقدار، عدد را بدون کاما و جداکننده بنویسید. مثال: <b>۶۰</b> در حالت درصدی یعنی سقف تقریبیِ ۶۰٪ از مجموع بدهکار؛ سندی که باعث عبور از این سقف شود انتخاب نمی‌شود و پوشش واقعی ممکن است کمتر باشد. در حالت مبلغی <b>۵۰۰۰۰۰۰۰۰</b> یعنی هدف ۵۰۰ میلیون ریال.',
+      'در کادر مقدار، عدد را بدون کاما و جداکننده بنویسید. مثال: <b>۶۰</b> در حالت درصدی یعنی انتخاب ردیف‌های سال جاری به مبلغی نزدیک به ۶۰٪ از جمع ستون بدهکار؛ چون هر ردیف کامل انتخاب می‌شود، پوشش واقعی می‌تواند کمی کمتر یا بیشتر باشد. در حالت مبلغی <b>۵۰۰۰۰۰۰۰۰</b> یعنی هدف ۵۰۰ میلیون ریال.',
       'انتخاب اشتباه مبنا کل نتیجه را جابه‌جا می‌کند: برای حساب‌های فروش معمولاً ستون <b>بستانکار</b> و برای حساب‌های خرید و هزینه ستون <b>بدهکار</b> ملاک است.'
     ],
     warn:'سند ابتدای سال هرگز وارد نمونه‌گیری نمی‌شود؛ فقط در جدول «تفکیک گردش و مانده» پایین کاربرگ می‌آید.'
@@ -3598,9 +3607,9 @@ function updateSamplingHelp(){
   help.innerHTML=helpHtml(m);
   area.querySelectorAll('.top-only').forEach(el=>el.style.display = m==='top'?'':'none');
   const val=area.querySelector('.samp-val');
-  val.placeholder = m==='top' ? (pct?'سقف درصد پوشش — مثال: ۶۰':'مبلغ هدف به ریال — مثال: ۵۰۰۰۰۰۰۰۰')
+  val.placeholder = m==='top' ? (pct?'درصد تقریبی نمونه — مثال: ۶۰':'مبلغ هدف به ریال — مثال: ۵۰۰۰۰۰۰۰۰')
                               : 'تعداد سند نمونه — مثال: ۲۵';
-  val.title = m==='top' ? (pct?'سقف درصدی از مجموع ستون مبنا؛ انتخاب از آن عبور نمی‌کند و پوشش واقعی ممکن است کمتر باشد (۱ تا ۱۰۰).'
+  val.title = m==='top' ? (pct?'درصد تقریبی از جمع مبنای اقلام سال جاری؛ انتخاب ردیف‌محور است و پوشش واقعی ممکن است کمی کمتر یا بیشتر باشد (۱ تا ۱۰۰).'
                              : 'مبلغ ثابت به ریال که مجموع اسناد منتخب باید به آن برسد.')
                       : 'تعداد اسنادی که می‌خواهید نمونه شوند. اگر بیشتر از تعداد اسناد جامعه باشد، همه انتخاب می‌شوند.';
 }
@@ -3688,13 +3697,13 @@ function computeSample(i){
       return {err:'مبنای مبلغ نادرست — '+why};
     }
     if(pct){
-      const units=sampleEventUnits(docs),selected=selTop(units,total*v/100,amt,true);
+      const units=sampleEventUnits(docs),selected=selTopApprox(units,total*v/100,amt,total);
       res={...selected,count:selected.sel.length,unit:'row',sel:sampleGroupEvents(selected.sel)};
     }else res=selTop(docs,v,amt);
-    if(!res.sel.length)return {err:pct?'هیچ رویدادی بدون عبور از درصد هدف قابل انتخاب نیست؛ درصد را افزایش دهید.':'هیچ سندی بدون عبور از مبلغ هدف انتخاب نشد.'};
+    if(!res.sel.length)return {err:pct?'هیچ ردیفی به اندازهٔ کافی به درصد هدف نزدیک نیست؛ درصد دیگری را امتحان کنید.':'هیچ سندی بدون عبور از مبلغ هدف انتخاب نشد.'};
     const baseName = base==='d'?'بدهکار':base==='c'?'بستانکار':'بدهکار و بستانکار';
     const actualPct=sampleCoveragePercent(res.sum,total);
-    msg = pct ? `پوشش واقعی ${actualPct.toLocaleString('fa-IR')}٪ از مجموع ستون ${baseName}، بر مبنای رویدادهای حساب؛ سقف درخواستی ${v.toLocaleString('fa-IR')}٪ و بدون عبور`
+    msg = pct ? `پوشش واقعی ${actualPct.toLocaleString('fa-IR')}٪ از جمع ${baseName} اقلام سال جاری؛ هدف ${v.toLocaleString('fa-IR')}٪ و انتخاب تقریبی از ردیف‌های کاملِ مرتب‌شده بر مبنای مبلغ`
               : `رسیدن به مبلغ ${fmt(v)} ریال از ستون ${baseName}`;
   } else {
     let n=Math.round(v);

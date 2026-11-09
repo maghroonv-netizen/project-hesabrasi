@@ -10,16 +10,18 @@ const cats=reportAggregate({groups:[{category:'گردش',basis:'شرح',refs:dat
 renderAnalysisOutput();const root=document.querySelector('#anaSheet .audit-template');
 function ok(v,msg){if(!v)throw Error(msg)}
 const capDocs=[{id:'54',amount:54},{id:'47',amount:47},{id:'20',amount:20},{id:'5',amount:5}],capped=selTop(capDocs,50,d=>d.amount,true);
-ok(capped.sum===47&&capped.sel.map(d=>d.id).join(',')==='47','percentage selection must skip documents that exceed the cap');
+ok(capped.sum===47&&capped.sel.map(d=>d.id).join(',')==='47','cap fallback provides the closest lower sample');
+const approximate=selTopApprox([{id:'48',amount:48},{id:'46',amount:46},{id:'3a',amount:3},{id:'3b',amount:3}],50,d=>d.amount,100);
+ok(approximate.sum===51&&approximate.sel.map(d=>d.id).join(',')==='48,3a','percentage selection may choose a closer slightly-higher event total');
 const voucher={doc:'100',debit:100,credit:0,rows:[{'بدهکار':60,'بستانکار':0},{'بدهکار':40,'بستانکار':0}]},voucherEvents=selTop(sampleEventUnits([voucher]),60,d=>d.debit,true),voucherSample=sampleGroupEvents(voucherEvents.sel);
 ok(voucherEvents.sum===60&&voucherSample.length===1&&voucherSample[0].rows.length===1&&voucherSample[0].rows[0]['بدهکار']===60,'percentage sample must include only selected event rows, not the entire voucher');
 ok(sampleCoveragePercent(579,1000)===57.9,'actual percentage rounds down to one decimal');
 ok(selTop([{amount:54}],50,d=>d.amount).sum===54,'fixed-amount target keeps existing reach/overshoot behavior');
 const oldSampleDocs=sampleDocs,oldSampleAccounts=WORKSHEET_ACCOUNTS,oldSampleCfg={...SAMP_CFG},pctInput=document.createElement('input');pctInput.className='samp-val';pctInput.value='50';document.body.append(pctInput);
 sampleDocs=()=>capDocs.map(d=>({doc:d.id,debit:d.amount,credit:0,rows:[{'بدهکار':d.amount,'بستانکار':0,'تاریخ':'1403/01/01'}]}));WORKSHEET_ACCOUNTS=[{}];SAMP_CFG={m:'top',base:'d',tmode:'p'};const sampleResult=computeSample(0);
-ok(sampleResult.res.sum===59&&sampleResult.res.count===2&&sampleResult.res.unit==='row'&&sampleResult.msg.includes('۴۶٫۸٪')&&sampleResult.msg.includes('سقف درخواستی ۵۰٪'),'percentage run samples event rows under cap and reports rounded-down actual coverage');
+ok(sampleResult.res.sum===59&&sampleResult.res.count===2&&sampleResult.res.unit==='row'&&sampleResult.msg.includes('۴۶٫۸٪')&&sampleResult.msg.includes('هدف ۵۰٪'),'percentage run samples event rows under cap and reports rounded-down actual coverage');
 sampleDocs=oldSampleDocs;WORKSHEET_ACCOUNTS=oldSampleAccounts;SAMP_CFG=oldSampleCfg;pctInput.remove();
-ok(!METHOD_HELP.top.li[2].includes('تا رسیدن به ۶۰٪')&&METHOD_HELP.top.li[2].includes('پوشش واقعی ممکن است کمتر باشد'),'percentage help describes a cap');
+ok(!METHOD_HELP.top.li[2].includes('تا رسیدن به ۶۰٪')&&METHOD_HELP.top.li[2].includes('پوشش واقعی می‌تواند کمی کمتر یا بیشتر باشد'),'percentage help describes a cap');
 ok(root.querySelector('[data-unit-header]').textContent.includes('ریال'),'rial header');ok(root.querySelectorAll('.descs tbody tr').length===9,'rows');ok(!root.querySelector('.acct-meta-strip')&&!root.querySelector('[data-account-code]'),'removed account metadata');ok(!root.querySelector('.c-id')&&!root.textContent.includes('عطف'),'removed analysis reference column');ok(o.unitMode==='rial','rial default');ok(!document.querySelector('#anaUnitMode'),'no million-rial option');
 ok([...root.querySelectorAll('.compact-note .body')].map(e=>e.dataset.field).join(',')==='issues,follow-up,conclusion','order');
 let x=root.querySelector('[data-row-index="1"][data-amount="dr"]');x.textContent='۲٬۰۰۰٬۰۰۰';x.dispatchEvent(new Event('input',{bubbles:true}));ok(root.querySelector('[data-amount="sumdr"]').textContent==='۲٬۰۰۰٬۰۰۰','sum in full rials');ok(root.querySelector('[data-amount="baldr"]').textContent==='۱٬۶۰۰٬۰۰۰','balance in full rials');
