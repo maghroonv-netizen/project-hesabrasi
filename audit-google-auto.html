@@ -1612,6 +1612,10 @@
 .sampling-template tbody tr:nth-child(even) td{background:var(--sample-zebra)}
 .sampling-template tr.item{break-inside:avoid;page-break-inside:avoid}
 .sampling-template .rownum{font-weight:bold;font-size:10.5px;color:var(--sample-ink);border:0;border-radius:0;background:none}
+.sampling-template td.sample-serial-cell{position:relative}
+.sampling-template .sample-row-remove{position:absolute;inset-block-start:1px;inset-inline-start:1px;width:13px;height:13px;min-height:0;padding:0;border:1px solid #b91c1c;border-radius:50%;background:#fff;color:#b91c1c;font:700 10px/10px Tahoma,sans-serif;cursor:pointer;z-index:2}
+.sampling-template .sample-row-remove:hover{background:#b91c1c;color:#fff}
+.sample-measuring .sample-row-remove{display:none!important}
 .sampling-template .cont-tag{display:block;font-size:8.5px;color:var(--sample-mute);font-weight:normal}
 .sampling-template td.num{direction:ltr;font-variant-numeric:tabular-nums;font-weight:bold;white-space:nowrap;word-break:normal;overflow-wrap:normal;font-size:10px;text-align:center;overflow:visible;padding-inline:2px;line-height:15px}
 .sampling-template td.num.dr{color:#0b4f8a}.sampling-template td.num.cr{color:#8a2b0b}
@@ -3186,6 +3190,9 @@ function sampleNaturalCompare(a,b){
   const digits=value=>String(value??'').replace(/[۰-۹٠-٩]/g,c=>{const n='۰۱۲۳۴۵۶۷۸۹'.indexOf(c);return String(n<0?'٠١٢٣٤٥٦٧٨٩'.indexOf(c):n);});
   return digits(a).localeCompare(digits(b),'en',{numeric:true});
 }
+function sampleOrderedRows(sel){
+  return sel.flatMap((d,di)=>(d.rows||[]).map((r,ri)=>({doc:d.doc,r,di,ri}))).sort((a,b)=>sampleDateCompare(a.r['تاریخ'],b.r['تاریخ'])||sampleNaturalCompare(a.doc,b.doc)||a.di-b.di||a.ri-b.ri);
+}
 function selMus(docs,n){
   const amt=d=>d.debit+d.credit, total=docs.reduce((t,d)=>t+amt(d),0);
   const chosen=new Set(); if(!total) return {sel:[]};
@@ -3332,19 +3339,19 @@ function helpHtml(m){
   return `<b>${h.head}</b><ol>${h.li.map(x=>`<li>${x}</li>`).join('')}</ol><div class="warn">${h.warn}</div>`;
 }
 function printHint(){
-  return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند.</p>';
+  return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند. برای حذف سطر ناخواسته، × کنار شماره ردیف را بزنید؛ فایل اصلی اکسل تغییر نمی‌کند.</p>';
 }
 function sheetHTML(w, sel){
   const layout=samplePrintLayout(w),c=SHEET_CFG,n=Math.max(1,Math.min(15,Math.round(Number(c.ctrl)||10))),cpCtx=cpWorksheetContext(),SPAN=8+n;
   CP_REPORT.filled=0;CP_REPORT.blank=0;CP_REPORT.reasons={};
-  const order=sel.flatMap((d,di)=>(d.rows||[]).map((r,ri)=>({doc:d.doc,r,di,ri}))).sort((a,b)=>sampleDateCompare(a.r['تاریخ'],b.r['تاریخ'])||sampleNaturalCompare(a.doc,b.doc)||a.di-b.di||a.ri-b.ri);
+  const order=sampleOrderedRows(sel);
   let sd=0,sc=0,k=0;
   const body=order.map(({doc,r})=>{
     const db=parseAmount(r['بدهکار']),cr=parseAmount(r['بستانکار']);sd+=db;sc+=cr;k++;
     const desc=r['شرح سند']||r['شرح ردیف']||'';
     const sub=r['شرح ردیف']&&r['شرح ردیف']!==r['شرح سند']?`<div class="sub sample-desc-text">${esc(r['شرح ردیف'])}</div>`:'';
     const cp=cpWorksheetCell(r,cpCtx);
-    return `<tr class="item" data-sample-row="${k}" data-sample-debit="${db}" data-sample-credit="${cr}"><td><span class="rownum">${faNum(k)}</span></td><td class="num sample-voucher">${esc(sampleDisplayDigits(doc))}</td><td class="sample-date date"><span class="sample-date-text">${esc(sampleDisplayDigits(r['تاریخ']??''))}</span></td><td class="desc l"><div class="sample-desc-text">${esc(desc)}</div>${sub}</td><td class="cp l">${cp}</td><td class="ref"></td><td class="num dr">${db?fmt(db):''}</td><td class="num cr">${cr?fmt(cr):''}</td>${Array.from({length:n},()=>'<td class="ctl"><span class="box"></span></td>').join('')}</tr>`;
+    return `<tr class="item" data-sample-row="${k}" data-sample-debit="${db}" data-sample-credit="${cr}"><td class="sample-serial-cell"><span class="rownum">${faNum(k)}</span><button type="button" class="sample-row-remove no-print" data-sample-remove="${k}" title="حذف این ردیف از کاربرگ نمونه؛ فایل منبع تغییر نمی‌کند" aria-label="حذف ردیف ${faNum(k)} از کاربرگ نمونه">×</button></td><td class="num sample-voucher">${esc(sampleDisplayDigits(doc))}</td><td class="sample-date date"><span class="sample-date-text">${esc(sampleDisplayDigits(r['تاریخ']??''))}</span></td><td class="desc l"><div class="sample-desc-text">${esc(desc)}</div>${sub}</td><td class="cp l">${cp}</td><td class="ref"></td><td class="num dr">${db?fmt(db):''}</td><td class="num cr">${cr?fmt(cr):''}</td>${Array.from({length:n},()=>'<td class="ctl"><span class="box"></span></td>').join('')}</tr>`;
   }).join('');
   const total=`<tr class="total tot"><td colspan="6" class="lbl">جمع اقلام رسیدگی‌شده</td><td class="num dr">${fmt(sd)}</td><td class="num cr">${fmt(sc)}</td><td colspan="${n}"></td></tr>`;
   // Same software-only opening/current/sample arithmetic as the approved worksheet.
@@ -3431,7 +3438,7 @@ function sampleCopyPreviewForPrint(host,target){
  const boxes=[...canvas.children].filter(e=>e.classList.contains('sample-paper-box'));
  if(!boxes.length)throw new Error('صفحات پیش‌نمایش در دسترس نیست؛ چاپ متوقف شد.');
  target.replaceChildren(...boxes.map(box=>box.cloneNode(true)));
- target.querySelectorAll('.col-resize-handle,.cp-ws-anchor').forEach(el=>el.remove());
+ target.querySelectorAll('.col-resize-handle,.cp-ws-anchor,.sample-row-remove').forEach(el=>el.remove());
  if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(target);
 }
 function printSheet(host){
@@ -3559,6 +3566,7 @@ function drawSheets(preserveScroll){
     });
   }));
   document.querySelectorAll('.sheetwrap .print-btn').forEach(b=>b.addEventListener('click',()=>printSheet(b.closest('.sheetwrap'))));
+
   document.querySelectorAll('.sheetwrap').forEach(v=>{
     if(!v.classList.contains('hide')){
       if(typeof sampleRenderOnScreenPages==='function')sampleRenderOnScreenPages(v);
@@ -3699,6 +3707,30 @@ function computeSample(i){
   return {res, msg};
 }
 function sampleSelectionStatus(item){return '✓ '+faNum(item.count??item.sel.length)+(item.unit==='row'?' رویداد':' سند');}
+function sampleRemoveRow(viewIndex,rowIndex){
+  const item=SHEET_OUT[viewIndex];if(!item)return;
+  const entry=sampleOrderedRows(item.sel)[rowIndex-1];if(!entry)return;
+  let removed=false;
+  item.sel=item.sel.map(group=>{
+    const at=group.rows.indexOf(entry.r);if(at<0)return group;
+    removed=true;const rows=group.rows.filter(row=>row!==entry.r);
+    return rows.length?{...group,rows}:null;
+  }).filter(Boolean);
+  if(!removed)return;
+  if(item.unit==='row')item.count=Math.max(0,(item.count??rowIndex)-1);else item.count=item.sel.length;
+  item.msg=(item.msg?item.msg+' · ':'')+'حذف دستی: یک ردیف از کاربرگ نمونه حذف شد؛ پوشش درج‌شده مربوط به قبل از حذف است و فایل منبع تغییر نکرد.';
+  const status=document.querySelector('tr[data-ws-idx="'+item.i+'"] .st');
+  if(status){status.className='st ok';status.textContent=sampleSelectionStatus(item);status.title=item.msg;}
+  drawSheets(true);
+}
+if(typeof document!=='undefined'&&typeof window!=='undefined'&&!window.__sampleRowRemoveBound){
+  window.__sampleRowRemoveBound=true;
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('.sample-row-remove');if(!button)return;
+    event.preventDefault();event.stopPropagation();
+    const wrap=button.closest('.sheetwrap');sampleRemoveRow(Number(wrap?.dataset.view),Number(button.dataset.sampleRemove));
+  });
+}
 function runSampling(i){
   const r=computeSample(i), row=document.querySelector(`tr[data-ws-idx="${i}"]`), st=row.querySelector('.st');
   if(r.err){ st.className='st warn'; st.textContent=r.err; SHEET_OUT=SHEET_OUT.filter(x=>x.i!==i); renderStepper(); return false; }

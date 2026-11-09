@@ -38,6 +38,14 @@ const { PDFDocument } = require('pdf-lib');
       return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:markers.length,ellipse:markerRects.length>0&&markerRects.every(r=>r.width>r.height),atRight:markers.length>0&&markers.every(m=>{const r=m.getBoundingClientRect(),box=m.closest('.meta').getBoundingClientRect();return Math.abs(box.right-r.right)<Math.abs(r.left-box.left)}),headerNotExpanded:markers.length>0&&markers.every(m=>m.getBoundingClientRect().height<m.closest('.meta').getBoundingClientRect().height),dateSorted};
     });
     assert.equal(initial.hidden,'1');assert.equal(initial.buttons,38);assert.ok(initial.refMarkers>=1&&initial.ellipse&&initial.atRight&&initial.headerNotExpanded,'every sampling page keeps a right-aligned oval that does not expand the header');assert.ok(initial.dateSorted,'sample worksheet rows are sorted chronologically, not by amount-selection order');
+    const removal=await page.evaluate(()=>{
+      const wrap=document.querySelector('.sheetwrap:not(.hide)'),canvas=wrap.querySelector('[data-sheet-canvas]'),printTarget=document.getElementById('printHost');SHEET_OUT[0].unit='row';SHEET_OUT[0].count=38;
+      sampleCopyPreviewForPrint(wrap,printTarget);const printHasNoDeleteControls=!printTarget.querySelector('.sample-row-remove');printTarget.replaceChildren();
+      canvas.querySelector('.sample-row-remove').click();
+      const remaining=SHEET_OUT[0].sel.flatMap(group=>group.rows||[]),sampleTotal=remaining.reduce((sum,row)=>sum+parseAmount(row['بدهکار']),0);
+      return {printHasNoDeleteControls,remaining:remaining.length,sampleTotal,sourceRows:FULL_ROWS.length,visibleRows:document.querySelectorAll('.sheetwrap:not(.hide) tr.item').length,count:SHEET_OUT[0].count,unit:SHEET_OUT[0].unit};
+    });
+    assert.deepStrictEqual(removal,{printHasNoDeleteControls:true,remaining:37,sampleTotal:740000000,sourceRows:76,visibleRows:37,count:37,unit:'row'});
     await page.evaluate(() => {
       const canvas=document.querySelector('.sheetwrap:not(.hide) [data-sheet-canvas]');
       for(const anchor of canvas.querySelectorAll('.cp-ws-anchor'))if(!anchor.closest('.p'))throw Error('Evidence button is not after the account name');
@@ -46,7 +54,7 @@ const { PDFDocument } = require('pdf-lib');
       const evButton=canvas.querySelector('.cp-ws-anchor button');evButton.click();
       const dialog=document.getElementById('cpWorksheetDialog'),lines=[...dialog.querySelectorAll('.cp-ws-evidence tbody tr')],totals=[...dialog.querySelectorAll('.cp-ws-evidence tfoot td')];
       if(lines.length!==2||!lines[0].textContent.includes('حساب نمونه')||!lines[1].textContent.includes('طرف حساب'))throw Error('Evidence must place debit before credit');
-      if(totals[1].textContent!=='۱٬۰۰۰٬۰۰۰'||totals[2].textContent!=='۱٬۰۰۰٬۰۰۰')throw Error('Evidence totals are incorrect');dialog.close();
+      if(totals[1].textContent!=='۲٬۰۰۰٬۰۰۰'||totals[2].textContent!=='۲٬۰۰۰٬۰۰۰')throw Error('Evidence totals are incorrect');dialog.close();
       const voucher=(code,d,c)=>({'شماره سند':'900','تاریخ':'1403/01/01','شرح سند':'سند چند ردیفی','کد حساب':code,'عنوان حساب':'حساب '+code,'شرح ردیف':'ردیف '+code,'بدهکار':d,'بستانکار':c});
       const evidence=[voucher('CREDIT','0','30'),voucher('DEBIT-A','9007199254740993','0'),voucher('DEBIT-B','1','0'),voucher('MIXED','3','4'),voucher('INVALID','نامعتبر','0'),voucher('ZERO','0','0')];
       FULL_ROWS=evidence;CP_LAB_META={...CP_LAB_META,source:evidence};const ctx=cpLabContext(evidence);CP_WS_CONTEXT=ctx;cpWorksheetOpen(evidence[0],ctx);
@@ -80,7 +88,7 @@ const { PDFDocument } = require('pdf-lib');
         if(canvas.dataset.paginated!=='1')throw Error(wrap.querySelector('[data-page-badge]').textContent);
         return [...canvas.querySelectorAll('.sample-paper-box')].map(x=>[...x.querySelectorAll('tr.item')].map(r=>r.dataset.sampleRow));
       });
-      assert(expected.length>1);assert.strictEqual(expected.flat().length,38);
+      assert(expected.length>1);assert.strictEqual(expected.flat().length,37);
       // Exercise Ctrl+P first, before the explicit toolbar print path.
       const direct=await page.pdf({preferCSSPageSize:true,printBackground:true});
       assert.strictEqual((await PDFDocument.load(direct)).getPageCount(),expected.length,`${orientation}/${density}: direct PDF page count`);
