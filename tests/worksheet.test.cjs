@@ -20,6 +20,8 @@ ok(selTop([{amount:54}],50,d=>d.amount).sum===54,'fixed-amount target keeps exis
 const oldSampleDocs=sampleDocs,oldSampleAccounts=WORKSHEET_ACCOUNTS,oldSampleCfg={...SAMP_CFG},pctInput=document.createElement('input');pctInput.className='samp-val';pctInput.value='50';document.body.append(pctInput);
 sampleDocs=()=>capDocs.map(d=>({doc:d.id,debit:d.amount,credit:0,rows:[{'بدهکار':d.amount,'بستانکار':0,'تاریخ':'1403/01/01'}]}));WORKSHEET_ACCOUNTS=[{}];SAMP_CFG={m:'top',base:'d',tmode:'p'};const sampleResult=computeSample(0);
 ok(sampleResult.res.sum===54&&sampleResult.res.count===1&&sampleResult.res.unit==='row'&&sampleResult.msg.includes('۴۲٫۸٪')&&sampleResult.msg.includes('هدف ۵۰٪'),'percentage run stops at first oversized event and reports actual coverage');
+sampleDocs=()=>[{doc:'single',debit:75,credit:0,rows:[{'بدهکار':75,'بستانکار':0,'تاریخ':'1403/01/01'}]},{doc:'small',debit:25,credit:0,rows:[{'بدهکار':25,'بستانکار':0,'تاریخ':'1403/01/02'}]}];SAMP_CFG={m:'top',base:'d',tmode:'p'};const forcedMinimum=computeSample(0);
+ok(forcedMinimum.res.count===1&&forcedMinimum.res.sel[0].rows[0]['بدهکار']===75&&forcedMinimum.msg.includes('بزرگ‌ترین رویداد حساب')&&forcedMinimum.msg.includes('بیشتر باشد'),'when even the largest event exceeds the percentage target, force that one event as the account minimum');
 const bothRows=[
  {'شماره سند':'1','ردیف سند':'1','تاریخ':'1403/01/01','بدهکار':100,'بستانکار':0},
  {'شماره سند':'1','ردیف سند':'2','تاریخ':'1403/01/01','بدهکار':70,'بستانکار':50},

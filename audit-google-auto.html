@@ -3289,7 +3289,7 @@ const METHOD_HELP = {
     li:[
       'در «مبنای مبلغ» تعیین کنید بزرگی سند بر اساس کدام عدد سنجیده شود: ستون <b>بدهکار</b>، ستون <b>بستانکار</b>، یا <b>مجموع هر دو</b>.',
       'در «نوع هدف» انتخاب کنید هدف به‌صورت <b>درصد از مجموع همان مبنا</b> است یا <b>مبلغ ثابت به ریال</b>.',
-      'در کادر مقدار، عدد را بدون کاما و جداکننده بنویسید. مثال: <b>۶۰</b> در حالت درصدی یعنی انتخاب ردیف‌های سال جاری تا ۶۰٪ جمع مبنا؛ در مبنای «بدهکار و بستانکار»، این هدف برای هر ستون جداگانه محاسبه می‌شود. ردیف‌ها از بزرگ به کوچک وارد می‌شوند و با رسیدن به ردیفی که جمع را از هدف بالاتر می‌برد، انتخاب متوقف می‌شود؛ بنابراین ممکن است پوشش واقعی کمتر از هدف باشد. در حالت مبلغی <b>۵۰۰۰۰۰۰۰۰</b> یعنی هدف ۵۰۰ میلیون ریال.',
+      'در کادر مقدار، عدد را بدون کاما و جداکننده بنویسید. مثال: <b>۶۰</b> در حالت درصدی یعنی انتخاب ردیف‌های سال جاری تا ۶۰٪ جمع مبنا؛ در مبنای «بدهکار و بستانکار»، این هدف برای هر ستون جداگانه محاسبه می‌شود. ردیف‌ها از بزرگ به کوچک وارد می‌شوند و با رسیدن به ردیفی که جمع را از هدف بالاتر می‌برد، انتخاب متوقف می‌شود؛ بنابراین ممکن است پوشش واقعی کمتر از هدف باشد. اگر هیچ ردیفی زیر هدف جا نشود، بزرگ‌ترین رویداد حساب برای اینکه حساب بدون نمونه نماند انتخاب می‌شود، حتی اگر از هدف بیشتر شود. در حالت مبلغی <b>۵۰۰۰۰۰۰۰۰</b> یعنی هدف ۵۰۰ میلیون ریال.',
       'انتخاب اشتباه مبنا کل نتیجه را جابه‌جا می‌کند: برای حساب‌های فروش معمولاً ستون <b>بستانکار</b> و برای حساب‌های خرید و هزینه ستون <b>بدهکار</b> ملاک است.'
     ],
     warn:'سند ابتدای سال هرگز وارد نمونه‌گیری نمی‌شود؛ فقط در جدول «تفکیک گردش و مانده» پایین کاربرگ می‌آید.'
@@ -3685,16 +3685,24 @@ function computeSample(i){
       return {err:'مبنای مبلغ نادرست — '+why};
     }
     const units=sampleEventUnits(docs),totalDebit=docs.reduce((sum,d)=>sum+d.debit,0),totalCredit=docs.reduce((sum,d)=>sum+d.credit,0);
+    let minimumEventForced=false;
+    const ensureMinimumEvent=()=>{
+      if(res.sel.length)return;
+      const largest=units.filter(unit=>amt(unit)>0).sort((a,b)=>amt(b)-amt(a))[0];
+      if(largest){res={...res,sel:[largest],sum:amt(largest),count:1,unit:'row'};minimumEventForced=true;}
+    };
     if(pct&&base==='b'){
       const debitSelection=totalDebit>0?selTopApprox(units.filter(u=>u.debit>0),totalDebit*v/100,u=>u.debit,totalDebit):{sel:[]};
       const creditSelection=totalCredit>0?selTopApprox(units.filter(u=>u.credit>0),totalCredit*v/100,u=>u.credit,totalCredit):{sel:[]};
       const selectedByRow=new Map([...debitSelection.sel,...creditSelection.sel].map(unit=>[unit.rows[0],unit]));
       res={sel:[...selectedByRow.values()],count:selectedByRow.size,unit:'row'};
+      ensureMinimumEvent();
       const selectedDebit=res.sel.reduce((sum,u)=>sum+u.debit,0),selectedCredit=res.sel.reduce((sum,u)=>sum+u.credit,0);
       msg=`پوشش بدهکار ${sampleCoveragePercent(selectedDebit,totalDebit).toLocaleString('fa-IR')}٪ از هدف ${v.toLocaleString('fa-IR')}٪؛ بستانکار ${sampleCoveragePercent(selectedCredit,totalCredit).toLocaleString('fa-IR')}٪ از همان هدف. هر سمت جداگانه و بر مبنای اقلام سال جاری محاسبه شده است.`;
     }else if(pct){
       const selected=selTopApprox(units,total*v/100,amt,total);
       res={...selected,count:selected.sel.length,unit:'row'};
+      ensureMinimumEvent();
       const baseName=base==='d'?'بدهکار':'بستانکار',actualPct=sampleCoveragePercent(res.sum,total);
       msg=`پوشش واقعی ${actualPct.toLocaleString('fa-IR')}٪ از جمع ${baseName} اقلام سال جاری؛ هدف ${v.toLocaleString('fa-IR')}٪ و انتخاب تقریبی از ردیف‌های کاملِ مرتب‌شده بر مبنای مبلغ`;
     }else{
@@ -3702,7 +3710,8 @@ function computeSample(i){
       const baseName = base==='d'?'بدهکار':base==='c'?'بستانکار':'بدهکار و بستانکار';
       msg=`رسیدن به مبلغ ${fmt(v)} ریال از ستون ${baseName}`;
     }
-    if(!res.sel.length)return {err:pct?'هیچ رویدادی پیش از عبور از هدف درصدی انتخاب نشد؛ درصد هدف یا مبنا را بررسی کنید.':'هیچ رویدادی بدون عبور از مبلغ هدف انتخاب نشد.'};
+    if(minimumEventForced)msg+=' چون هیچ رویدادی زیر هدف جا نمی‌شد، بزرگ‌ترین رویداد حساب برای پوشش حداقلی انتخاب شد و ممکن است از هدف درصدی بیشتر باشد.';
+    if(!res.sel.length)return {err:pct?'برای این حساب رویداد قابل نمونه‌گیری پیدا نشد؛ مبنای مبلغ را بررسی کنید.':'هیچ رویدادی بدون عبور از مبلغ هدف انتخاب نشد.'};
   } else {
     let n=Math.round(v);
     if(n>docs.length){ msg=`هشدار: فقط ${faNum(docs.length)} سند موجود بود، همه انتخاب شد`; n=docs.length; }
