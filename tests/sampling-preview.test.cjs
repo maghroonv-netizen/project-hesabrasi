@@ -20,11 +20,12 @@ const { PDFDocument } = require('pdf-lib');
       // Build while the stage is hidden, as happens on first entering the output step.
       ACCOUNT_LEVELS=[{code:'کد حساب',title:'عنوان حساب'}];const all=[],selected=[];
       for(let i=1;i<=38;i++){
-        const base={'شماره سند':String(i),'تاریخ':'1403/01/01','شرح سند':'ثبت هزینه عملیاتی شماره '+i+' بابت پرداخت و خدمات','نوع سند':'روزانه'};
+        const month=1+Math.floor((i-1)/28),day=1+(i-1)%28,base={'شماره سند':String(i),'تاریخ':'1403/'+String(month).padStart(2,'0')+'/'+String(day).padStart(2,'0'),'شرح سند':'ثبت هزینه عملیاتی شماره '+i+' بابت پرداخت و خدمات','نوع سند':'روزانه'};
         const target={...base,'کد حساب':'100','عنوان حساب':'حساب نمونه','شرح ردیف':'شرح ردیف '+i+' خدمات شرکت با اطلاعات و مدارک پشتیبان','بدهکار':i*1000000,'بستانکار':0};
         const credit={...base,'کد حساب':'200','عنوان حساب':'طرف حساب ویژه شرکت الف با شرح حساب آزمایشی '+i,'شرح ردیف':'طرف مقابل سند '+i,'بدهکار':0,'بستانکار':i*1000000};
         all.push(credit,target);selected.push({doc:String(i),rows:[target]});
       }
+      selected.reverse();
       FULL_ROWS=all;ACCOUNT_ROWS=all;
       const w={keyPath:['100|حساب نمونه'],levelIdx:0,pathLabel:'حساب نمونه',title:'حساب نمونه',code:'100'};
       SHEET_OUT=[{w,sel:selected}];ACTIVE_SHEET=0;renderOutputStep();
@@ -32,10 +33,11 @@ const { PDFDocument } = require('pdf-lib');
       const hidden=canvas.dataset.paginated;
       document.body.classList.remove('meta-stage-active');document.getElementById('projectMeta').hidden=true;
       document.querySelectorAll('.stage').forEach(x=>x.classList.remove('active'));document.querySelector('[data-stage="6"]').classList.add('active');
-      const markers=[...canvas.querySelectorAll('.ref-oval')],markerRects=markers.map(m=>m.getBoundingClientRect());
-      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:markers.length,ellipse:markerRects.length>0&&markerRects.every(r=>r.width>r.height),atRight:markers.length>0&&markers.every(m=>{const r=m.getBoundingClientRect(),box=m.closest('.meta').getBoundingClientRect();return Math.abs(box.right-r.right)<Math.abs(r.left-box.left)}),headerNotExpanded:markers.length>0&&markers.every(m=>m.getBoundingClientRect().height<m.closest('.meta').getBoundingClientRect().height)};
+      const markers=[...canvas.querySelectorAll('.ref-oval')],markerRects=markers.map(m=>m.getBoundingClientRect()),dates=[...canvas.querySelectorAll('tr.item .sample-date-text')].map(x=>x.textContent);
+      const dateSorted=dates.every((date,i)=>i===0||sampleDateCompare(dates[i-1],date)<=0);
+      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:markers.length,ellipse:markerRects.length>0&&markerRects.every(r=>r.width>r.height),atRight:markers.length>0&&markers.every(m=>{const r=m.getBoundingClientRect(),box=m.closest('.meta').getBoundingClientRect();return Math.abs(box.right-r.right)<Math.abs(r.left-box.left)}),headerNotExpanded:markers.length>0&&markers.every(m=>m.getBoundingClientRect().height<m.closest('.meta').getBoundingClientRect().height),dateSorted};
     });
-    assert.equal(initial.hidden,'1');assert.equal(initial.buttons,38);assert.ok(initial.refMarkers>=1&&initial.ellipse&&initial.atRight&&initial.headerNotExpanded,'every sampling page keeps a right-aligned oval that does not expand the header');
+    assert.equal(initial.hidden,'1');assert.equal(initial.buttons,38);assert.ok(initial.refMarkers>=1&&initial.ellipse&&initial.atRight&&initial.headerNotExpanded,'every sampling page keeps a right-aligned oval that does not expand the header');assert.ok(initial.dateSorted,'sample worksheet rows are sorted chronologically, not by amount-selection order');
     await page.evaluate(() => {
       const canvas=document.querySelector('.sheetwrap:not(.hide) [data-sheet-canvas]');
       for(const anchor of canvas.querySelectorAll('.cp-ws-anchor'))if(!anchor.closest('.p'))throw Error('Evidence button is not after the account name');
