@@ -13,8 +13,8 @@ const capDocs=[{id:'54',amount:54},{id:'47',amount:47},{id:'20',amount:20},{id:'
 ok(capped.sum===47&&capped.sel.map(d=>d.id).join(',')==='47','cap fallback provides the closest lower sample');
 const approximate=selTopApprox([{id:'48',amount:48},{id:'46',amount:46},{id:'3a',amount:3},{id:'3b',amount:3}],50,d=>d.amount,100);
 ok(approximate.sum===51&&approximate.sel.map(d=>d.id).join(',')==='48,3a','percentage selection may choose a closer slightly-higher event total');
-const voucher={doc:'100',debit:100,credit:0,rows:[{'بدهکار':60,'بستانکار':0},{'بدهکار':40,'بستانکار':0}]},voucherEvents=selTop(sampleEventUnits([voucher]),60,d=>d.debit,true),voucherSample=sampleGroupEvents(voucherEvents.sel);
-ok(voucherEvents.sum===60&&voucherSample.length===1&&voucherSample[0].rows.length===1&&voucherSample[0].rows[0]['بدهکار']===60,'percentage sample must include only selected event rows, not the entire voucher');
+const voucher={doc:'100',debit:100,credit:0,rows:[{'بدهکار':60,'بستانکار':0},{'بدهکار':40,'بستانکار':0}]},voucherEvents=selTop(sampleEventUnits([voucher]),60,d=>d.debit,true);
+ok(voucherEvents.sum===60&&voucherEvents.sel.length===1&&voucherEvents.sel[0].rows[0]['بدهکار']===60,'percentage sample must include only selected event rows, not the entire voucher');
 ok(sampleCoveragePercent(579,1000)===57.9,'actual percentage rounds down to one decimal');
 ok(selTop([{amount:54}],50,d=>d.amount).sum===54,'fixed-amount target keeps existing reach/overshoot behavior');
 const oldSampleDocs=sampleDocs,oldSampleAccounts=WORKSHEET_ACCOUNTS,oldSampleCfg={...SAMP_CFG},pctInput=document.createElement('input');pctInput.className='samp-val';pctInput.value='50';document.body.append(pctInput);

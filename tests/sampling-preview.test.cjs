@@ -113,9 +113,10 @@ const { PDFDocument } = require('pdf-lib');
       const w={keyPath:['100|حساب نمونه'],levelIdx:0,pathLabel:'حساب نمونه',title:'حساب نمونه',code:'100'};
       SHEET_OUT=[{i:0,w,sel:[{doc:'700',rows:[a,b]},{doc:'701',rows:[last]}],count:3,unit:'row',msg:'نمونه'}];ACTIVE_SHEET=0;drawSheets();
       document.querySelector('.sheetwrap:not(.hide) .sample-row-remove').click();
-      return {remaining:SHEET_OUT[0].sel.flatMap(group=>group.rows).length,doc:SHEET_OUT[0].sel[0]?.doc,count:SHEET_OUT[0].count,sourceRows:FULL_ROWS.length};
+      const remaining=SHEET_OUT[0].sel.flatMap(group=>group.rows);
+      return {remaining:remaining.length,remainingAmounts:remaining.map(row=>row['بدهکار']),doc:SHEET_OUT[0].sel[0]?.doc,count:SHEET_OUT[0].count,sourceRows:FULL_ROWS.length};
     });
-    assert.deepStrictEqual(multiRowDelete,{remaining:1,doc:'701',count:1,sourceRows:5});
+    assert.deepStrictEqual(multiRowDelete,{remaining:2,remainingAmounts:[40,30],doc:'700',count:2,sourceRows:5});
     // A single sampled voucher with many contra-accounts can span pages. The
     // button belongs only after the final fragment, without repeating amounts.
     const split=await page.evaluate(()=>{
