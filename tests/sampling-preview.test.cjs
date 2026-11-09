@@ -32,9 +32,10 @@ const { PDFDocument } = require('pdf-lib');
       const hidden=canvas.dataset.paginated;
       document.body.classList.remove('meta-stage-active');document.getElementById('projectMeta').hidden=true;
       document.querySelectorAll('.stage').forEach(x=>x.classList.remove('active'));document.querySelector('[data-stage="6"]').classList.add('active');
-      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:canvas.querySelectorAll('.refcircle').length};
+      const markers=[...canvas.querySelectorAll('.ref-oval')],markerRects=markers.map(m=>m.getBoundingClientRect());
+      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:markers.length,ellipse:markerRects.length>0&&markerRects.every(r=>r.width>r.height),atRight:markers.length>0&&markers.every(m=>{const r=m.getBoundingClientRect(),box=m.closest('.meta').getBoundingClientRect();return Math.abs(box.right-r.right)<Math.abs(r.left-box.left)}),headerNotExpanded:markers.length>0&&markers.every(m=>m.getBoundingClientRect().height<m.closest('.meta').getBoundingClientRect().height)};
     });
-    assert.deepStrictEqual(initial,{hidden:'1',buttons:38,refMarkers:0});
+    assert.equal(initial.hidden,'1');assert.equal(initial.buttons,38);assert.ok(initial.refMarkers>=1&&initial.ellipse&&initial.atRight&&initial.headerNotExpanded,'every sampling page keeps a right-aligned oval that does not expand the header');
     await page.evaluate(() => {
       const canvas=document.querySelector('.sheetwrap:not(.hide) [data-sheet-canvas]');
       for(const anchor of canvas.querySelectorAll('.cp-ws-anchor'))if(!anchor.closest('.p'))throw Error('Evidence button is not after the account name');

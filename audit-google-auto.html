@@ -1589,13 +1589,14 @@
 .sampling-template table{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;margin:0}
 .sampling-template th,.sampling-template td{padding:2.5px 4px;vertical-align:middle;text-align:center;border:0;font-size:10.2px;color:var(--sample-ink);white-space:normal;word-break:normal;overflow-wrap:anywhere}
 .sampling-template th.sample-header-cell{padding:0;background:none;border:0;font-weight:normal}
-.sampling-template .meta{display:grid;grid-template-columns:1.95fr .95fr;align-items:center;gap:8px;padding:4.5px 11px;background:linear-gradient(180deg,#fffaf0,#fff2cc);text-align:right;border-bottom:1.3px solid #334155}
+.sampling-template .meta{display:grid;grid-template-columns:14mm 1.95fr .95fr;align-items:center;gap:8px;padding:4.5px 11px;background:linear-gradient(180deg,#fffaf0,#fff2cc);text-align:right;border-bottom:1.3px solid #334155}
 .sampling-template.sample-recap-only-page .meta{border-bottom:0}
 .sampling-template .meta div{padding:1px 0}
 .sampling-template .meta .k{color:var(--sample-blue);font-weight:bold}
 .sampling-template .meta .v{font-weight:bold}
 .sampling-template .meta .big{font-size:11.2px;line-height:1.36;white-space:normal;overflow-wrap:anywhere}
 .sampling-template .meta .side{border-right:1.2px dashed #475569;padding-right:10px;font-size:10.5px;line-height:1.36}
+.sampling-template .meta .ref-oval{box-sizing:border-box;width:13mm;height:8.5mm;justify-self:center;border:1.6px solid var(--sample-red);border-radius:50%;background:#fff;padding:0}
 .sampling-template .path{background:#fff;padding:2.5px 10px;text-align:right;border-bottom:1.1px solid var(--sample-line);line-height:1.35}
 .sampling-template.sample-continuation-page .path{display:none}
 .sampling-template .path .lab{color:var(--sample-red);font-weight:bold;margin-left:5px;font-size:10px}
@@ -1678,7 +1679,8 @@ body.is-col-resizing,body.is-col-resizing *{cursor:col-resize!important;user-sel
 .col-resize-guide{position:fixed;top:0;bottom:0;width:2px;background:#0070c0;pointer-events:none;z-index:9998;box-shadow:0 0 0 1px #ffffffaa}
 .col-resize-tooltip{position:fixed;transform:translate(-50%,-125%);padding:5px 10px;border-radius:8px;background:#1c2430ee;color:#fff;font:12px/1.4 Tahoma,sans-serif;direction:rtl;white-space:nowrap;pointer-events:none;z-index:9999;box-shadow:0 4px 14px #00000040}
 .sheet.sampling-template[data-sample-density="compact"]{line-height:1.28}
-.sheet.sampling-template[data-sample-density="compact"] .meta{padding:3px 9px;gap:6px;grid-template-columns:2fr .95fr}
+.sheet.sampling-template[data-sample-density="compact"] .meta{padding:3px 9px;gap:6px;grid-template-columns:12mm 2fr .95fr}
+.sheet.sampling-template[data-sample-density="compact"] .meta .ref-oval{width:11mm;height:7.5mm}
 .sheet.sampling-template[data-sample-density="compact"] .meta .big{font-size:10.4px;line-height:1.26}
 .sheet.sampling-template[data-sample-density="compact"] .meta .side{font-size:9.8px;line-height:1.26}
 .sheet.sampling-template[data-sample-density="compact"] .cols th{padding:1.5px 2px;font-size:9.8px}
@@ -3341,7 +3343,7 @@ function sheetHTML(w, sel){
   const headLabels=['ردیف','سند','تاریخ','شرح','طرف حساب','عطف','بدهکار (ریال)','بستانکار (ریال)'];
   const resizableHeads=headLabels.map((lbl,i)=>`<th rowspan="2">${lbl}<span class="col-resize-handle no-print" data-col-resize="${i}" title="برای تغییر عرض ستون بکشید (دوبار کلیک: بازنشانی)"></span></th>`).join('');
   return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" data-sample-density="${layout.density||'normal'}" style="--sample-full-width:${layout.paperWidth}mm;--sample-full-height:${layout.paperHeight}mm;--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-box:${boxSize.toFixed(2)}px;--sample-control-font:${controlFont.toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
-  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(subjectText)}</span></div><div class="big"><span class="k">تاریخ ترازنامه :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
+  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="ref-oval" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(subjectText)}</span></div><div class="big"><span class="k">تاریخ ترازنامه :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
   <tr class="cols">${resizableHeads}<th class="sample-controls-title" colspan="${n}">کنترل‌های حسابرسی</th></tr><tr class="cols">${nums}</tr></thead><tbody>${body}${total}</tbody></table></div>
   <div class="recap frame sample-recap"><div class="ttl">تفکیک گردش و مانده</div><table class="sum"><thead><tr><th style="width:34%">تفکیک</th><th>بدهکار (ریال)</th><th style="width:11%">درصد</th><th>بستانکار (ریال)</th><th style="width:11%">درصد</th></tr></thead><tbody>${R('افتتاحیه (مانده ابتدای سال)',opD,opC)}${R('اقلام رسیدگی‌شده',sd,sc)}${R('سایر اقلام (رسیدگی‌نشده)',othD,othC)}${R('جمع',totD,totC,'sumrow')}<tr class="rest"><td class="lab">مانده در پایان سال مالی</td><td class="num" colspan="4" style="text-align:right;padding-right:14px;direction:rtl">${fmtSignedBalance(end)}</td></tr></tbody></table></div></div></div>`;
 }
