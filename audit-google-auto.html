@@ -1950,6 +1950,18 @@ body.meta-stage-active .wrap{display:none!important;}
 .raw-preview-tag{padding:6px 10px;border-radius:8px;background:var(--ok-bg);color:var(--ok);font-size:.8rem;font-weight:700;}
 .sample-output-error{margin:0 0 10px;}
 .xfer-opt{display:flex;align-items:flex-start;gap:8px;margin:12px 0 0;font-size:.84rem;font-weight:600;line-height:1.7;cursor:pointer;}.xfer-opt input{margin-top:6px;flex:none;}
+.sample-ledger-modal{max-width:1240px;max-height:90vh;}
+.sample-ledger-body{padding:12px 16px;overflow:auto;}
+.sample-ledger-note{margin:0 0 10px;padding:9px 12px;border-inline-start:3px solid var(--accent);background:var(--bg);font-size:.82rem;line-height:1.7;}
+.sample-ledger-body .scrollx{max-height:65vh;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+.sample-ledger-body table{width:100%;min-width:1000px;border-collapse:collapse;font-size:.8rem;}
+.sample-ledger-body th,.sample-ledger-body td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top;}
+.sample-ledger-body td:nth-child(4){min-width:300px;}
+.sample-ledger-body td:nth-child(4) small{display:block;color:var(--muted);margin-top:3px;}
+.sample-ledger-body .transfer-candidate{background:color-mix(in srgb,var(--warn,#f0a52b) 10%,var(--panel));}
+.sample-ledger-body tr.excluded{opacity:.58;}
+.sample-ledger-body tr.excluded td:nth-child(4){text-decoration:line-through;}
+.sample-ledger-open{margin:0 0 10px;}
 .sample-population-manager{margin:0 0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);}
 .sample-population-manager summary{padding:10px 12px;cursor:pointer;font-weight:700;font-size:.84rem;}
 .sample-population-tools{padding:0 12px 12px;}
@@ -1957,6 +1969,7 @@ body.meta-stage-active .wrap{display:none!important;}
 .sample-population-tools .scrollx{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
 .sample-population-tools table{width:100%;min-width:780px;border-collapse:collapse;font-size:.75rem;}
 .sample-population-tools th,.sample-population-tools td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;}
+.ledger-sort{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap;}.ledger-sort:hover{color:var(--accent);}
 .sample-population-tools td:last-child{min-width:260px;}
 .sample-population-tools .transfer-candidate{background:color-mix(in srgb,var(--warn,#f0a52b) 10%,var(--panel));}
 .sample-population-tools tr.excluded{opacity:.58;}
@@ -2453,7 +2466,7 @@ function handleFile(file){
   TYPE_OVERRIDES = new Map();
   currentHeaders = []; currentRows = []; FULL_ROWS = [];
   ACCOUNT_LEVELS = []; SELECTED_BY_LEVEL = []; ACCOUNT_ROWS = []; WORKSHEET_ACCOUNTS = [];
-  SHEET_OUT = []; ACTIVE_SHEET = 0; SAMP_TARGET=''; SAMP_CFG={m:'top',base:'d',tmode:'p',xfer:true}; LAST_CFG=null;
+  SHEET_OUT = []; ACTIVE_SHEET = 0; SAMP_TARGET=''; SAMP_CFG={m:'top',base:'d',tmode:'p',xfer:true}; SAMPLE_LEDGER_SORT={}; LAST_CFG=null;
   ANA.accounts=[]; ANA.pickerPath=[]; ANA.out=[]; ANA.active=0;
   ANA.nextRows=[]; ANA.nextLoaded=false; ANA.nextName='';
   ANA.materiality=null; ANA.periodLabel=''; ANA.finProvided=false;
@@ -3476,24 +3489,56 @@ function sampleEffectiveExcluded(rawRows,manual,kept,cfg){
   return [...set];
 }
 function samplePopulationHTML(item){
-  const rows=item.rawRows||accountRows(item.w),cfgUse=item.rawPreview?SAMP_CFG:(item.cfg||SAMP_CFG),excluded=new Set(sampleEffectiveExcluded(rows,item.excludedRows,item.keptRows,cfgUse)),suspects=rows.filter(sampleTransferReason).length;
+  const rows=item.rawRows||accountRows(item.w),suspects=rows.filter(sampleTransferReason).length;
   if(!suspects)return '';
+  return `<button type="button" class="confirm sample-ledger-open no-print" data-open-sample-ledger="${item.i}">گردش حساب — بررسی ${faNum(suspects)} مورد احتمالی انتقال‌مانده</button>`;
+}
+function sampleLedgerTableHTML(item){
+  const rows=item.rawRows||accountRows(item.w),cfgUse=item.rawPreview?SAMP_CFG:(item.cfg||SAMP_CFG),excluded=new Set(sampleEffectiveExcluded(rows,item.excludedRows,item.keptRows,cfgUse)),suspects=rows.filter(sampleTransferReason).length;
   const note=cfgUse.xfer!==false
-    ?'کنارگذاری خودکار انتقال‌مانده روشن است: موارد احتمالی انتقال/تسویه از جامعهٔ نمونه‌گیری کنار می‌روند و در «سایر اقلام (رسیدگی‌نشده)» می‌آیند. برای هر رویداد می‌توانید تیک را بردارید یا بگذارید.'
-    :'کنارگذاری خودکار انتقال‌مانده خاموش است؛ فقط ردیف‌هایی که تیک بزنید از جامعهٔ نمونه‌گیری کنار می‌روند.';
-  return `<details class="sample-population-manager no-print" ${item.rawPreview&&suspects?'open':''}>
-    <summary>جامعهٔ نمونه و انتقال‌مانده‌ها — ${faNum(rows.length)} رویداد، ${faNum(suspects)} مورد احتمالی انتقال/تسویه، ${faNum(excluded.size)} مورد کنارگذاشته از جامعهٔ نمونه‌گیری</summary>
-    <div class="sample-population-tools"><span>${note} فایل منبع تغییر نمی‌کند.</span>
-      <div class="scrollx"><table><thead><tr><th>کنارگذاری</th><th>تاریخ</th><th>سند</th><th>ردیف</th><th>بدهکار</th><th>بستانکار</th><th>شرح / تشخیص</th></tr></thead><tbody>
-      ${rows.map((r,index)=>{const reason=sampleTransferReason(r),off=excluded.has(r);return `<tr class="${reason?'transfer-candidate':''} ${off?'excluded':''}"><td><input type="checkbox" data-population-exclude="${index}" ${off?'checked':''} aria-label="کنارگذاری این رویداد از جامعهٔ نمونه‌گیری"></td><td>${esc(sampleDisplayDigits(r['تاریخ']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره سند']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره ردیف']??''))}</td><td>${fmt(parseAmount(r['بدهکار']))}</td><td>${fmt(parseAmount(r['بستانکار']))}</td><td>${esc(r['شرح ردیف']||r['شرح سند']||'')}${reason?` <b>— ${reason}</b>`:''}</td></tr>`;}).join('')}
-      </tbody></table></div>
-    </div>
-  </details>`;
+    ?'انتقال‌مانده‌های تشخیص‌داده‌شده فعلاً از جامعهٔ نمونه‌گیری کنار گذاشته می‌شوند و در «سایر اقلام (رسیدگی‌نشده)» می‌آیند. برای نگه‌داشتن هر مورد، تیک کنار همان ردیف را بردارید.'
+    :'کنارگذاری خودکار خاموش است؛ ردیف‌هایی را که نمی‌خواهید وارد نمونه شوند تیک بزنید.';
+  const key=JSON.stringify(item.w.keyPath||[item.w.key||item.w.code]),sort=SAMPLE_LEDGER_SORT[key]||{field:'date',dir:1};
+  const ordered=rows.map((r,index)=>({r,index})).sort((a,b)=>{
+    if(sort.field==='debit'||sort.field==='credit'){
+      const delta=parseAmount(a.r[sort.field==='debit'?'بدهکار':'بستانکار'])-parseAmount(b.r[sort.field==='debit'?'بدهکار':'بستانکار']);
+      if(delta)return delta*sort.dir;
+    }else{const date=sampleDateCompare(a.r['تاریخ'],b.r['تاریخ']);if(date)return date*sort.dir;}
+    return sampleNaturalCompare(a.r['شماره سند'],b.r['شماره سند'])||sampleNaturalCompare(a.r['شماره ردیف'],b.r['شماره ردیف'])||a.index-b.index;
+  });
+  const sortHead=(field,label)=>`<button type="button" class="ledger-sort" data-ledger-sort="${field}" aria-label="مرتب‌سازی بر اساس ${label}">${label} ${sort.field===field?(sort.dir<0?'▼':'▲'):'↕'}</button>`;
+  return `<div class="sample-ledger-note">${note} · ${faNum(suspects)} مورد مشکوک از ${faNum(rows.length)} رویداد علامت خورده؛ فایل منبع تغییر نمی‌کند.</div>
+    <div class="sample-population-tools"><div class="scrollx"><table><thead><tr><th>شماره ردیف</th><th>شماره سند</th><th>تاریخ سند</th><th>شرح سند / ردیف</th><th>${sortHead('debit','بدهکار')}</th><th>${sortHead('credit','بستانکار')}</th><th>جامعه</th></tr></thead><tbody>
+    ${ordered.map(({r,index})=>{const reason=sampleTransferReason(r),off=excluded.has(r),docDesc=String(r['شرح سند']||'').trim(),rowDesc=String(r['شرح ردیف']||'').trim();return `<tr class="${reason?'transfer-candidate':''} ${off?'excluded':''}"><td>${esc(sampleDisplayDigits(r['شماره ردیف']??''))}</td><td>${esc(sampleDisplayDigits(r['شماره سند']??''))}</td><td>${esc(sampleDisplayDigits(r['تاریخ']??''))}</td><td>${docDesc?`<b>${esc(docDesc)}</b>`:''}${rowDesc&&rowDesc!==docDesc?`<small>${esc(rowDesc)}</small>`:''}${reason?` <b>— ${reason}</b>`:''}</td><td>${fmt(parseAmount(r['بدهکار']))}</td><td>${fmt(parseAmount(r['بستانکار']))}</td><td><input type="checkbox" data-population-exclude="${index}" ${off?'checked':''} aria-label="کنارگذاری این رویداد از جامعهٔ نمونه‌گیری"></td></tr>`;}).join('')}
+    </tbody></table></div></div>`;
 }
 function syncTransferOptionForActive(){
   const option=document.querySelector('#sampleOutputSettings .xfer-opt'),item=SHEET_OUT[ACTIVE_SHEET];if(!option)return;
   const rows=item?.rawRows|| (item?accountRows(item.w):[]);
   option.style.display=rows.some(sampleTransferReason)?'':'none';
+}
+function bindSampleLedgerBody(index){
+  const body=document.getElementById('sampleLedgerBody');if(!body)return;
+  body.querySelectorAll('[data-ledger-sort]').forEach(button=>button.addEventListener('click',()=>{
+    const item=SHEET_OUT[index];if(!item)return;
+    const key=JSON.stringify(item.w.keyPath||[item.w.key||item.w.code]),field=button.dataset.ledgerSort,previous=SAMPLE_LEDGER_SORT[key];
+    SAMPLE_LEDGER_SORT[key]={field,dir:previous?.field===field?-previous.dir:-1};openSampleLedger(index);
+  }));
+  body.querySelectorAll('[data-population-exclude]').forEach(input=>input.addEventListener('change',()=>{
+    const item=SHEET_OUT[index],row=item?.rawRows?.[Number(input.dataset.populationExclude)];if(!item||!row)return;
+    const cfgUse=item.rawPreview?SAMP_CFG:(item.cfg||SAMP_CFG),excluded=item.excludedRows||[],kept=item.keptRows||[],auto=cfgUse.xfer!==false&&!!sampleTransferReason(row);
+    if(input.checked){if(!excluded.includes(row))excluded.push(row);const k=kept.indexOf(row);if(k>=0)kept.splice(k,1);}
+    else{const at=excluded.indexOf(row);if(at>=0)excluded.splice(at,1);if(auto&&!kept.includes(row))kept.push(row);}
+    item.excludedRows=excluded;item.keptRows=kept;ACTIVE_SHEET=index;
+    if(!item.rawPreview)runSampling(item.i,item.cfg,item.target,excluded);
+    openSampleLedger(index);
+  }));
+}
+function openSampleLedger(index){
+  const item=SHEET_OUT[index],modal=document.getElementById('sampleLedgerModal');if(!item||!modal)return;
+  ACTIVE_SHEET=index;document.getElementById('sampleLedgerTitle').textContent='گردش حساب — '+accLabel(item.w);
+  document.getElementById('sampleLedgerBody').innerHTML=sampleLedgerTableHTML(item);
+  modal.classList.add('open');bindSampleLedgerBody(index);
 }
 // ===================== پیش‌نمایش و نمونه‌گیری =====================
 function renderOutputStep(){
@@ -3522,6 +3567,9 @@ function renderOutputStep(){
     <div id="staleBox"></div>
     <div class="tabs" id="sheetTabs"></div>
     <div id="sheetViews"></div>
+  </div>
+  <div class="modal-overlay sample-ledger-overlay" id="sampleLedgerModal" role="dialog" aria-modal="true" aria-labelledby="sampleLedgerTitle">
+    <div class="modal-box sample-ledger-modal"><div class="modal-head"><b id="sampleLedgerTitle">گردش حساب</b><button type="button" class="modal-close" id="sampleLedgerClose" aria-label="بستن">×</button></div><div class="sample-ledger-body" id="sampleLedgerBody"></div></div>
   </div>`;
   syncSamplingControls(area.querySelector('#sampleOutputSettings'));
   const settings=area.querySelector('#sampleOutputSettings');
@@ -3530,6 +3578,9 @@ function renderOutputStep(){
   settings.querySelector('.tmode').addEventListener('change',e=>{SAMP_CFG.tmode=e.target.value;syncSamplingControls(settings);checkStale();});
   settings.querySelector('.xfer-chk').addEventListener('change',e=>{SAMP_CFG.xfer=e.target.checked;checkStale();});
   settings.querySelector('.samp-val').addEventListener('input',e=>{SAMP_TARGET=e.target.value;});
+  const ledgerModal=area.querySelector('#sampleLedgerModal');
+  area.querySelector('#sampleLedgerClose').addEventListener('click',()=>ledgerModal.classList.remove('open'));
+  ledgerModal.addEventListener('click',event=>{if(event.target===ledgerModal)ledgerModal.classList.remove('open');});
   settings.querySelector('#applyAllSamplesBtn').addEventListener('click',()=>{
     SAMP_TARGET=settings.querySelector('.samp-val').value;
     let ok=0,fail=0;WORKSHEET_ACCOUNTS.forEach((_,i)=>runSampling(i,SAMP_CFG,SAMP_TARGET)?ok++:fail++);
@@ -3598,19 +3649,8 @@ function drawSheets(preserveScroll){
     });
   }));
   document.querySelectorAll('.sheetwrap .print-btn').forEach(b=>b.addEventListener('click',()=>printSheet(b.closest('.sheetwrap'))));
-  document.querySelectorAll('[data-population-exclude]').forEach(input=>input.addEventListener('change',()=>{
-    const wrap=input.closest('.sheetwrap'),idx=Number(wrap.dataset.view),item=SHEET_OUT[idx],row=item?.rawRows?.[Number(input.dataset.populationExclude)];if(!item||!row)return;
-    const cfgUse=item.rawPreview?SAMP_CFG:(item.cfg||SAMP_CFG),excluded=item.excludedRows||[],kept=item.keptRows||[],auto=cfgUse.xfer!==false&&!!sampleTransferReason(row);
-    if(input.checked){
-      if(!excluded.includes(row))excluded.push(row);
-      const k=kept.indexOf(row);if(k>=0)kept.splice(k,1);
-    }else{
-      const at=excluded.indexOf(row);if(at>=0)excluded.splice(at,1);
-      if(auto&&!kept.includes(row))kept.push(row);   // کاربر این مورد انتقالی را عمداً در جامعه نگه داشته است
-    }
-    item.excludedRows=excluded;item.keptRows=kept;ACTIVE_SHEET=idx;
-    if(!item.rawPreview)runSampling(item.i,item.cfg,item.target,excluded);
-    renderOutputStep();
+  document.querySelectorAll('[data-open-sample-ledger]').forEach(button=>button.addEventListener('click',()=>{
+    const index=SHEET_OUT.findIndex(item=>item.i===Number(button.dataset.openSampleLedger));if(index>=0)openSampleLedger(index);
   }));
 
   document.querySelectorAll('.sheetwrap').forEach(v=>{
@@ -3627,6 +3667,7 @@ function drawSheets(preserveScroll){
 }
 // ---------- تنظیمات مشترک نمونه‌گیری ----------
 let SAMP_CFG={m:'top', base:'d', tmode:'p', xfer:true};
+let SAMPLE_LEDGER_SORT={};
 let SAMP_TARGET='';
 let LAST_CFG=null;        // تنظیماتی که کاربرگ‌های فعلی با آن ساخته شده‌اند
 const accLabel=w=>w.keyPath[w.keyPath.length-1].split('|')[1] || w.pathLabel;
