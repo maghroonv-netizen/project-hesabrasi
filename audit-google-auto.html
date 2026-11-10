@@ -3518,6 +3518,15 @@ function syncTransferOptionForActive(){
   const rows=item?.rawRows|| (item?accountRows(item.w):[]);
   option.style.display=rows.some(sampleTransferReason)?'':'none';
 }
+function syncSampleLedgerRowState(rowEl,index,row){
+  const item=SHEET_OUT[index];if(!item||!rowEl)return;
+  const cfgUse=item.rawPreview?SAMP_CFG:(item.cfg||SAMP_CFG),excluded=new Set(sampleEffectiveExcluded(item.rawRows||[],item.excludedRows,item.keptRows,cfgUse,item.manualSelectedRows));
+  rowEl.classList.toggle('excluded',excluded.has(row));
+  rowEl.classList.toggle('manual-picked',(item.manualSelectedRows||[]).includes(row));
+  const excludeInput=rowEl.querySelector('[data-population-exclude]'),manualInput=rowEl.querySelector('[data-manual-sample]');
+  if(excludeInput)excludeInput.checked=excluded.has(row);
+  if(manualInput)manualInput.checked=(item.manualSelectedRows||[]).includes(row);
+}
 function bindSampleLedgerBody(index){
   const body=document.getElementById('sampleLedgerBody');if(!body)return;
   body.querySelectorAll('[data-ledger-sort]').forEach(button=>button.addEventListener('click',()=>{
@@ -3532,7 +3541,7 @@ function bindSampleLedgerBody(index){
     else{const at=excluded.indexOf(row);if(at>=0)excluded.splice(at,1);if(auto&&!kept.includes(row))kept.push(row);}
     item.excludedRows=excluded;item.keptRows=kept;item.manualSelectedRows=manualSelected;ACTIVE_SHEET=index;
     if(!item.rawPreview)runSampling(item.i,item.cfg,item.target,excluded,manualSelected);
-    openSampleLedger(index);
+    syncSampleLedgerRowState(input.closest('tr'),index,row);
   }));
   body.querySelectorAll('[data-manual-sample]').forEach(input=>input.addEventListener('change',()=>{
     const item=SHEET_OUT[index],row=item?.rawRows?.[Number(input.dataset.manualSample)];if(!item||!row)return;
@@ -3541,7 +3550,7 @@ function bindSampleLedgerBody(index){
     else{const at=manualSelected.indexOf(row);if(at>=0)manualSelected.splice(at,1);}
     item.excludedRows=excluded;item.manualSelectedRows=manualSelected;ACTIVE_SHEET=index;
     if(!item.rawPreview)runSampling(item.i,item.cfg,item.target,excluded,manualSelected);
-    openSampleLedger(index);
+    syncSampleLedgerRowState(input.closest('tr'),index,row);
   }));
 }
 function openSampleLedger(index){
