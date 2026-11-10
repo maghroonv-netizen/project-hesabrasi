@@ -3499,7 +3499,7 @@ function sampleLedgerTableHTML(item){
     ?'انتقال‌مانده‌های تشخیص‌داده‌شده فعلاً از جامعهٔ نمونه‌گیری کنار گذاشته می‌شوند. برای نگه‌داشتن هر مورد، تیک جامعه را بردارید؛ با «انتخاب دستی در نمونه» می‌توانید رویدادی را مستقیم به کاربرگ اضافه کنید.'
     :'کنارگذاری خودکار خاموش است؛ رویدادها را دستی به نمونه اضافه کنید یا از جامعه کنار بگذارید.')
     :'انتقال‌مانده‌ای شناسایی نشد؛ می‌توانید رویدادها را دستی به نمونه اضافه کنید یا از جامعه کنار بگذارید.';
-  const key=JSON.stringify(item.w.keyPath||[item.w.key||item.w.code]),sort=SAMPLE_LEDGER_SORT[key]||{field:'date',dir:1};
+  const sort=SAMPLE_LEDGER_SORT||{field:'date',dir:1};
   const ordered=rows.map((r,index)=>({r,index})).sort((a,b)=>{
     if(sort.field==='debit'||sort.field==='credit'){
       const delta=parseAmount(a.r[sort.field==='debit'?'بدهکار':'بستانکار'])-parseAmount(b.r[sort.field==='debit'?'بدهکار':'بستانکار']);
@@ -3531,8 +3531,8 @@ function bindSampleLedgerBody(index){
   const body=document.getElementById('sampleLedgerBody');if(!body)return;
   body.querySelectorAll('[data-ledger-sort]').forEach(button=>button.addEventListener('click',()=>{
     const item=SHEET_OUT[index];if(!item)return;
-    const key=JSON.stringify(item.w.keyPath||[item.w.key||item.w.code]),field=button.dataset.ledgerSort,previous=SAMPLE_LEDGER_SORT[key];
-    SAMPLE_LEDGER_SORT[key]={field,dir:previous?.field===field?-previous.dir:-1};openSampleLedger(index);
+    const field=button.dataset.ledgerSort,previous=SAMPLE_LEDGER_SORT;
+    SAMPLE_LEDGER_SORT={field,dir:previous?.field===field?-previous.dir:-1};openSampleLedger(index);
   }));
   body.querySelectorAll('[data-population-exclude]').forEach(input=>input.addEventListener('change',()=>{
     const item=SHEET_OUT[index],row=item?.rawRows?.[Number(input.dataset.populationExclude)];if(!item||!row)return;

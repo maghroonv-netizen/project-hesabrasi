@@ -73,6 +73,7 @@ document.querySelector('#sampleLedgerClose').click();
 document.querySelector('#sheetTabs [data-tab="1"]').click();ok(document.querySelector('#sampleOutputSettings .xfer-opt').style.display==='none','transfer suggestions are hidden while viewing an account with no detected transfer');
 document.querySelector('.sheetwrap[data-view="1"] [data-open-sample-ledger]').click();
 ledger=document.querySelector('#sampleLedgerModal .sample-ledger-body table');ok(!ledger.querySelector('.transfer-candidate')&&ledger.querySelectorAll('tbody tr').length===2,'ledger button opens the full account rows even without detected transfers');
+ok(SAMPLE_LEDGER_SORT.field==='debit'&&SAMPLE_LEDGER_SORT.dir===1&&[...ledger.querySelectorAll('tbody tr')].map(r=>parseAmount(r.cells[4].textContent)).every((v,i,a)=>i===0||a[i-1]<=v),'manual ledger sorting is preserved when switching accounts');
 const manualPick=document.querySelector('#sampleLedgerModal [data-manual-sample="0"]');manualPick.checked=true;manualPick.dispatchEvent(new Event('change',{bubbles:true}));
 ok(SHEET_OUT[1].manualSelectedRows.includes(ACCOUNT_ROWS[3]),'user can manually add a ledger event to the sample');
 document.querySelector('#sampleLedgerClose').click();
