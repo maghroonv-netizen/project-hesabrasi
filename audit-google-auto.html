@@ -6784,15 +6784,22 @@ function samplePrintControls(w){
  return `${cpModePill}<label class="sample-print-controls">جهت کاغذ <select data-sample-orientation aria-label="جهت کاغذ"><option value="landscape" ${l.orientation==='landscape'?'selected':''}>افقی — Landscape (پیشنهادی)</option><option value="portrait" ${l.orientation==='portrait'?'selected':''}>عمودی — Portrait</option></select></label><label class="sample-print-controls">تراکم سطرها <select data-sample-density aria-label="تراکم سطرها"><option value="normal" ${l.density==='normal'?'selected':''}>استاندارد</option><option value="compact" ${l.density==='compact'?'selected':''}>فشرده (اسناد بیشتر در هر صفحه)</option></select></label>`;
 }
 function sampleColumnToolsHTML(w,viewIdx){
- const customized=sampleHasCustomColumns(w);
- return `<span class="sample-col-tools"><span class="sample-col-hint">↔ تغییر دستی عرض ستون‌ها با کشیدن مرز عناوین جدول</span><button type="button" class="sample-col-btn" data-col-auto="${viewIdx}" title="تنظیم هوشمند نسبت ستون شرح و طرف حساب بر اساس طول واقعی متن‌های همین حساب">چیدمان هوشمند ستون‌ها</button>${customized?`${SHEET_OUT.length>1?`<button type="button" class="sample-col-btn" data-col-apply-all="${viewIdx}">اعمال به همه تب‌ها</button>`:''}<button type="button" class="sample-col-btn" data-col-reset="${viewIdx}">بازنشانی ستون‌ها</button>`:''}</span>`;
+ const customized=sampleHasCustomColumns(w),orientation=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
+ const localOnly=!!w?._customCols?.[orientation]&&!SHEET_CFG.customCols?.[orientation];
+ return `<span class="sample-col-tools"><span class="sample-col-hint">↔ تغییر دستی عرض ستون‌ها با کشیدن مرز عناوین جدول؛ عرض انتخاب‌شده روی همهٔ حساب‌ها اعمال می‌شود</span><button type="button" class="sample-col-btn" data-col-auto="${viewIdx}" title="تنظیم هوشمند نسبت ستون شرح و طرف حساب بر اساس طول واقعی متن‌های همین حساب">چیدمان هوشمند ستون‌ها</button>${customized?`${localOnly&&SHEET_OUT.length>1?`<button type="button" class="sample-col-btn" data-col-apply-all="${viewIdx}">اعمال به همه تب‌ها</button>`:''}<button type="button" class="sample-col-btn" data-col-reset="${viewIdx}">بازنشانی ستون‌ها</button>`:''}</span>`;
 }
-function sampleSetWorksheetColumns(viewIdx,vec){
+function sampleSetWorksheetColumns(viewIdx,vec,applyAll=true){
  const item=SHEET_OUT[viewIdx];if(!item)return;
  const m=sampleBasePrintMetrics();
  const clean=sampleNormalizeColumnVector(vec,m);
- if(!item.w._customCols)item.w._customCols={};
- item.w._customCols[m.orientation]=clean;
+ if(applyAll){
+  if(!SHEET_CFG.customCols)SHEET_CFG.customCols={};
+  SHEET_CFG.customCols[m.orientation]=clean.slice();
+  SHEET_OUT.forEach(x=>{if(x.w._customCols){delete x.w._customCols[m.orientation];if(!Object.keys(x.w._customCols).length)delete x.w._customCols;}});
+ }else{
+  if(!item.w._customCols)item.w._customCols={};
+  item.w._customCols[m.orientation]=clean;
+ }
  drawSheets(true);
 }
 function sampleResetColumns(viewIdx){
@@ -6805,10 +6812,7 @@ function sampleResetColumns(viewIdx){
 function sampleApplyColumnsToAll(viewIdx){
  const item=SHEET_OUT[viewIdx];if(!item)return;
  const l=samplePrintLayout(item.w);
- if(!SHEET_CFG.customCols)SHEET_CFG.customCols={};
- SHEET_CFG.customCols[l.orientation]=l.vector.slice();
- SHEET_OUT.forEach(x=>{if(!x.w._customCols)x.w._customCols={};x.w._customCols[l.orientation]=l.vector.slice();});
- drawSheets(true);
+ sampleSetWorksheetColumns(viewIdx,l.vector,true);
 }
 function sampleAutoOptimizeColumns(viewIdx){
  const item=SHEET_OUT[viewIdx];if(!item)return;
@@ -6834,7 +6838,7 @@ function sampleAutoOptimizeColumns(viewIdx){
  const ratioD=Math.min(0.62,Math.max(0.20,dNeed/(dNeed+cNeed)));
  vec[3]=Math.max(minV[3],+(pool*ratioD).toFixed(3));
  vec[4]=Math.max(minV[4],+(pool-vec[3]).toFixed(3));
- sampleSetWorksheetColumns(viewIdx,vec);
+ sampleSetWorksheetColumns(viewIdx,vec,false);
 }
 function sampleUniformRows(p){
  if(!p||p.getBoundingClientRect().width<1)return;

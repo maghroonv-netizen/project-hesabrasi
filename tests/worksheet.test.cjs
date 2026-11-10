@@ -58,6 +58,10 @@ WORKSHEET_ACCOUNTS=[sampleW,sampleW2];SHEET_OUT=[];SAMP_CFG={m:'top',base:'d',tm
 ok(MODULE_STEPS.sample.some(s=>s.n==='4')&&MODULE_STEPS.sample.at(-1)?.n==='5'&&!MODULE_STEPS.sample.some(s=>s.n==='6')&&document.querySelector('#outputArea').closest('[data-stage="5"]'),'sample workflow has account selection followed by one combined preview stage');
 ok(!document.querySelector('#sampleOutputSettings .help')&&document.querySelector('.raw-preview-banner')&&document.querySelector('[data-raw-preview="1"]'),'combined preview opens with raw account rows before sampling');
 ok(document.querySelector('#sampleOutputSettings .m-sel')&&document.querySelector('#sampleOutputSettings #applyAllSamplesBtn')&&document.querySelector('#sampleOutputSettings .samp-val'),'preview includes editable sampling controls');
+let sharedColumns=samplePrintLayout(SHEET_OUT[0].w).vector.slice();sharedColumns[3]+=3;sharedColumns[4]-=3;sampleSetWorksheetColumns(0,sharedColumns);
+ok(SHEET_OUT.every(item=>JSON.stringify(samplePrintLayout(item.w).vector)===JSON.stringify(sharedColumns)),'manual column resizing on the first account is shared across every account');
+sharedColumns=samplePrintLayout(SHEET_OUT[1].w).vector.slice();sharedColumns[3]-=2;sharedColumns[4]+=2;sampleSetWorksheetColumns(1,sharedColumns);
+ok(SHEET_OUT.every(item=>JSON.stringify(samplePrintLayout(item.w).vector)===JSON.stringify(sharedColumns)),'a manual resize on another account updates the shared column widths everywhere');
 ok(document.querySelector('.sheetwrap[data-view="0"] [data-open-sample-ledger]'),'account with transfer candidates has a ledger button');
 ok(document.querySelector('.sheetwrap[data-view="1"] [data-open-sample-ledger]'),'ledger button remains available for an account without a detected transfer');
 document.querySelector('.sheetwrap[data-view="0"] [data-open-sample-ledger]').click();
