@@ -11447,6 +11447,7 @@ el('routerForget').onclick=()=>{
   }
 
   function slotBase(spec, slot) {
+    if (spec && spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true) return '/api/tooken';
     if (slot && slot.extra && slot.extra.base) return trimSlash(slot.extra.base);
     if (spec.kind === 'iranrouter') return iranChat();
     if (spec.id === 'cloudflare') {
@@ -11532,6 +11533,7 @@ el('routerForget').onclick=()=>{
   function modelsUrl(info) {
     var provider = info && info.provider;
     var model = info && info.model;
+    if (provider === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true) return '/api/tooken/models';
     if (provider === 'google') {
       var root = typeof AD_GOOGLE_ROOT === 'string' ? AD_GOOGLE_ROOT : 'https://generativelanguage.googleapis.com/v1beta/';
       var mid = typeof adGoogleModelId === 'function' ? adGoogleModelId(model) : String(model || '').replace(/^models\//, '');
@@ -11557,6 +11559,7 @@ el('routerForget').onclick=()=>{
   function modelsHeaders(info) {
     var provider = info && info.provider;
     var key = info && info.key ? cleanAsciiToken(info.key) : '';
+    if (provider === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true) return {};
     if (provider === 'google' || provider === 'gemini') return key ? { 'x-goog-api-key': key } : {};
     var spec = BY_ID[provider];
     if (spec && spec.kind === 'gemini') return key ? { 'x-goog-api-key': key } : {};
@@ -12278,11 +12281,12 @@ el('routerForget').onclick=()=>{
     if (spec.keys) links += '<a href="' + esc(spec.keys) + '" target="_blank" rel="noopener">دریافت کلید</a>';
     if (spec.site) links += (links ? ' · ' : '') + '<a href="' + esc(spec.site) + '" target="_blank" rel="noopener">سایت</a>';
 
+    var localTookenProxy = spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true;
     var bodyFields = spec.id === 'open_router'
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
       : spec.dynamicModels
-        ? ('<div class="aihub-grid"><label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API Tooken Club" value="' + esc(sl.key) + '"></label>' +
-          '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div><label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل از پنل Tooken (دستی؛ تأیید زنده نشده)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
+        ? ('<div class="aihub-grid"><label>' + (localTookenProxy ? 'کلید Tooken (فقط روی سرور محلی)' : 'کلید API') + '<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API Tooken Club" value="' + esc(localTookenProxy ? 'local' : sl.key) + '"' + (localTookenProxy ? ' disabled' : '') + '></label>' +
+          '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div>' + (localTookenProxy ? '<small>کلید فقط در فرایند محلی Node.js نگهداری می‌شود؛ مرورگر آن را دریافت یا ذخیره نمی‌کند.</small>' : '') + '<label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل از پنل Tooken (دستی؛ تأیید زنده نشده)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
         : ('<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
           '<label>مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '"></label>' +
@@ -12528,7 +12532,7 @@ el('routerForget').onclick=()=>{
     box.id = 'hesabrasiAiHub';
     box.innerHTML =
       '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال OpenRouter، Tooken Club و ارائه‌دهندگان سازگار</h3>' +
-      '<p class="aihub-note">پیش‌فرض روی <b>OpenRouter + Claude Haiku 4.5</b> است. در کارت Tooken Club کافی است کلید خود را وارد کنید؛ فهرست مدل‌های حساب برای انتخاب بارگذاری می‌شود و آزمایش اتصال فقط فهرست را می‌خواند، نه اینکه درخواست تولیدی پولی بفرستد.</p>' +
+      (global.HESABRASI_TOOKEN_LOCAL_PROXY === true ? '<p class="aihub-note">اتصال Tooken از واسط محلی Node.js انجام می‌شود؛ کلید در متغیر محیطی سرور است و در مرورگر نمایش داده نمی‌شود. آزمایش اتصال فقط فهرست مدل‌ها را می‌خواند، نه اینکه درخواست تولیدی بفرستد.</p>' : '<p class="aihub-note">پیش‌فرض روی <b>OpenRouter + Claude Haiku 4.5</b> است. در کارت Tooken Club کافی است کلید خود را وارد کنید؛ فهرست مدل‌های حساب برای انتخاب بارگذاری می‌شود و آزمایش اتصال فقط فهرست را می‌خواند، نه اینکه درخواست تولیدی پولی بفرستد.</p>') +
       '<div id="aihubFeatured"></div>' +
       '<details><summary>سایر سکوهای سازگار (بیش از ۵۰ سکوی OpenAI-Compatible)</summary><div id="aihubRest"></div></details>' +
       '<div class="aihub-toolbar">' +
@@ -12564,6 +12568,7 @@ el('routerForget').onclick=()=>{
     box.addEventListener('click', onHubClick);
     box.addEventListener('change', onHubChange);
     box.addEventListener('input', onHubInput);
+    if (global.HESABRASI_TOOKEN_LOCAL_PROXY === true) fetchModelsCatalog('tooken_club', 'local', false);
 
     var openBtn = document.getElementById('routerOpen');
     if (openBtn) {
@@ -12702,6 +12707,15 @@ el('routerForget').onclick=()=>{
   }
 
   load();
+  if (global.HESABRASI_TOOKEN_LOCAL_PROXY === true) {
+    var localTookenSlot = state.slots.tooken_club || emptySlot('tooken_club');
+    localTookenSlot.key = 'local';
+    localTookenSlot.enabled = true;
+    localTookenSlot.lastOk = false;
+    localTookenSlot.lastError = '';
+    state.slots.tooken_club = localTookenSlot;
+    save();
+  }
 
   global.HesabrasiAI = {
     catalog: CATALOG,

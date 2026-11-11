@@ -1,0 +1,22 @@
+const {JSDOM,VirtualConsole}=require('jsdom');
+const fs=require('fs');
+const path=require('path');
+const html=fs.readFileSync(path.join(__dirname,'..','audit-google-auto.html'),'utf8');
+const errors=[];const vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
+let calls=[];
+const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://127.0.0.1:8787/',pretendToBeVisual:true,virtualConsole:vc,beforeParse(w){w.TextEncoder=require('util').TextEncoder;w.TextDecoder=require('util').TextDecoder;w.scrollTo=()=>{};w.HESABRASI_TOOKEN_LOCAL_PROXY=true;w.fetch=async(url,init={})=>{calls.push({url:String(url),init});return {ok:true,status:200,headers:{get:()=> 'application/json'},json:async()=>({data:[{id:'gpt-6.1-sol',name:'GPT 6.1 Sol',context_length:128000,pricing:{prompt:'0.000001',completion:'0.000002'}}]})};};}});
+const w=dom.window,api=w.HesabrasiAI;
+(async()=>{try{
+  await new Promise(resolve=>setTimeout(resolve,0));api.mount();
+  const slot=api.readySlots().find(x=>x.id==='tooken_club');
+  const card=w.document.querySelector('[data-aihub-card="tooken_club"]');
+  if(!slot||slot.key!=='local'||!card)throw Error('proxy mode should auto-enable Tooken using the non-secret local marker');
+  const keyInput=card.querySelector('[data-f="key"]');
+  if(!keyInput.disabled||keyInput.value!=='local'||!card.textContent.includes('کلید فقط در فرایند محلی'))throw Error('the browser must not request or display the server-side API key');
+  if(api.modelsUrl({provider:'tooken_club'})!=='/api/tooken/models'||api.chatUrl({provider:'tooken_club',slotId:'tooken_club',model:'gpt-6.1-sol'})!=='/api/tooken/chat/completions')throw Error('Tooken calls must be same-origin in proxy mode');
+  if(!calls.length||calls.some(c=>c.url!=='/api/tooken/models'||c.init.headers?.Authorization))throw Error('catalog requests must use the same-origin proxy without browser Authorization');
+  const result=await api.testSlot('tooken_club');
+  if(!result.ok||calls.some(c=>c.init.method==='POST'))throw Error('connection test must only read the model catalog and never send generation');
+  if(errors.length)throw Error(errors.join('\n'));
+  console.log('Tooken local proxy UI: PASS — local mode initialization, no browser key, same-origin catalog and no paid test request');
+}catch(e){console.error(e.stack||e);process.exitCode=1;}finally{w.close();}})();
