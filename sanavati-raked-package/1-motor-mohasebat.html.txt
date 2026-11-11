@@ -1,0 +1,773 @@
+<script>
+/* <<<SR-ENGINE-BEGIN>>> */
+/* ============================================================================
+   ماژول «اقلام سنواتی و راکد» — موتور محاسباتی خالص (بدون DOM)
+   طرح: docs/sanavati-raked/02-design.md   آزمون‌ها: tests/sanavati-raked/
+   اصول: همهٔ مبالغ BigInt ریالی؛ گردش ناخالص هرگز خالص نمی‌شود؛ هوش مصنوعی
+   هیچ عددی تولید نمی‌کند؛ نبودِ شاهد ← «نامشخص».
+   ============================================================================ */
+var SRE = (function(){
+'use strict';
+const UNKNOWN = -Infinity;            // تاریخ تولد نامشخص (قبل از دورهٔ اطلاعاتی)
+
+/* ---------------------------------------------------------------- E1 تاریخ */
+const BREAKS=[-61,9,38,199,426,686,756,818,1111,1181,1210,1635,2060,2097,2192,2262,2324,2394,2456,3178];
+const div=(a,b)=>~~(a/b), mod=(a,b)=>a-~~(a/b)*b;
+function jalCal(jy,withoutLeap){
+  const bl=BREAKS.length, gy=jy+621; let leapJ=-14, jp=BREAKS[0], jm, jump=0, n, i;
+  if(jy<jp||jy>=BREAKS[bl-1]) throw new Error('سال شمسی نامعتبر: '+jy);
+  for(i=1;i<bl;i++){ jm=BREAKS[i]; jump=jm-jp; if(jy<jm) break; leapJ+=div(jump,33)*8+div(mod(jump,33),4); jp=jm; }
+  n=jy-jp; leapJ+=div(n,33)*8+div(mod(n,33)+3,4);
+  if(mod(jump,33)===4&&jump-n===4) leapJ+=1;
+  const leapG=div(gy,4)-div((div(gy,100)+1)*3,4)-150, march=20+leapJ-leapG;
+  if(withoutLeap) return {gy,march};
+  if(jump-n<6) n=n-jump+div(jump+4,33)*33;
+  let leap=mod(mod(n+1,33)-1,4); if(leap===-1) leap=4;
+  return {leap,gy,march};
+}
+function g2d(gy,gm,gd){
+  let d=div((gy+div(gm-8,6)+100100)*1461,4)+div(153*mod(gm+9,12)+2,5)+gd-34840408;
+  return d-div(div(gy+100100+div(gm-8,6),100)*3,4)+752;
+}
+function d2g(jdn){
+  let j=4*jdn+139361631; j=j+div(div(4*jdn+183187720,146097)*3,4)*4-3908;
+  const i=div(mod(j,1461),4)*5+308, gd=div(mod(i,153),5)+1, gm=mod(div(i,153),12)+1, gy=div(j,1461)-100100+div(8-gm,6);
+  return {gy,gm,gd};
+}
+function jalaliToDay(jy,jm,jd){ const r=jalCal(jy,true); return g2d(r.gy,3,r.march)+(jm-1)*31-div(jm,7)*(jm-7)+jd-1; }
+function dayToJalali(day){
+  const gy=d2g(day).gy; let jy=gy-621; const r=jalCal(jy,false), first=g2d(gy,3,r.march); let k=day-first;
+  if(k>=0){ if(k<=185) return {jy,jm:1+div(k,31),jd:mod(k,31)+1}; k-=186; }
+  else { jy-=1; k+=179; if(r.leap===1) k+=1; }
+  return {jy,jm:7+div(k,30),jd:mod(k,30)+1};
+}
+function isLeap(jy){ return jalCal(jy,false).leap===0; }
+function monthLength(jy,jm){ return jm<=6?31:(jm<=11?30:(isLeap(jy)?30:29)); }
+function validJalali(y,m,d){ return y>=1200&&y<=1600&&m>=1&&m<=12&&d>=1&&d<=monthLength(y,m); }
+const pad2=n=>String(n).padStart(2,'0');
+function formatDay(day){
+  if(day===UNKNOWN) return 'نامشخص';
+  if(typeof day!=='number'||!isFinite(day)) return '—';
+  const j=dayToJalali(day); return j.jy+'/'+pad2(j.jm)+'/'+pad2(j.jd);
+}
+const FA='۰۱۲۳۴۵۶۷۸۹', AR='٠١٢٣٤٥٦٧٨٩';
+function latinDigits(s){ return String(s).replace(/[۰-۹]/g,c=>FA.indexOf(c)).replace(/[٠-٩]/g,c=>AR.indexOf(c)); }
+function fromYMD(y,m,d){
+  if(y>=1200&&y<=1600) return validJalali(y,m,d)?{ok:true,day:jalaliToDay(y,m,d)}:{ok:false,code:'RANGE'};
+  if(y>=1800&&y<=2200){
+    const dt=new Date(Date.UTC(y,m-1,d));
+    if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d) return {ok:false,code:'RANGE'};
+    return {ok:true,day:g2d(y,m,d),gregorian:true};
+  }
+  return {ok:false,code:'RANGE'};
+}
+/** تاریخ سلول ← شمارهٔ روز (روز ژولینی). شمسی، میلادی، سریال اکسل و Date پشتیبانی می‌شود. */
+function parseDate(v){
+  if(v===null||v===undefined||v==='') return {ok:false,code:'EMPTY'};
+  if(Object.prototype.toString.call(v)==='[object Date]') return isNaN(v)?{ok:false,code:'FORMAT'}:{ok:true,day:g2d(v.getFullYear(),v.getMonth()+1,v.getDate()),gregorian:true};
+  if(typeof v==='number'){
+    if(!isFinite(v)) return {ok:false,code:'FORMAT'};
+    if(Number.isInteger(v)&&v>=12000101&&v<=16001231) return fromYMD(Math.floor(v/10000),Math.floor(v/100)%100,v%100);
+    if(v>=1&&v<200000) return {ok:true,day:Math.floor(v)+2415019,serial:true};
+    return {ok:false,code:'FORMAT'};
+  }
+  const s=latinDigits(String(v)).trim();
+  let m=s.match(/(\d{4})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{1,2})/);
+  if(m) return fromYMD(+m[1],+m[2],+m[3]);
+  m=s.match(/(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4})/);
+  if(m) return fromYMD(+m[3],+m[2],+m[1]);
+  m=s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(m) return fromYMD(+m[1],+m[2],+m[3]);
+  if(/^\d+(\.\d+)?$/.test(s)) return parseDate(Number(s));
+  return {ok:false,code:'FORMAT'};
+}
+/** افزودن n ماه تقویمی شمسی؛ روزِ ناموجود ← آخرین روز همان ماه */
+function addMonths(day,n){
+  const j=dayToJalali(day), t=j.jy*12+(j.jm-1)+n, y=Math.floor(t/12), m=t-y*12+1;
+  return jalaliToDay(y,m,Math.min(j.jd,monthLength(y,m)));
+}
+/** تاریخ مرز: پایان دوره منهای آستانه. method: 'months' | 'days' */
+function cutoffDay(endDay,months,method){
+  if(method==='days') return endDay-(months%12===0?365*months/12:30*months);
+  return addMonths(endDay,-months);
+}
+
+/* ---------------------------------------------------------------- E2 مبلغ */
+/** مبلغ سلول ← BigInt ریال. نامعتبر ← خطا (هرگز صفرِ بی‌صدا). */
+function parseAmount(v){
+  if(v===null||v===undefined) return {ok:true,value:0n};
+  if(typeof v==='bigint') return {ok:true,value:v};
+  if(typeof v==='boolean') return {ok:false,code:'INVALID'};
+  if(typeof v==='number'){
+    if(!isFinite(v)) return {ok:false,code:'INVALID'};
+    if(!Number.isInteger(v)){ const r=Math.round(v); if(Math.abs(v-r)<1e-6) v=r; else return {ok:false,code:'NON_INTEGER'}; }
+    if(!Number.isSafeInteger(v)) return {ok:false,code:'PRECISION'};
+    return {ok:true,value:BigInt(v)};
+  }
+  let s=latinDigits(String(v)).replace(/[\u200c\u200e\u200f\u00a0\s,٬'’_]/g,'').replace(/٫/g,'.');
+  if(s===''||s==='-'||s==='—'||s==='–') return {ok:true,value:0n};
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){ neg=true; s=s.slice(1,-1); }
+  if(s.startsWith('-')){ neg=!neg; s=s.slice(1); } else if(s.endsWith('-')){ neg=!neg; s=s.slice(0,-1); }
+  if(s.startsWith('+')) s=s.slice(1);
+  const m=s.match(/^(\d+)(?:\.(\d+))?$/);
+  if(!m) return {ok:false,code:'INVALID'};
+  if(m[2]&&/[1-9]/.test(m[2])) return {ok:false,code:'NON_INTEGER'};
+  const b=BigInt(m[1]); return {ok:true,value:neg?-b:b};
+}
+const babs=x=>x<0n?-x:x, bmin=(a,b)=>a<b?a:b;
+
+/* ---------------------------------------------------------------- کمکی‌ها */
+function normText(s){
+  return latinDigits(String(s??'')).replace(/\u200c/g,' ').replace(/ي/g,'ی').replace(/ك/g,'ک')
+    .replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/\s+/g,' ').trim().toLowerCase();
+}
+function normCode(v){
+  if(v===null||v===undefined) return '';
+  if(typeof v==='number') return Number.isInteger(v)?String(v):String(v);
+  return latinDigits(String(v)).replace(/[\u200c\u200e\u200f\u00a0]/g,'').trim().replace(/\.0+$/,'');
+}
+function similarity(a,b){
+  a=normText(a); b=normText(b); if(!a||!b) return 0; if(a===b) return 1;
+  const bg=s=>{const r=[];for(let i=0;i<s.length-1;i++)r.push(s.substr(i,2));return r;};
+  const A=bg(a), B=bg(b); if(!A.length||!B.length) return 0;
+  const pool=B.slice(); let hit=0;
+  for(const g of A){ const i=pool.indexOf(g); if(i>=0){hit++;pool.splice(i,1);} }
+  return 2*hit/(A.length+B.length);
+}
+function cmpNatural(a,b){
+  const na=/^\d+$/.test(a), nb=/^\d+$/.test(b);
+  if(na&&nb){ if(a.length!==b.length) return a.length-b.length; return a<b?-1:(a>b?1:0); }
+  if(na!==nb) return na?-1:1;
+  return a<b?-1:(a>b?1:0);
+}
+const sideSign=s=>s==='D'?1n:-1n;
+const opp=s=>s==='D'?'C':'D';
+function signedOf(amount,side){ return side==='D'?amount:-amount; }
+function sideOfSigned(x){ return x>0n?'D':(x<0n?'C':null); }
+
+/* ------------------------------------------------------ E3/E4 نرمال‌سازی */
+const FIELDS=['doc','row','date','descDoc','descRow','debit','credit','kol','kolT','moein','moeinT','taf','tafT','taf1','taf1T','taf2','taf2T'];
+const KEY_LEVELS=[['taf','tafT'],['taf1','taf1T'],['taf2','taf2T']];
+/**
+ * input.files[]: {id,label,start,end,rows:[{doc,row,date,...}], srcRows?:[], keyFields:['taf',...],
+ *                 openingDocs:[...], closingDocs:[...], hasOpening:bool}
+ * خروجی: مدل داده با رویدادهای ناخالص، اسناد، حساب‌ها، کلیدها و استثناهای ورودی.
+ */
+function build(input){
+  const exceptions=[];
+  const files=input.files.map(f=>({
+    id:String(f.id), label:String(f.label??f.id), start:f.start, end:f.end, name:f.name||'',
+    keyFields:(f.keyFields||[]).slice(), hasOpening:f.hasOpening!==false,
+    openingDocs:new Set((f.openingDocs||[]).map(normCode)), closingDocs:new Set((f.closingDocs||[]).map(normCode)),
+    rowCount:(f.rows||[]).length, events:[], minDay:null, maxDay:null
+  }));
+  files.sort((a,b)=>a.start-b.start);
+  const events=[], byId=new Map(), docs=new Map(), accounts=new Map(), keys=new Map();
+  const unreliable=new Map();         // key -> [{fileId, srcRow, code}]
+  input.files.forEach(src=>{
+    const f=files.find(x=>x.id===String(src.id));
+    const rows=src.rows||[];
+    const brokenDocs=new Set();
+    rows.forEach((r,i)=>{
+      const srcRow=src.srcRows?src.srcRows[i]:i+2;
+      const kol=normCode(r.kol), moein=normCode(r.moein);
+      const doc=normCode(r.doc)||('بدون‌شماره-'+srcRow);
+      const docId=f.id+'|'+doc;
+      const parts=[kol,moein]; let person=false;
+      for(const [c] of KEY_LEVELS){ if(f.keyFields.includes(c)){ const v=normCode(r[c]); parts.push(v); if(v) person=true; } }
+      const key=parts.join('|');
+      const base={fileId:f.id,srcRow,doc,docId};
+      const dr=parseAmount(r.debit), cr=parseAmount(r.credit);
+      if(!dr.ok||!cr.ok){
+        exceptions.push({code:'INVALID_AMOUNT',severity:'error',...base,key,detail:String(!dr.ok?r.debit:r.credit)});
+        brokenDocs.add(docId); if(kol&&moein) addUnreliable(unreliable,key,f.id,srcRow,'INVALID_AMOUNT'); return;
+      }
+      let debit=dr.value, credit=cr.value;
+      if(debit===0n&&credit===0n) return;
+      if(!kol||!moein){
+        exceptions.push({code:'MISSING_CODE',severity:'error',...base,detail:'کد کل یا معین خالی است'});
+        brokenDocs.add(docId); return;
+      }
+      const pd=parseDate(r.date);
+      if(!pd.ok){
+        exceptions.push({code:'INVALID_DATE',severity:'error',...base,key,detail:String(r.date??'')});
+        brokenDocs.add(docId); addUnreliable(unreliable,key,f.id,srcRow,'INVALID_DATE'); return;
+      }
+      if(f.start!=null&&f.end!=null&&(pd.day<f.start||pd.day>f.end)){
+        exceptions.push({code:'DATE_OUT_OF_YEAR',severity:'error',...base,key,day:pd.day,detail:formatDay(pd.day)});
+        brokenDocs.add(docId); addUnreliable(unreliable,key,f.id,srcRow,'DATE_OUT_OF_YEAR'); return;
+      }
+      if(debit<0n||credit<0n){
+        exceptions.push({code:'NEGATIVE_AMOUNT',severity:'warn',...base,key,amount:babs(debit<0n?debit:credit)});
+        if(debit<0n){ credit+= -debit; debit=0n; }
+        if(credit<0n){ debit+= -credit; credit=0n; }
+      }
+      const account=kol+'|'+moein;
+      const docType=f.openingDocs.has(doc)?'OPENING':(f.closingDocs.has(doc)?'CLOSING':'NORMAL');
+      if(!accounts.has(account)) accounts.set(account,{id:account,kol,moein,kolT:'',moeinT:'',files:new Set(),personKeys:new Set(),blankKeys:new Set()});
+      const acc=accounts.get(account); acc.files.add(f.id);
+      if(r.kolT) acc.kolT=String(r.kolT).trim(); if(r.moeinT) acc.moeinT=String(r.moeinT).trim();
+      (person?acc.personKeys:acc.blankKeys).add(f.id+'#'+key);
+      if(!keys.has(key)) keys.set(key,{key,account,kol,moein,person,title:'',titles:new Map(),levels:{}});
+      const km=keys.get(key);
+      const tt=KEY_LEVELS.filter(([c])=>f.keyFields.includes(c)&&normCode(r[c])).map(([c,t])=>String(r[t]??'').trim()||normCode(r[c]));
+      const title=[acc.moeinT||String(r.moeinT??'').trim(),...tt].filter(Boolean).join(' / ');
+      if(title) km.titles.set(f.id,title);
+      const rowNo=normCode(r.row);
+      for(const [side,amount] of [['D',debit],['C',credit]]){
+        if(amount===0n) continue;
+        const e={eid:f.id+':'+srcRow+':'+side,fileId:f.id,srcRow,doc,docId,rowNo,day:pd.day,key,account,side,amount,docType,
+                 descDoc:String(r.descDoc??''),descRow:String(r.descRow??''),person};
+        events.push(e); byId.set(e.eid,e); f.events.push(e);
+        if(!docs.has(docId)) docs.set(docId,{docId,fileId:f.id,doc,events:[],debit:0n,credit:0n,complete:true,days:new Set()});
+        const d=docs.get(docId); d.events.push(e); d.days.add(pd.day); if(side==='D') d.debit+=amount; else d.credit+=amount;
+      }
+      if(f.minDay===null||pd.day<f.minDay) f.minDay=pd.day; if(f.maxDay===null||pd.day>f.maxDay) f.maxDay=pd.day;
+    });
+    brokenDocs.forEach(id=>{ if(docs.has(id)) docs.get(id).complete=false; });
+  });
+  docs.forEach(d=>{ d.balanced=d.complete&&d.debit===d.credit; });
+  // ترتیب پایدار: سال، روز، شماره سند، ردیف، سطر اکسل
+  const fileOrder=new Map(files.map((f,i)=>[f.id,i]));
+  const cmpEv=(a,b)=>(fileOrder.get(a.fileId)-fileOrder.get(b.fileId))||(a.day-b.day)||cmpNatural(a.doc,b.doc)||cmpNatural(a.rowNo,b.rowNo)||(a.srcRow-b.srcRow)||(a.side<b.side?-1:(a.side>b.side?1:0));
+  events.sort(cmpEv); files.forEach(f=>f.events.sort(cmpEv));
+  keys.forEach(k=>{ const last=[...k.titles.values()].pop(); k.title=last||k.key; });
+  // استثناهای ساختاری کلید
+  accounts.forEach(acc=>{
+    files.forEach(f=>{
+      const p=[...acc.personKeys].some(x=>x.startsWith(f.id+'#')), b=[...acc.blankKeys].some(x=>x.startsWith(f.id+'#'));
+      if(p&&b) exceptions.push({code:'MIXED_TAFSILI',severity:'error',fileId:f.id,account:acc.id,detail:'در این معین بخشی از ردیف‌ها تفصیلی دارند و بخشی ندارند'});
+    });
+  });
+  files.forEach(f=>{
+    if(!f.keyFields.length) exceptions.push({code:'NO_KEY_LEVEL',severity:'warn',fileId:f.id,detail:'هیچ ستون تفصیلی برای کلید انتخاب نشده؛ همهٔ محاسبات در سطح معین و با هشدار اختلاط اشخاص است'});
+    if(!f.hasOpening&&f===files[0]) exceptions.push({code:'FIRST_YEAR_NO_OPENING',severity:'warn',fileId:f.id,detail:'اولین فایل سند افتتاحیه ندارد؛ مانده‌های قبل از آن صفر فرض نمی‌شوند و کل زنجیره ناقص است'});
+    if(f.hasOpening&&!f.openingDocs.size) exceptions.push({code:'OPENING_NOT_SET',severity:'warn',fileId:f.id,detail:'سند افتتاحیه برای این فایل مشخص نشده است'});
+  });
+  for(let i=0;i<files.length;i++) for(let j=i+1;j<files.length;j++){
+    if(files[j].start<=files[i].end) exceptions.push({code:'YEAR_OVERLAP',severity:'error',fileId:files[j].id,detail:'بازهٔ سال مالی این فایل با فایل '+files[i].label+' هم‌پوشانی دارد'});
+  }
+  return {files,events,byId,docs,accounts,keys,unreliable,exceptions,auditFileId:input.auditFileId!=null?String(input.auditFileId):null};
+}
+function addUnreliable(map,key,fileId,srcRow,code){ if(!map.has(key)) map.set(key,[]); map.get(key).push({fileId,srcRow,code}); }
+
+/* ------------------------------------------------- پیشنهاد برچسب حساب‌ها */
+const RX_CASH=/بانک|صندوق|تنخواه|وجوه\s*نقد|موجودی\s*نقد/, RX_CASH_NOT=/تسهیلات|وام|سود|کارمزد|هزینه|ذخیره|اسناد|چک/;
+const RX_NOTES_R=/اسناد\s*دریافتنی|چک(\s*ها|‌ها)?\s*(ی\s*)?(دریافتنی|دریافتی|در\s*جریان|نزد|وصول)|اسناد\s*در\s*جریان\s*وصول|اسناد\s*واگذار/;
+const RX_NOTES_P=/اسناد\s*پرداختنی|چک(\s*ها)?\s*(ی\s*)?(پرداختنی|پرداختی|صادره)/;
+const RX_PERSON=/دریافتنی|پرداختنی|بدهکاران|بستانکاران|پیش\s*پرداخت|پیش\s*دریافت|علی\s*الحساب|طلب|مشتریان|فروشندگان|تامین\s*کنندگان|تأمین\s*کنندگان|پیمانکاران|اشخاص|کارکنان|سپرده|ودیعه|ودایع|جاری\s*شرکا|حساب\s*جاری|وام\s*کارکنان|مساعده/;
+const RX_NAT_D=/دریافتنی|بدهکاران|پیش\s*پرداخت|مشتریان|کارکنان|مساعده|وام\s*کارکنان|ودیعه|ودایع/;
+const RX_NAT_C=/پرداختنی|بستانکاران|پیش\s*دریافت|فروشندگان|تامین\s*کنندگان|تأمین\s*کنندگان|پیمانکاران/;
+function suggestRole(title){
+  const t=normText(title);
+  let role='OTHER';
+  if(RX_NOTES_R.test(t)) role='NOTES_R';
+  else if(RX_NOTES_P.test(t)) role='NOTES_P';
+  else if(RX_CASH.test(t)&&!RX_CASH_NOT.test(t)) role='CASH';
+  else if(RX_PERSON.test(t)) role='PERSON';
+  let nature='';
+  if(role==='CASH'||role==='NOTES_R') nature='D';
+  else if(role==='NOTES_P') nature='C';
+  else if(role==='PERSON'){ const d=RX_NAT_D.test(t), c=RX_NAT_C.test(t); nature=d&&!c?'D':(c&&!d?'C':''); }
+  return {role,nature};
+}
+function suggestRoles(model){
+  const out=new Map();
+  model.accounts.forEach(acc=>{ const s=suggestRole(acc.kolT+' '+acc.moeinT); out.set(acc.id,{...s,confirmed:false,selected:s.role==='PERSON'}); });
+  return out;
+}
+
+/* ------------------------------------------ پیشنهاد اسناد افتتاحیه/اختتامیه */
+const RX_OPEN=/افتتاحیه|مانده\s*(ابتدای|اول)\s*(سال|دوره)|نقل\s*(مانده\s*)?از\s*(سال\s*)?(قبل|گذشته)|انتقال(ی)?\s*از\s*سال\s*(قبل|گذشته)|مانده\s*نقل\s*از\s*قبل/;
+const RX_OPEN_NOT=/بانک|حساب\s*بانکی|شعبه|کارت|وام|تسهیلات|فروشگاه|نمایندگی/;
+const RX_CLOSE=/اختتامیه|بستن\s*حساب\s*(ها)?\s*(ی\s*)?دائم|تراز\s*اختتامیه|سند\s*اختتامیه/;
+const RX_TEMP_CLOSE=/بستن\s*حساب\s*(ها)?\s*(ی\s*)?موقت|بستن\s*(حساب\s*)?(درآمد|هزینه)|انتقال\s*به\s*(سود\s*و\s*زیان|عملکرد)/;
+/** rows: ردیف‌های کانونی یک فایل. خروجی: پیشنهادها با مبنای قابل نمایش. */
+function suggestOpeningClosing(rows,start,end){
+  const byDoc=new Map();
+  rows.forEach(r=>{
+    const doc=normCode(r.doc); if(!doc) return;
+    if(!byDoc.has(doc)) byDoc.set(doc,{doc,desc:'',rows:0,debit:0n,credit:0n,days:new Set(),text:''});
+    const d=byDoc.get(doc); d.rows++;
+    const a=parseAmount(r.debit), b=parseAmount(r.credit); if(a.ok) d.debit+=a.value; if(b.ok) d.credit+=b.value;
+    const pd=parseDate(r.date); if(pd.ok) d.days.add(pd.day);
+    if(!d.desc&&r.descDoc) d.desc=String(r.descDoc);
+    if(d.text.length<400) d.text+=' '+(r.descDoc||'')+' '+(r.descRow||'');
+  });
+  const opening=[], closing=[], tempClosing=[];
+  byDoc.forEach(d=>{
+    const t=normText(d.text), days=[...d.days];
+    const atStart=start!=null&&days.length&&days.every(x=>x===start), atEnd=end!=null&&days.length&&days.every(x=>x===end);
+    const info={doc:d.doc,desc:d.desc||d.text.trim().slice(0,80),rows:d.rows,debit:d.debit,credit:d.credit,days};
+    if(RX_CLOSE.test(t)) closing.push({...info,strong:true,reason:'عبارت «اختتامیه» در شرح'});
+    else if(RX_TEMP_CLOSE.test(t)) tempClosing.push({...info,strong:false,reason:'بستن حساب‌های موقت (اختتامیه نیست)'});
+    else if(RX_OPEN.test(t)&&!RX_OPEN_NOT.test(t)) opening.push({...info,strong:atStart||d.doc==='1',reason:'عبارت افتتاحیه در شرح'+(atStart?' + تاریخ روز اول سال':'')});
+    else if(d.doc==='1'&&atStart) opening.push({...info,strong:false,reason:'سند شمارهٔ ۱ در روز اول سال (بدون عبارت افتتاحیه)'});
+  });
+  return {opening,closing,tempClosing};
+}
+
+/* ------------------------------------------------- E5 طبقه‌بندی رویدادها */
+const TAGS=['NORMAL','TRANSFER','CORRECTION','REVERSAL','CHECK_BOUNCED','NONCASH_SETTLEMENT'];
+const RX_REVERSAL=/برگشت\s*(سند|ثبت|آرتیکل|ارتیکل)|ابطال|سند\s*معکوس|حذف\s*ثبت|عکس\s*سند/;
+const RX_BOUNCE=/(برگشت|برگشتی|عودت|استرداد)\s*(ی\s*)?چک|چک\s*(ها\s*)?(ی\s*)?(برگشت|برگشتی|عودت)/;
+const RX_CORR=/اصلاح|تصحیح|ثبت\s*اشتباه|رفع\s*اشتباه|اشتباها|به\s*اشتباه/;
+const RX_NONCASH=/تهاتر/;
+const RX_TRANSFER=/انتقال|منتقل|تجدید\s*طبقه|طبقه\s*بندی\s*مجدد|کسر\s*از\s*حساب|اضافه\s*به\s*حساب|جابجایی\s*حساب|جابه\s*جایی\s*حساب/;
+const RX_TRANSFER_NOT=/انتقال\s*(وجه|بانکی|اینترنتی)|حواله|پایا|ساتنا|انتقال(ی)?\s*از\s*سال/;
+/** برچسب پیشنهادی هر رویداد (قابل اصلاح توسط حسابرس). roles: Map حساب ← {role,nature} */
+function classify(model,roles){
+  const tags=new Map();
+  const roleOf=acc=>(roles&&roles.get(acc)||{}).role||'OTHER';
+  const natureOf=acc=>(roles&&roles.get(acc)||{}).nature||'';
+  model.events.forEach(e=>{
+    if(e.docType!=='NORMAL') return;
+    const t=normText(e.descRow+' '+e.descDoc);
+    const doc=model.docs.get(e.docId);
+    const others=doc.events.filter(x=>x.key!==e.key);
+    const hasCash=others.some(x=>roleOf(x.account)==='CASH');
+    const oppNotes=others.some(x=>x.side!==e.side&&/NOTES/.test(roleOf(x.account)));
+    let tag=null, why='';
+    if(RX_REVERSAL.test(t)){ tag='REVERSAL'; why='شرح: برگشت/ابطال سند'; }
+    else if(RX_BOUNCE.test(t)){ tag='CHECK_BOUNCED'; why='شرح: برگشت چک'; }
+    else if(oppNotes&&natureOf(e.account)&&e.side===natureOf(e.account)&&roleOf(e.account)==='PERSON'){ tag='CHECK_BOUNCED'; why='ساختار سند: افزایش حساب شخص در مقابل اسناد دریافتنی/پرداختنی'; }
+    else if(RX_CORR.test(t)){ tag='CORRECTION'; why='شرح: اصلاح/ثبت اشتباه'; }
+    else if(RX_NONCASH.test(t)){ tag='NONCASH_SETTLEMENT'; why='شرح: تهاتر'; }
+    else if(RX_TRANSFER.test(t)&&!RX_TRANSFER_NOT.test(t)&&!hasCash){ tag='TRANSFER'; why='شرح: انتقال/تجدید طبقه‌بندی، بدون ردیف نقدی'; }
+    if(tag) tags.set(e.eid,{tag,why});
+  });
+  return tags;
+}
+
+/* -------------------------------------------- پیشنهاد اتصال جفت‌ها (چک/سند) */
+function numbersIn(s){ return (latinDigits(String(s)).match(/\d{4,}/g)||[]); }
+function suggestLinks(model,tagOf){
+  const out=[], used=new Set();
+  const byKeyFile=new Map();
+  model.events.forEach(e=>{ if(e.docType!=='NORMAL') return; const k=e.fileId+'#'+e.key; if(!byKeyFile.has(k)) byKeyFile.set(k,[]); byKeyFile.get(k).push(e); });
+  model.events.forEach(e=>{
+    const tag=tagOf(e); if(tag!=='CHECK_BOUNCED'&&tag!=='REVERSAL') return;
+    const pool=(byKeyFile.get(e.fileId+'#'+e.key)||[]).filter(x=>x!==e&&x.side!==e.side&&x.amount===e.amount&&x.day<=e.day&&!used.has(x.eid)&&tagOf(x)!==tag);
+    if(!pool.length) return;
+    const myNums=new Set(numbersIn(e.descRow+' '+e.descDoc));
+    let best=null, strength='weak', reason='';
+    if(tag==='REVERSAL'){
+      const m=latinDigits(normText(e.descRow+' '+e.descDoc)).match(/سند\s*(شماره\s*)?(\d+)/);
+      if(m){ const hit=pool.filter(x=>x.doc===m[2]); if(hit.length===1){ best=hit[0]; strength='strong'; reason='شمارهٔ سند اصلی در شرح برگشت ذکر شده'; } }
+    } else {
+      const hit=pool.filter(x=>numbersIn(x.descRow+' '+x.descDoc).some(n=>myNums.has(n)));
+      if(hit.length===1){ best=hit[0]; strength='strong'; reason='شمارهٔ مشترک در شرح (احتمالاً شمارهٔ چک)'; }
+    }
+    if(!best&&pool.length===1){ best=pool[0]; reason='تنها رویداد هم‌مبلغِ مخالف در همین کلید و سال'; }
+    if(!best) return;
+    used.add(best.eid); used.add(e.eid);
+    out.push({id:best.eid+'~'+e.eid,kind:tag==='REVERSAL'?'REVERSAL':'CHECK',origEid:best.eid,laterEid:e.eid,strength,reason,amount:e.amount,key:e.key});
+  });
+  return out;
+}
+
+/* ------------------------------------------- E6 پیشنهاد تطبیق کدینگ */
+function keyBalancesByFile(model){
+  const m=new Map();       // fileId -> Map key -> {opening, end(pre-closing), present}
+  model.files.forEach(f=>m.set(f.id,new Map()));
+  model.events.forEach(e=>{
+    const fm=m.get(e.fileId); if(!fm.has(e.key)) fm.set(e.key,{opening:0n,end:0n});
+    const r=fm.get(e.key), v=signedOf(e.amount,e.side);
+    if(e.docType==='OPENING') r.opening+=v;
+    if(e.docType!=='CLOSING') r.end+=v;
+  });
+  return m;
+}
+function suggestCoding(model){
+  const out=[], bal=keyBalancesByFile(model);
+  for(let i=1;i<model.files.length;i++){
+    const prev=model.files[i-1], cur=model.files[i];
+    const P=bal.get(prev.id), C=bal.get(cur.id);
+    const orphansNew=[...C.entries()].filter(([k,v])=>!P.has(k)&&v.opening!==0n);
+    const orphansOld=[...P.entries()].filter(([k,v])=>!C.has(k)&&v.end!==0n);
+    orphansNew.forEach(([k,v])=>{
+      const tNew=(model.keys.get(k)||{}).titles?.get(cur.id)||'';
+      let best=null;
+      orphansOld.forEach(([ok,ov])=>{
+        const tOld=(model.keys.get(ok)||{}).titles?.get(prev.id)||'';
+        const sim=similarity(tNew,tOld), sameBal=ov.end===v.opening;
+        let strength=null;
+        if(sim>=0.999&&sameBal) strength='strong';
+        else if(sim>=0.8&&sameBal) strength='medium';
+        else if(sim>=0.8) strength='weak';
+        if(strength&&(!best||rank(strength)>rank(best.strength)||(rank(strength)===rank(best.strength)&&sim>best.sim)))
+          best={fromKey:ok,toKey:k,toFileId:cur.id,fromFileId:prev.id,strength,sim,sameBal,titleOld:tOld,titleNew:tNew};
+      });
+      if(best) out.push({...best,id:best.fromKey+'=>'+best.toKey,reason:(best.sameBal?'مانده پایان = افتتاحیه، ':'')+'شباهت عنوان '+Math.round(best.sim*100)+'٪'});
+    });
+  }
+  return out;
+  function rank(s){ return s==='strong'?3:(s==='medium'?2:1); }
+}
+function codeTitleChanges(model){
+  const out=[];
+  model.keys.forEach(k=>{
+    const t=[...k.titles.entries()];
+    for(let i=1;i<t.length;i++) if(similarity(t[i-1][1],t[i][1])<0.5)
+      out.push({code:'CODE_TITLE_CHANGED',severity:'warn',key:k.key,fileId:t[i][0],detail:'«'+t[i-1][1]+'» ← «'+t[i][1]+'»'});
+  });
+  return out;
+}
+
+/* ------------------------------------------------------ E7 دفتر لایه‌ها */
+/** یک دفتر برای یک پیمایش. MIN: مصرف قدیمی‌ترین (bornLate) اول. MAX: مصرف جدیدترین (bornEarly) اول. */
+class Book{
+  constructor(pass,followUp){ this.pass=pass; this.followUp=!!followUp; this.side=null; this.sum=0n; this.q=[]; this.h=0; this.known=[]; this.unk=[]; this.fresh=[]; this.seq=0; }
+  live(){ return this.pass==='MIN'?this.q.slice(this.h).filter(L=>L.size>0n):[...this.unk,...this.known,...this.fresh].filter(L=>L.size>0n); }
+  reset(){ this.side=null; this.sum=0n; this.q=[]; this.h=0; this.known=[]; this.unk=[]; this.fresh=[]; }
+  load(layers,tracked){
+    this.reset();
+    const ls=layers.map(L=>({...L,tracked:tracked?true:!!L.tracked}));
+    if(this.pass==='MIN'){ this.q=ls.slice().sort((a,b)=>(a.late-b.late)||(a.lid-b.lid)); }
+    else { ls.forEach(L=>{ (L.early===UNKNOWN?this.unk:this.known).push(L); }); this.known.sort((a,b)=>(a.early-b.early)||(a.lid-b.lid)); this.unk.sort((a,b)=>a.lid-b.lid); }
+    ls.forEach(L=>{ this.sum+=L.size; this.side=L.side; this.seq=Math.max(this.seq,L.lid); });
+  }
+  push(L){
+    L.lid=++this.seq; L.size=L.size; this.side=L.side; this.sum+=L.size;
+    if(this.pass==='MIN') this.q.push(L);
+    else if(this.followUp) this.fresh.push(L);
+    else (L.early===UNKNOWN?this.unk:this.known).push(L);
+    return L;
+  }
+  /** مصرف مبلغ از لایه‌ها؛ باقی‌مانده (عبور از صفر) برگردانده می‌شود */
+  consume(amount,onTake){
+    let rest=amount;
+    const take=L=>{ const t=bmin(rest,L.size); if(t>0n){ L.size-=t; rest-=t; this.sum-=t; onTake(L,t); } };
+    if(this.pass==='MIN'){
+      while(rest>0n&&this.h<this.q.length){ const L=this.q[this.h]; take(L); if(L.size===0n) this.h++; }
+      if(this.h>512&&this.h*2>this.q.length){ this.q=this.q.slice(this.h); this.h=0; }
+    } else {
+      for(const st of [this.fresh,this.known,this.unk]){
+        while(rest>0n&&st.length){ const L=st[st.length-1]; take(L); if(L.size===0n) st.pop(); }
+      }
+    }
+    if(this.sum===0n) this.side=null;
+    return rest;
+  }
+}
+function signedBook(b){ return b.side?signedOf(b.sum,b.side):0n; }
+
+/**
+ * اجرای یک کلید در یک پیمایش روی سال‌های زنجیره.
+ * ctx: {years:[file], eventsByYear:Map(fileId->[event]), birthOf(e)->[early,origin], voided:Set}
+ */
+function runKey(ctx,pass){
+  const b=new Book(pass,false);
+  const log=[], flags=[], created=[], role=new Map(), yearEnd=new Map(), checks=[];
+  let prev=null, ledger=0n;
+  for(const y of ctx.years){
+    const ev=(ctx.eventsByYear.get(y.id)||[]).filter(e=>!ctx.voided.has(e.eid));
+    const openEv=ev.filter(e=>e.docType==='OPENING');
+    const openNet=openEv.reduce((s,e)=>s+signedOf(e.amount,e.side),0n);
+    const contiguous=prev&&y.start===prev.end+1;
+    if(!prev||!contiguous){
+      if(prev&&!contiguous&&(y.hasOpening?openNet:ledger)!==0n) flags.push({code:'YEAR_GAP',fileId:y.id,amount:babs(y.hasOpening?openNet:ledger),detail:'سال یا دورهٔ مفقود پیش از '+y.label});
+      b.reset(); created.length=0;
+      const start=y.hasOpening?openNet:(prev?ledger:0n);
+      ledger=start;
+      if(start!==0n){
+        const origin=prev?'GAP':'PRE_PERIOD';
+        const L=b.push({side:sideOfSigned(start),size:babs(start),early:UNKNOWN,late:y.start-1,origin,eid:openEv[0]?openEv[0].eid:null,day:y.start-1});
+        created.push({side:L.side,size:L.size,early:UNKNOWN});
+      }
+    } else if(y.hasOpening){
+      const diff=openNet-ledger;
+      if(diff!==0n){
+        flags.push({code:'OPENING_MISMATCH',fileId:y.id,amount:babs(diff),detail:'افتتاحیه '+fmtSigned(openNet)+' ؛ مانده پیش از اختتامیهٔ سال قبل '+fmtSigned(ledger)});
+        applyAmount(b,sideOfSigned(diff),babs(diff),y.start-1,UNKNOWN,'SUSPECT',null,log,flags,created,role,pass);
+      }
+      ledger=openNet;
+    }
+    // روزبه‌روز: اول افزایش‌ها، سپس کاهش‌ها
+    const normal=ev.filter(e=>e.docType==='NORMAL');
+    let i=0;
+    while(i<normal.length){
+      const day=normal[i].day; let j=i; while(j<normal.length&&normal[j].day===day) j++;
+      const today=normal.slice(i,j); i=j;
+      const side0=b.side||'D';
+      const ordered=[...today.filter(e=>e.side===side0),...today.filter(e=>e.side!==side0)];
+      for(const e of ordered){
+        const [early,origin]=ctx.birthOf(e);
+        applyAmount(b,e.side,e.amount,e.day,early,origin,e,log,flags,created,role,pass);
+        ledger+=signedOf(e.amount,e.side);
+      }
+    }
+    // کنترل: جمع لایه‌ها = مانده دفتر (مبلغ و سمت جداگانه)
+    const bs=signedBook(b), layersSum=b.live().reduce((s,L)=>s+signedOf(L.size,L.side),0n);
+    if(bs!==ledger||layersSum!==ledger) checks.push({fileId:y.id,pass,detail:'جمع لایه‌ها با مانده دفتر برابر نیست',ledger,layers:layersSum});
+    const closeNet=ev.filter(e=>e.docType==='CLOSING').reduce((s,e)=>s+signedOf(e.amount,e.side),0n);
+    yearEnd.set(y.id,{ledger,closeNet,hasClosing:ev.some(e=>e.docType==='CLOSING'),layers:b.live().map(L=>({...L}))});
+    prev=y;
+  }
+  return {pass,book:b,log,flags,created,role,yearEnd,checks,ledger};
+}
+function applyAmount(b,side,amount,day,early,origin,e,log,flags,created,role,pass){
+  if(!b.side||b.side===side){
+    const L=b.push({side,size:amount,early:early===UNKNOWN?UNKNOWN:day,late:day,origin,eid:e?e.eid:null,day});
+    created.push({side,size:amount,early:L.early});
+    if(e) role.set(e.eid,{inc:amount,dec:0n});
+    return;
+  }
+  const rest=b.consume(amount,(L,t)=>log.push({eid:e?e.eid:null,lid:L.lid,amount:t,pass,layerDay:L.day,origin:L.origin}));
+  if(e) role.set(e.eid,{inc:rest,dec:amount-rest});
+  if(rest>0n){
+    const L=b.push({side,size:rest,early:early===UNKNOWN?UNKNOWN:day,late:day,origin:origin==='KNOWN'?'KNOWN':origin,eid:e?e.eid:null,day});
+    created.push({side,size:rest,early:L.early});
+    flags.push({code:'SIGN_CHANGE',eid:e?e.eid:null,amount:rest,day});
+  }
+}
+function fmtSigned(x){ const s=sideOfSigned(x); return s?(babs(x).toString()+(s==='D'?' بد':' بس')):'۰'; }
+
+/* ------------------------------------------------ E8 شاخص‌ها و E9 فعالیت */
+function olderThan(minLayers,maxLayers,side,cut){
+  let lo=0n, hi=0n;
+  for(const L of minLayers) if(L.side===side&&L.late<=cut) lo+=L.size;
+  for(const L of maxLayers) if(L.side===side&&L.early<=cut) hi+=L.size;
+  return {min:lo,max:hi};
+}
+function activityOfEvent(e,model,roleOf,tagOf,voided){
+  if(voided.has(e.eid)) return {status:'VOID',why:'جفتِ متصلِ تأییدشده'};
+  const tag=tagOf(e);
+  if(tag==='CORRECTION'||tag==='REVERSAL'||tag==='TRANSFER') return {status:'NONE',why:'اصلاحیه/برگشت/انتقال گردش مؤثر نیست'};
+  const doc=model.docs.get(e.docId);
+  if(!doc||!doc.balanced) return {status:'UNKNOWN',why:'سند نامتوازن یا ناقص'};
+  const others=doc.events.filter(x=>x.key!==e.key);
+  const oppRows=others.filter(x=>x.side!==e.side);
+  if(oppRows.some(x=>/NOTES/.test(roleOf(x.account)))) return {status:'PROVISIONAL',why:'دریافت/پرداخت با چک (تا وصول، محتمل)'};
+  const C=oppRows.filter(x=>roleOf(x.account)==='CASH').reduce((s,x)=>s+x.amount,0n);
+  if(C===0n) return tag==='NONCASH_SETTLEMENT'&&tagOf.confirmed&&tagOf.confirmed(e)?{status:'FULL',why:'تسویهٔ غیرنقدی تأییدشده'}:{status:'NONE',why:'ردیف نقدی در سند نیست'};
+  const S=others.filter(x=>x.side===e.side).reduce((s,x)=>s+x.amount,0n);
+  const d=doc.events.filter(x=>x.key===e.key&&x.side===e.side).reduce((s,x)=>s+x.amount,0n);
+  if(S===0n&&C>=d) return {status:'FULL',why:'سند ساده: کاهش در مقابل بانک/صندوق'};
+  const lb=C>S?C-S:0n, ub=bmin(e.amount,C);
+  return {status:'POSSIBLE',why:'سند مرکب؛ کران ارتباط نقدی '+lb+' تا '+ub,lb,ub};
+}
+
+/* -------------------------------------------- E10 Snapshot و اثرانگشت */
+function canon(x){
+  if(typeof x==='bigint') return '"'+x.toString()+'n"';
+  if(x===UNKNOWN) return '"-inf"';
+  if(Array.isArray(x)) return '['+x.map(canon).join(',')+']';
+  if(x&&typeof x==='object') return '{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+canon(x[k])).join(',')+'}';
+  return JSON.stringify(x===undefined?null:x);
+}
+function digest(obj){
+  const s=canon(obj); let h=0x811c9dc5, h2=0x01000193;
+  for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); h^=c; h=Math.imul(h,0x01000193)>>>0; h2=Math.imul(h2^c,0x5bd1e995)>>>0; }
+  return h.toString(16).padStart(8,'0')+h2.toString(16).padStart(8,'0')+':'+s.length;
+}
+function deepFreeze(o){ if(o&&typeof o==='object'&&!Object.isFrozen(o)){ Object.freeze(o); Object.values(o).forEach(deepFreeze); } return o; }
+
+/* ---------------------------------------------------------- تحلیل کامل */
+const RX_PRIOR_ADJ=/تعدیلات\s*سنواتی|تعدیل\s*سنواتی|اصلاح\s*اشتباه|سنوات\s*(قبل|گذشته)|مربوط\s*به\s*سال\s*(قبل|گذشته)/;
+/**
+ * settings: {roles:Map, tagOverrides:Map(eid->tag), confirmedTags:Set(eid), links:[{origEid,laterEid}],
+ *            aliases:[{fromKey,toKey,toFileId}], accounts:Set|null, thresholds:[6,12,24],
+ *            cutoffMethod:'months'|'days', inclusive:true}
+ */
+function analyze(model,settings){
+  settings=Object.assign({thresholds:[6,12,24],cutoffMethod:'months',inclusive:true,links:[],aliases:[],tagOverrides:new Map(),confirmedTags:new Set(),roles:new Map(),accounts:null},settings||{});
+  const exceptions=[...model.exceptions,...codeTitleChanges(model)];
+  const files=model.files;
+  const audit=files.find(f=>f.id===model.auditFileId);
+  if(!audit) throw new Error('سال رسیدگی مشخص نشده است.');
+  const chain=files.filter(f=>f.start<=audit.start);
+  const nextCandidates=files.filter(f=>f.start>audit.end);
+  const next=nextCandidates[0]||null;
+  if(next&&next.start!==audit.end+1) exceptions.push({code:'NEXT_NOT_CONTIGUOUS',severity:'warn',fileId:next.id,detail:'فایل سال بعد بلافاصله پس از سال رسیدگی شروع نمی‌شود'});
+  nextCandidates.slice(1).forEach(f=>exceptions.push({code:'FILE_IGNORED',severity:'info',fileId:f.id,detail:'فقط اولین سال پس از سال رسیدگی برای پیگیری استفاده می‌شود'}));
+
+  // برچسب مؤثر هر رویداد
+  const autoTags=classify(model,settings.roles);
+  const tagOf=e=>{ const o=settings.tagOverrides.get(e.eid); if(o) return o; const a=autoTags.get(e.eid); return a?a.tag:'NORMAL'; };
+  tagOf.confirmed=e=>settings.confirmedTags.has(e.eid)||settings.tagOverrides.has(e.eid);
+  const roleOf=acc=>{ const r=settings.roles.get(acc); return r&&r.confirmed?r.role:'OTHER'; };
+  const natureOf=acc=>{ const r=settings.roles.get(acc); return r&&r.confirmed?r.nature:''; };
+  const anyCashConfirmed=[...settings.roles.values()].some(r=>r.confirmed&&r.role==='CASH');
+
+  // اتصال‌های تأییدشده ← رویدادهای باطل (محاسبه از ابتدا بدون آن‌ها)
+  const voided=new Set();
+  for(const l of settings.links){
+    const a=model.byId.get(l.origEid), c=model.byId.get(l.laterEid);
+    if(!a||!c||a.key!==c.key||a.side===c.side||a.amount!==c.amount||a.fileId!==c.fileId){
+      exceptions.push({code:'LINK_INVALID',severity:'error',detail:'اتصال تأییدشده معتبر نیست (کلید، سمت، مبلغ یا سال یکسان نیست): '+l.origEid+' ~ '+l.laterEid}); continue;
+    }
+    voided.add(a.eid); voided.add(c.eid);
+  }
+  // نگاشت کدینگ تأییدشده
+  const fileStart=new Map(files.map(f=>[f.id,f.start]));
+  const keyOf=e=>{
+    let k=e.key;
+    for(const a of settings.aliases){ if(k===a.fromKey&&e.day<fileStart.get(a.toFileId)) k=a.toKey; }
+    return k;
+  };
+  const birthOf=e=>{
+    const t=tagOf(e);
+    if(t==='TRANSFER') return [UNKNOWN,'TRANSFER'];
+    if(t==='CHECK_BOUNCED') return [UNKNOWN,'SUSPECT'];
+    return [e.day,'KNOWN'];
+  };
+  // گروه‌بندی بر اساس کلید
+  const groups=new Map();
+  for(const e of model.events){
+    const k=keyOf(e); const acc=e.account;
+    if(!groups.has(k)) groups.set(k,{key:k,account:(model.keys.get(k)||{}).account||acc,byYear:new Map()});
+    const g=groups.get(k); if(!g.byYear.has(e.fileId)) g.byYear.set(e.fileId,[]); g.byYear.get(e.fileId).push(e);
+  }
+  const auditStartCut=audit.start-1;
+  const cuts=settings.thresholds.map(T=>{ let c=cutoffDay(audit.end,T,settings.cutoffMethod); if(!settings.inclusive) c-=1; return {T,cut:c,windowFrom:c+1}; });
+  const keysOut=[], snapshotObj={}, allChecks=[];
+  for(const g of groups.values()){
+    const meta=model.keys.get(g.key)||{key:g.key,account:g.account,person:true,title:g.key};
+    if(settings.accounts&&!settings.accounts.has(meta.account)) continue;
+    const hasChain=chain.some(f=>g.byYear.has(f.id));
+    if(!hasChain) continue;
+    const ctx={years:chain,eventsByYear:g.byYear,birthOf,voided};
+    const rMin=runKey(ctx,'MIN'), rMax=runKey(ctx,'MAX');
+    const end=rMin.ledger, endSide=sideOfSigned(end), endAmt=babs(end);
+    const minL=rMin.book.live(), maxL=rMax.book.live();
+    const checks=[...rMin.checks,...rMax.checks];
+    const unrel=(model.unreliable.get(g.key)||[]);
+    const flags=rMin.flags.slice();
+    const k={key:g.key,title:meta.title,account:meta.account,person:!!meta.person,end:endAmt,endSide,
+             unreliable:unrel.length>0,unreliableRows:unrel,flags,checks};
+    if(endSide){
+      k.sanavati=olderThan(minL,maxL,endSide,auditStartCut);
+      const unk={min:0n,max:0n};
+      minL.forEach(L=>{ if(L.side===endSide&&(L.origin==='PRE_PERIOD'||L.origin==='GAP')) unk.min+=L.size; });
+      maxL.forEach(L=>{ if(L.side===endSide&&L.early===UNKNOWN) unk.max+=L.size; });
+      k.unknown=unk;
+      k.byOrigin=chain.map(f=>({fileId:f.id,label:f.label,cut:f.start-1,...olderThan(minL,maxL,endSide,f.start-1)}));
+      const createdSide=rMax.created.filter(c=>c.side===endSide);
+      k.stale=cuts.map(c=>{
+        const r=olderThan(minL,maxL,endSide,c.cut);
+        const gross=createdSide.filter(x=>x.early<=c.cut).reduce((s,x)=>s+x.size,0n);
+        const free=bmin(gross,endAmt);
+        return {T:c.T,cut:c.cut,...r,modelFreeMax:free>r.max?free:r.max,risk:free>r.max?free-r.max:0n};
+      });
+      const sanFree=bmin(createdSide.filter(x=>x.early<=auditStartCut).reduce((s,x)=>s+x.size,0n),endAmt);
+      k.sanavati.modelFreeMax=sanFree>k.sanavati.max?sanFree:k.sanavati.max;
+      k.sanavati.risk=sanFree>k.sanavati.max?sanFree-k.sanavati.max:0n;
+      k.width=endAmt===0n?null:Number(k.sanavati.max-k.sanavati.min)/Number(endAmt);
+      if(!(k.sanavati.min<=k.sanavati.max&&k.sanavati.max<=endAmt)) checks.push({detail:'کنترل کمینه ≤ بیشینه ≤ مانده نقض شد'});
+      k.stale.forEach(s=>{ if(!(s.min<=s.max&&s.max<=endAmt)) checks.push({detail:'کنترل آستانه '+s.T+' ماه نقض شد'}); });
+      const nat=natureOf(meta.account);
+      if(nat&&nat!==endSide) exceptions.push({code:'CONTRA_BALANCE',severity:'warn',key:g.key,amount:endAmt,detail:'مانده '+(endSide==='D'?'بدهکار':'بستانکار')+' در حساب با ماهیت '+(nat==='D'?'بدهکار':'بستانکار')});
+    }
+    // فعالیت (مستقل از قدمت)
+    const chainEv=[]; chain.forEach(f=>(g.byYear.get(f.id)||[]).forEach(e=>{ if(e.docType==='NORMAL') chainEv.push(e); }));
+    const actEv=[];
+    for(const e of chainEv){
+      const rr=rMin.role.get(e.eid); if(!rr) continue;
+      if(rr.dec>0n){ const a=activityOfEvent(e,model,roleOf,tagOf,voided); actEv.push({eid:e.eid,day:e.day,amount:rr.dec,...a}); }
+    }
+    let lastInc=null; for(const e of chainEv){ const rr=rMin.role.get(e.eid); if(rr&&rr.inc>0n) lastInc=e.day; }
+    k.activity=cuts.map(c=>{
+      const inWin=actEv.filter(a=>a.day>=c.windowFrom&&a.day<=audit.end);
+      const last=st=>{ const l=inWin.filter(a=>st.includes(a.status)); return l.length?l[l.length-1]:null; };
+      const full=last(['FULL']), poss=last(['PROVISIONAL','POSSIBLE']), unk=last(['UNKNOWN']);
+      let status=full?'FULL':(poss?'POSSIBLE':(unk?'UNKNOWN':'NONE'));
+      if(!anyCashConfirmed&&status!=='FULL'&&inWin.length) status='UNKNOWN';
+      if(k.unreliable&&status==='NONE') status='UNKNOWN';
+      return {T:c.T,from:c.windowFrom,status,lastFull:full,lastPossible:poss,decreases:inWin.length};
+    });
+    k.lastIncrease=lastInc;
+    k.activityEvents=actEv;
+    // منابع عدم‌قطعیت (مبلغ‌محور)
+    const unc=[];
+    const auditEv=(g.byYear.get(audit.id)||[]).filter(e=>e.docType==='NORMAL'&&!voided.has(e.eid));
+    const decNoEvidence=auditEv.reduce((s,e)=>{ const rr=rMin.role.get(e.eid); return s+(rr?rr.dec:0n); },0n);
+    if(decNoEvidence>0n) unc.push({code:'UNALLOCATED_DEC',amount:decNoEvidence});
+    const corr=auditEv.filter(e=>tagOf(e)==='CORRECTION'||tagOf(e)==='REVERSAL').reduce((s,e)=>s+e.amount,0n);
+    if(corr>0n) unc.push({code:'CORRECTION_NOREF',amount:corr});
+    const tr=chainEv.filter(e=>tagOf(e)==='TRANSFER'&&!voided.has(e.eid)).reduce((s,e)=>{ const rr=rMin.role.get(e.eid); return s+(rr?rr.inc:0n); },0n);
+    if(tr>0n) unc.push({code:'TRANSFER_UNKNOWN',amount:tr});
+    const bounced=chainEv.filter(e=>tagOf(e)==='CHECK_BOUNCED'&&!voided.has(e.eid)).reduce((s,e)=>{ const rr=rMin.role.get(e.eid); return s+(rr?rr.inc:0n); },0n);
+    if(bounced>0n) unc.push({code:'BOUNCE_UNLINKED',amount:bounced});
+    const om=flags.filter(f=>f.code==='OPENING_MISMATCH').reduce((s,f)=>s+f.amount,0n);
+    if(om>0n) unc.push({code:'OPENING_MISMATCH',amount:om});
+    if(k.unknown&&k.unknown.max>0n) unc.push({code:'PRE_PERIOD',amount:k.unknown.max});
+    if(flags.some(f=>f.code==='YEAR_GAP')) unc.push({code:'YEAR_GAP',amount:flags.filter(f=>f.code==='YEAR_GAP').reduce((s,f)=>s+f.amount,0n)});
+    if(!k.person&&endAmt>0n) unc.push({code:'MIXED_PERSONS',amount:endAmt});
+    const comp=actEv.filter(a=>a.status==='POSSIBLE').reduce((s,a)=>s+a.amount,0n);
+    if(comp>0n) unc.push({code:'COMPOSITE_DOC',amount:comp});
+    if(k.sanavati&&k.sanavati.risk>0n) unc.push({code:'REBOUND',amount:k.sanavati.risk});
+    k.uncertainty=unc;
+    // استثناهای کلید
+    flags.forEach(f=>{ if(f.code==='OPENING_MISMATCH'||f.code==='YEAR_GAP') exceptions.push({code:f.code,severity:'warn',key:g.key,fileId:f.fileId,amount:f.amount,detail:f.detail}); });
+    if(!k.person) exceptions.push({code:'NO_TAFSILI',severity:'warn',key:g.key,amount:endAmt,detail:'محاسبه در سطح معین؛ قدمت به شخص مشخصی قابل انتساب نیست'});
+    chain.forEach(f=>{ const ye=rMin.yearEnd.get(f.id); if(ye&&ye.hasClosing&&ye.closeNet!==-ye.ledger) exceptions.push({code:'CLOSING_MISMATCH',severity:'warn',key:g.key,fileId:f.id,amount:babs(ye.closeNet+ye.ledger),detail:'سند اختتامیه قرینهٔ مانده پیش از اختتامیه نیست'}); });
+    if(checks.length){ allChecks.push(...checks.map(c=>({...c,key:g.key}))); k.failed=true; }
+    // نمای ریز
+    k.layers={MIN:minL.map(L=>({...L})),MAX:maxL.map(L=>({...L}))};
+    k.log={MIN:rMin.log,MAX:rMax.log};
+    k.byYearEnd=chain.map(f=>({fileId:f.id,label:f.label,ledger:(rMin.yearEnd.get(f.id)||{}).ledger}));
+    snapshotObj[g.key]={end,MIN:k.layers.MIN,MAX:k.layers.MAX};
+    k._g=g; k._min=rMin; k._max=rMax;
+    keysOut.push(k);
+  }
+  // E10: Snapshot تغییرناپذیر سال رسیدگی
+  deepFreeze(snapshotObj);
+  const snapDigest=digest(snapshotObj);
+  let nextOut=null;
+  if(next){
+    nextOut={fileId:next.id,label:next.label,lastDay:next.maxDay};
+    for(const k of keysOut){ k.next=followUp(k,snapshotObj[k.key],next,settings,birthOf,voided,model); delete k._g; delete k._min; delete k._max; }
+  } else keysOut.forEach(k=>{ delete k._g; delete k._min; delete k._max; });
+  const after=digest(snapshotObj);
+  if(after!==snapDigest) allChecks.push({detail:'Snapshot سال رسیدگی پس از پردازش سال بعد تغییر کرد'});
+  // جمع‌ها به تفکیک سمت (هرگز خالص نمی‌شود)
+  const totals={D:mkTot(),C:mkTot()};
+  keysOut.forEach(k=>{ if(!k.endSide) return; const t=totals[k.endSide]; t.count++; t.end+=k.end; t.sanMin+=k.sanavati.min; t.sanMax+=k.sanavati.max; t.unkMax+=k.unknown.max;
+    k.stale.forEach((s,i)=>{ t.stale[i]=t.stale[i]||{min:0n,max:0n}; t.stale[i].min+=s.min; t.stale[i].max+=s.max; }); });
+  return {audit:{id:audit.id,label:audit.label,start:audit.start,end:audit.end},chain:chain.map(f=>({id:f.id,label:f.label,start:f.start,end:f.end})),
+          next:nextOut,cuts,keys:keysOut,exceptions,checks:allChecks,snapshotDigest:snapDigest,totals,settings:{thresholds:settings.thresholds,cutoffMethod:settings.cutoffMethod,inclusive:settings.inclusive},
+          anyCashConfirmed,zeroKeys:keysOut.filter(k=>!k.endSide).length};
+  function mkTot(){ return {count:0,end:0n,sanMin:0n,sanMax:0n,unkMax:0n,stale:[]}; }
+}
+/** پیگیری سال بعد روی نسخهٔ جدا از Snapshot؛ Snapshot هرگز تغییر نمی‌کند. */
+function followUp(k,snap,next,settings,birthOf,voided,model){
+  const ev=(k._g.byYear.get(next.id)||[]).filter(e=>!voided.has(e.eid));
+  const out={grossD:0n,grossC:0n,inc:0n,dec:0n,remaining:null,settled:null,openingDiff:0n,priorAdj:[]};
+  if(!snap) return out;
+  const openNet=ev.filter(e=>e.docType==='OPENING').reduce((s,e)=>s+signedOf(e.amount,e.side),0n);
+  if(next.hasOpening&&next.start===model.files.find(f=>f.id===model.auditFileId).end+1&&openNet!==snap.end) out.openingDiff=openNet-snap.end;
+  const res={};
+  for(const pass of ['MIN','MAX']){
+    const b=new Book(pass,true); b.load(snap[pass],true);
+    const dummy=[], flags=[], created=[], role=new Map();
+    const normal=ev.filter(e=>e.docType==='NORMAL');
+    let i=0;
+    while(i<normal.length){
+      const day=normal[i].day; let j=i; while(j<normal.length&&normal[j].day===day) j++;
+      const today=normal.slice(i,j); i=j; const side0=b.side||'D';
+      for(const e of [...today.filter(x=>x.side===side0),...today.filter(x=>x.side!==side0)]){
+        const [early,origin]=birthOf(e);
+        applyAmount(b,e.side,e.amount,e.day,early,origin,e,dummy,flags,created,role,pass);
+        if(pass==='MIN'){ if(e.side==='D') out.grossD+=e.amount; else out.grossC+=e.amount; const rr=role.get(e.eid); out.inc+=rr.inc; out.dec+=rr.dec; }
+      }
+    }
+    res[pass]=b.live().filter(L=>L.tracked).reduce((s,L)=>s+L.size,0n);
+  }
+  const endAmt=babs(snap.end);
+  out.remaining={min:res.MIN,max:res.MAX};
+  out.settled={min:endAmt-res.MAX,max:endAmt-res.MIN};
+  out.priorAdj=ev.filter(e=>e.docType==='NORMAL'&&RX_PRIOR_ADJ.test(normText(e.descRow+' '+e.descDoc))).map(e=>({eid:e.eid,doc:e.doc,day:e.day,amount:e.amount,side:e.side,desc:e.descRow||e.descDoc}));
+  return out;
+}
+
+return {UNKNOWN,FIELDS,KEY_LEVELS,TAGS,
+  jalaliToDay,dayToJalali,isLeap,monthLength,formatDay,parseDate,addMonths,cutoffDay,latinDigits,
+  parseAmount,normText,normCode,similarity,
+  build,suggestRole,suggestRoles,suggestOpeningClosing,classify,suggestLinks,suggestCoding,
+  runKey,Book,analyze,digest,canon};
+})();
+if(typeof module!=='undefined'&&module.exports) module.exports=SRE;
+/* <<<SR-ENGINE-END>>> */
+</script>

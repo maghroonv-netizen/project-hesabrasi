@@ -1,0 +1,653 @@
+<script>
+/* <<<SR-UI-BEGIN>>> */
+/* ============================================================================
+   ماژول «اقلام سنواتی و راکد» — رابط کاربری (ماژول سوم)
+   همهٔ اعداد از SRE (موتور محاسباتی) می‌آیند؛ این بخش فقط نمایش و دریافت تصمیم حسابرس است.
+   ============================================================================ */
+(function(){
+'use strict';
+if(typeof SRE==='undefined') return;
+const U=SRE.UNKNOWN;
+const SR={files:[],auditId:null,seq:0,mapped:false,model:null,result:null,roles:new Map(),tagOverrides:new Map(),
+  linkSug:[],linkOk:new Set(),codingSug:[],codingOk:new Set(),
+  settings:{thresholds:[6,12,24],cutoffMethod:'months',inclusive:true},
+  view:{tab:'san',T:0,filter:'',limit:200,key:null,accFilter:'',tagFilter:''},busy:false};
+window.SR_STATE=SR;
+
+/* ---------------------------------------------------------------- ثبت ماژول */
+MODULES.push({id:'sr',name:'اقلام سنواتی و راکد',icon:'⏳',desc:'مانده‌های سنواتی و راکد با حداقل و حداکثر، از روی اسناد چند سال.'});
+MODULE_STEPS.sr=[
+  {n:'s1',title:'فایل‌های سال‌ها'},{n:'s2',title:'ستون‌ها و سال مالی'},{n:'s3',title:'افتتاحیه و اختتامیه'},
+  {n:'s4',title:'حساب‌ها'},{n:'s5',title:'تنظیمات و بازبینی'},{n:'s6',title:'گزارش‌ها'}];
+
+/* ---------------------------------------------------------------- کمکی‌ها */
+const FA_D='۰۱۲۳۴۵۶۷۸۹';
+const fa=s=>String(s).replace(/[0-9]/g,d=>FA_D[d]);
+const fmtB=x=>{ if(x===null||x===undefined) return '—'; try{ return BigInt(x).toLocaleString('fa-IR'); }catch(e){ return fa(String(x)); } };
+const fmtD=d=>d===U?'نامشخص (قبل از دورهٔ اطلاعاتی)':(d==null?'—':fa(SRE.formatDay(d)));
+const side=s=>s==='D'?'بدهکار':(s==='C'?'بستانکار':'—');
+const e_=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const $=id=>document.getElementById(id);
+const pct=x=>x==null?'—':fa((Math.round(x*1000)/10).toString())+'٪';
+const FIELD_LABEL={doc:'شماره سند',row:'ردیف سند',date:'تاریخ سند',descDoc:'شرح سند',descRow:'شرح ردیف',debit:'بدهکار',credit:'بستانکار',
+  kol:'کد حساب کل',kolT:'عنوان حساب کل',moein:'کد حساب معین',moeinT:'عنوان حساب معین',taf:'کد تفصیلی',tafT:'عنوان تفصیلی',
+  taf1:'کد تفصیلی یک',taf1T:'عنوان تفصیلی یک',taf2:'کد تفصیلی دو',taf2T:'عنوان تفصیلی دو'};
+const FIELD_EXPECTED={doc:'شماره سند',row:'ردیف سند',date:'تاریخ',descDoc:'شرح سند',descRow:'شرح ردیف',debit:'بدهکار',credit:'بستانکار',
+  kol:'کد حساب کل',kolT:'عنوان حساب کل',moein:'کد حساب معین',moeinT:'عنوان حساب معین',taf:'کد حساب تفصیلی',tafT:'عنوان حساب تفصیلی',
+  taf1:'کد تفصیلی یک',taf1T:'عنوان تفصیلی یک',taf2:'کد تفصیلی دو',taf2T:'عنوان تفصیلی دو'};
+const REQUIRED=['doc','date','debit','credit','kol','moein'];
+const ROLE_LABEL={CASH:'بانک و صندوق',NOTES_R:'اسناد دریافتنی (چک)',NOTES_P:'اسناد پرداختنی (چک)',PERSON:'اشخاص (دریافتنی/پرداختنی)',OTHER:'سایر'};
+const TAG_LABEL={NORMAL:'عادی',TRANSFER:'انتقال / تجدید طبقه‌بندی',CORRECTION:'اصلاحیه',REVERSAL:'برگشت سند',CHECK_BOUNCED:'برگشت چک',NONCASH_SETTLEMENT:'تسویهٔ غیرنقدی (تهاتر)'};
+const ACT_LABEL={FULL:'دارای گردش مؤثر قطعی',POSSIBLE:'دارای گردش محتمل',PROVISIONAL:'محتمل (چک وصول‌نشده)',NONE:'فاقد گردش مؤثر شناسایی‌شده',UNKNOWN:'نامشخص (ابهام یا کیفیت داده)',VOID:'باطل (جفت متصل)'};
+const UNC_LABEL={UNALLOCATED_DEC:'کاهش‌های بدون شاهد تخصیص',CORRECTION_NOREF:'اصلاحیه/برگشت بدون مرجع',TRANSFER_UNKNOWN:'انتقال با منشأ نامشخص',
+  BOUNCE_UNLINKED:'برگشت چک بدون اتصال',OPENING_MISMATCH:'اختلاف افتتاحیه با سال قبل',PRE_PERIOD:'قبل از دورهٔ اطلاعاتی',YEAR_GAP:'شکاف سال',
+  MIXED_PERSONS:'اختلاط اشخاص (نبود تفصیلی)',COMPOSITE_DOC:'سند مرکب مبهم',REBOUND:'احتمال پیش‌پرداخت/مصرف پیش از ایجاد'};
+const EXC_LABEL={INVALID_DATE:'تاریخ نامعتبر',DATE_OUT_OF_YEAR:'تاریخ خارج از سال مالی فایل',MISSING_CODE:'کد حساب خالی',INVALID_AMOUNT:'مبلغ نامعتبر',
+  NEGATIVE_AMOUNT:'مبلغ منفی (به ستون مقابل منتقل شد)',MIXED_TAFSILI:'تفصیلی ناهمگن در معین',NO_KEY_LEVEL:'کلید بدون تفصیلی',FIRST_YEAR_NO_OPENING:'اولین سال بدون افتتاحیه',
+  OPENING_NOT_SET:'سند افتتاحیه مشخص نشده',YEAR_OVERLAP:'هم‌پوشانی سال‌ها',CODE_TITLE_CHANGED:'تغییر عنوان با کد یکسان',NEXT_NOT_CONTIGUOUS:'سال بعد پیوسته نیست',
+  FILE_IGNORED:'فایل استفاده‌نشده',LINK_INVALID:'اتصال نامعتبر',CONTRA_BALANCE:'مانده خلاف ماهیت',OPENING_MISMATCH:'افتتاحیه و اختتامیه نامنطبق',
+  YEAR_GAP:'سال مفقود (مانده غیرصفر)',NO_TAFSILI:'حساب فاقد تفصیلی',CLOSING_MISMATCH:'سند اختتامیه نامنطبق'};
+const SEV_LABEL={error:'خطا',warn:'هشدار',info:'اطلاع'};
+
+function invalidate(level){            // level: 'model' (ساختار داده تغییر کرد) | 'result' (فقط تنظیمات)
+  if(level==='model') SR.model=null;
+  SR.result=null;
+}
+function srStepReady(n){
+  if(n==='s1') return true;
+  if(n==='s2') return SR.files.length>0&&SR.files.every(f=>f.headers)&&!!SR.auditId;
+  if(n==='s3') return SR.mapped;
+  if(n==='s4'||n==='s5') return !!SR.model;
+  if(n==='s6') return !!SR.result;
+  return false;
+}
+window.srStepReady=srStepReady;
+function srRender(){
+  const m={s1:renderFiles,s2:renderMapping,s3:renderOC,s4:renderAccounts,s5:renderSettings,s6:renderReports}[CUR_STEP];
+  if(m) m();
+}
+window.srEnter=function(){ srRender(); };
+function go(n){ CUR_STEP=n; srRender(); paint(); }
+function nav(back,next,nextLabel,disabled){
+  return `<div class="sr-nav">${back?`<button type="button" class="btn ghost" data-go="${back}">→ مرحلهٔ قبل</button>`:'<span></span>'}
+    ${next?`<button type="button" class="confirm" data-next="${next}" ${disabled?'disabled':''}>${nextLabel||'ادامه ←'}</button>`:''}</div>`;
+}
+function bindNav(host,onNext){
+  host.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
+  host.querySelectorAll('[data-next]').forEach(b=>b.addEventListener('click',()=>onNext(b.dataset.next)));
+}
+function busy(host,label,fn){
+  host.insertAdjacentHTML('afterbegin',`<div class="card sr-busy" id="srBusy">${e_(label)}…</div>`);
+  setTimeout(()=>{ try{ fn(); }catch(err){ console.error(err); const b=$('srBusy'); if(b) b.outerHTML=`<div class="card"><div class="err">${e_(err.message||String(err))}</div></div>`; } },30);
+}
+
+/* ------------------------------------------------------- خواندن فایل‌ها */
+function cellVal(c){
+  if(!c) return '';
+  if(c.t==='n') return c.v; if(c.t==='d') return c.v; if(c.t==='b') return String(c.v);
+  if(c.t==='e'||c.t==='z') return '';
+  return c.v!==undefined&&c.v!==null?c.v:(c.w||'');
+}
+function extractRaw(sheet){
+  let rows=[];
+  const dense=Array.isArray(sheet)?sheet:(Array.isArray(sheet&&sheet['!data'])?sheet['!data']:null);
+  if(dense){ for(let r=0;r<dense.length;r++){ const rc=dense[r]; if(!rc){ rows.push(null); continue; } const a=new Array(rc.length); for(let c=0;c<rc.length;c++) a[c]=cellVal(rc[c]); rows.push(a); } }
+  else rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:'',blankrows:true});
+  let h=-1; for(let r=0;r<rows.length;r++){ if(rows[r]&&rows[r].some(v=>String(v).trim()!=='')){ h=r; break; } }
+  if(h<0) return {headers:[],data:[],srcRows:[]};
+  const headers=rows[h].map(v=>norm(String(v)));
+  const data=[], srcRows=[];
+  for(let r=h+1;r<rows.length;r++){ const a=rows[r]; if(!a||!a.some(v=>String(v).trim()!=='')) continue; data.push(a); srcRows.push(r+1); }
+  return {headers,data,srcRows};
+}
+function sheetFromWb(f,name){
+  if(f.rawBytes){ const wb=XLSX.read(f.rawBytes,{type:'array',sheets:[name],...AUDIT_XLSX_OPTS}); return wb.Sheets[name]; }
+  return f.wb.Sheets[name];
+}
+function loadSheetInto(f,name){
+  const raw=extractRaw(sheetFromWb(f,name));
+  if(!raw.headers.length) throw new Error('برگهٔ «'+name+'» خالی است.');
+  f.sheet=name; f.headers=raw.headers; f.data=raw.data; f.srcRows=raw.srcRows;
+  f.mapping=guessMapping(f.headers); f.keyFields=['taf','taf1','taf2'].filter(k=>f.mapping[k]>=0);
+  const prev=SR.files.find(x=>x!==f&&x.headers&&x.headers.join('|')===f.headers.join('|'));
+  if(prev){ f.mapping={...prev.mapping}; f.keyFields=prev.keyFields.slice(); }
+  guessYear(f);
+}
+function guessMapping(headers){
+  // هر ستون فقط به یک فیلد داده می‌شود: ابتدا قوی‌ترین تطابق‌ها
+  const g=bestGuesses(headers), map={}, cand=[];
+  Object.keys(FIELD_EXPECTED).forEach(k=>{ map[k]=-1; const i=EXPECTED.indexOf(FIELD_EXPECTED[k]); if(i>=0&&g[i]&&g[i].idx>=0) cand.push({k,idx:g[i].idx,score:g[i].score,ord:Object.keys(FIELD_EXPECTED).indexOf(k)}); });
+  cand.sort((a,b)=>b.score-a.score||a.ord-b.ord);
+  const used=new Set();
+  cand.forEach(c=>{ if(!used.has(c.idx)){ map[c.k]=c.idx; used.add(c.idx); } });
+  if(map.taf<0&&map.taf1>=0&&map.taf2<0){ map.taf=map.taf1; map.taf1=-1; if(map.tafT<0){ map.tafT=map.taf1T; map.taf1T=-1; } }
+  return map;
+}
+function guessYear(f){
+  if(f.mapping.date<0){ f.start=null; f.end=null; return; }
+  let lo=null, hi=null;
+  for(const r of f.data){ const p=SRE.parseDate(r[f.mapping.date]); if(p.ok){ if(lo===null||p.day<lo) lo=p.day; if(hi===null||p.day>hi) hi=p.day; } }
+  f.minDay=lo; f.maxDay=hi;
+  if(lo===null){ f.start=null; f.end=null; return; }
+  const oneYear=SRE.addMonths(lo,12)-1;
+  f.start=lo; f.end=hi<=oneYear?oneYear:hi;
+  f.label=fa(SRE.dayToJalali(f.end).jy);
+}
+async function addFiles(list){
+  const host=$('srS1');
+  for(const file of list){
+    const f={id:'f'+(++SR.seq),name:file.name,status:'reading',hasOpening:true,openingDocs:new Set(),closingDocs:new Set()};
+    SR.files.push(f); renderFiles();
+    try{
+      const wb=await auditReadWorkbookFile(file);
+      f.sheetNames=wb.SheetNames.slice();
+      if(wb._rawBytes){ f.rawBytes=wb._rawBytes; f.wb=null; }
+      else f.wb=wb;
+      let best=f.sheetNames[0];
+      if(f.sheetNames.length>1){ let bs=-1; f.sheetNames.forEach(n=>{ const s=sheetScore(wb,n).score; if(s>bs){ bs=s; best=n; } }); }
+      loadSheetInto(f,best);
+      f.status='ok';
+    }catch(err){ f.status='error'; f.error=auditWorkbookMessage?auditWorkbookMessage(err):String(err&&err.message||err); }
+    if(!SR.auditId&&f.status==='ok') SR.auditId=f.id;
+    SR.mapped=false; invalidate('model');
+    if(host&&CUR_STEP==='s1') renderFiles();
+  }
+}
+function addMainFile(){
+  if(!FULL_ROWS.length) return;
+  const keys=Object.keys(FULL_ROWS[0]||{});
+  const f={id:'f'+(++SR.seq),name:'فایل اصلیِ بارگذاری‌شده'+(fname&&fname.textContent?' ('+fname.textContent+')':''),status:'ok',hasOpening:true,openingDocs:new Set(),closingDocs:new Set(),sheetNames:[]};
+  f.headers=keys.map(norm); f.data=FULL_ROWS.map(r=>keys.map(k=>r[k]??'')); f.srcRows=FULL_ROWS.map((r,i)=>i+2);
+  f.mapping=guessMapping(f.headers); f.keyFields=['taf','taf1','taf2'].filter(k=>f.mapping[k]>=0); guessYear(f);
+  SR.files.push(f); if(!SR.auditId) SR.auditId=f.id; SR.mapped=false; invalidate('model'); renderFiles();
+}
+
+/* ------------------------------------------------------- مرحلهٔ ۱: فایل‌ها */
+function renderFiles(){
+  const host=$('srS1'); if(!host) return;
+  const list=SR.files.map(f=>`
+    <div class="sr-file ${f.status}">
+      <div class="sr-file-h"><b>${e_(f.name)}</b>
+        <button type="button" class="btn ghost sr-x" data-del="${f.id}" title="حذف این فایل">✕ حذف</button></div>
+      ${f.status==='reading'?'<div class="hint">در حال خواندن…</div>':''}
+      ${f.status==='error'?`<div class="err">${e_(f.error)}</div>`:''}
+      ${f.status==='ok'?`<div class="sr-file-b">
+        ${f.sheetNames&&f.sheetNames.length>1?`<label>برگه: <select data-sheet="${f.id}">${f.sheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${e_(n)}</option>`).join('')}</select></label>`:''}
+        <span>${fa(f.data.length.toLocaleString())} ردیف</span>
+        ${f.minDay!=null?`<span>از ${fmtD(f.minDay)} تا ${fmtD(f.maxDay)}</span>`:''}
+        <label class="sr-audit"><input type="radio" name="srAudit" value="${f.id}" ${SR.auditId===f.id?'checked':''}> این فایل «سال مورد رسیدگی» است</label>
+      </div>`:''}
+    </div>`).join('');
+  host.innerHTML=`
+    <h1>اقلام سنواتی و راکد — فایل‌های سال‌ها</h1>
+    <p class="sub">فایل اکسل اسناد حسابداری <b>هر سال جداگانه</b> بارگذاری کنید: سال مورد رسیدگی، سال‌های قبل (برای پیدا کردن منشأ مانده‌ها) و در صورت وجود سال بعد (فقط برای پیگیری). فایل‌ها فقط در همین مرورگر خوانده می‌شوند.</p>
+    <div class="card">
+      <div class="drop" id="srDrop"><p class="big">فایل‌ها را اینجا رها کنید</p><p class="sub2">می‌توانید چند فایل را با هم انتخاب کنید</p>
+        <button type="button" class="btn primary" id="srPick">انتخاب فایل‌ها</button>
+        <input type="file" id="srFile" accept=".xlsx,.xls,.csv" multiple hidden></div>
+      ${typeof FULL_ROWS!=='undefined'&&FULL_ROWS.length&&!SR.files.some(f=>f.name.startsWith('فایل اصلی'))?`<p class="hint">فایلی که در صفحهٔ اول بارگذاری کرده‌اید را هم می‌توانید به‌عنوان یکی از سال‌ها اضافه کنید: <button type="button" class="btn ghost" id="srMain">افزودن فایل اصلی</button><br>اگر تاریخ‌ها در اکسل به شکل «تاریخ میلادی» قالب‌بندی شده‌اند، بهتر است همان فایل را مستقیم از دکمهٔ بالا بارگذاری کنید تا تاریخ دقیق خوانده شود.</p>`:''}
+    </div>
+    ${list?`<div class="card"><h2>فایل‌های بارگذاری‌شده</h2>${list}</div>`:''}
+    ${nav(null,'s2','ادامه: ستون‌ها و سال مالی ←',!srStepReady('s2'))}`;
+  const inp=$('srFile');
+  $('srPick').onclick=()=>inp.click();
+  inp.onchange=e=>{ const l=[...e.target.files]; e.target.value=''; if(l.length) addFiles(l); };
+  const d=$('srDrop');
+  ['dragenter','dragover'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove('over');}));
+  d.addEventListener('drop',e=>{ const l=[...e.dataTransfer.files]; if(l.length) addFiles(l); });
+  if($('srMain')) $('srMain').onclick=addMainFile;
+  host.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ SR.files=SR.files.filter(f=>f.id!==b.dataset.del); if(SR.auditId===b.dataset.del) SR.auditId=(SR.files.find(f=>f.status==='ok')||{}).id||null; SR.mapped=false; invalidate('model'); renderFiles(); paint(); });
+  host.querySelectorAll('[data-sheet]').forEach(s=>s.onchange=()=>{ const f=SR.files.find(x=>x.id===s.dataset.sheet); try{ loadSheetInto(f,s.value); }catch(err){ f.status='error'; f.error=err.message; } SR.mapped=false; invalidate('model'); renderFiles(); });
+  host.querySelectorAll('input[name=srAudit]').forEach(r=>r.onchange=()=>{ SR.auditId=r.value; invalidate('model'); renderFiles(); paint(); });
+  bindNav(host,n=>go(n));
+}
+
+/* ------------------------------------------- مرحلهٔ ۲: ستون‌ها و سال مالی */
+function renderMapping(){
+  const host=$('srS2'); if(!host) return;
+  const files=SR.files.filter(f=>f.status==='ok');
+  host.innerHTML=`
+    <h1>ستون‌ها، کلید طرف حساب و سال مالی</h1>
+    <p class="sub">برای هر فایل، ستون‌ها را بررسی کنید (برنامه حدس زده است). ستون‌های «تفصیلی» که تیک بخورند، کلید طرف حساب را می‌سازند؛ اگر هیچ‌کدام تیک نخورد، محاسبه در سطح معین و با هشدار «اختلاط اشخاص» انجام می‌شود. تاریخ شروع و پایان سال مالی را تأیید کنید (سال مالی می‌تواند غیرتقویمی باشد).</p>
+    ${files.map(f=>`
+    <div class="card sr-map" data-file="${f.id}">
+      <h2>${e_(f.name)} ${SR.auditId===f.id?'<span class="sr-tag">سال رسیدگی</span>':''}</h2>
+      <div class="sr-grid3">
+        <label>عنوان سال<input data-k="label" value="${e_(f.label||'')}"></label>
+        <label>شروع سال مالی<input data-k="start" dir="ltr" value="${f.start!=null?SRE.formatDay(f.start):''}" placeholder="1404/01/01"></label>
+        <label>پایان سال مالی<input data-k="end" dir="ltr" value="${f.end!=null?SRE.formatDay(f.end):''}" placeholder="1404/12/29"></label>
+      </div>
+      ${f.minDay!=null?`<p class="hint">اولین تاریخ در فایل: ${fmtD(f.minDay)} — آخرین تاریخ: ${fmtD(f.maxDay)}</p>`:''}
+      <div class="sr-maprows">${Object.keys(FIELD_LABEL).map(k=>`
+        <label class="sr-maprow"><span>${FIELD_LABEL[k]}${REQUIRED.includes(k)?' <b class="sr-req">*</b>':''}</span>
+          <select data-map="${k}"><option value="-1">— ندارد —</option>${f.headers.map((h,i)=>`<option value="${i}" ${f.mapping[k]===i?'selected':''}>${e_(h||('ستون '+(i+1)))}</option>`).join('')}</select>
+          ${['taf','taf1','taf2'].includes(k)?`<span class="sr-keychk"><input type="checkbox" data-keyf="${k}" ${f.keyFields.includes(k)?'checked':''} ${f.mapping[k]<0?'disabled':''}> جزء کلید طرف حساب</span>`:''}
+        </label>`).join('')}</div>
+      <div class="sr-msg" data-msg></div>
+    </div>`).join('')}
+    ${nav('s1','s3','تأیید و ادامه ←')}`;
+  host.querySelectorAll('.sr-map').forEach(card=>{
+    const f=SR.files.find(x=>x.id===card.dataset.file);
+    card.querySelectorAll('[data-map]').forEach(s=>s.onchange=()=>{
+      f.mapping[s.dataset.map]=Number(s.value);
+      if(s.dataset.map==='date') guessYear(f);
+      if(['taf','taf1','taf2'].includes(s.dataset.map)){ if(Number(s.value)>=0&&!f.keyFields.includes(s.dataset.map)) f.keyFields.push(s.dataset.map); if(Number(s.value)<0) f.keyFields=f.keyFields.filter(k=>k!==s.dataset.map); }
+      SR.mapped=false; invalidate('model'); renderMapping(); paint();
+    });
+    card.querySelectorAll('[data-keyf]').forEach(c=>c.onchange=()=>{ const k=c.dataset.keyf; f.keyFields=c.checked?[...new Set([...f.keyFields,k])]:f.keyFields.filter(x=>x!==k); SR.mapped=false; invalidate('model'); });
+    card.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{
+      const k=i.dataset.k;
+      if(k==='label') f.label=i.value.trim();
+      else { const p=SRE.parseDate(i.value); if(p.ok){ f[k]=p.day; i.classList.remove('sr-bad'); } else { f[k]=null; i.classList.add('sr-bad'); } }
+      SR.mapped=false; invalidate('model'); paint();
+    });
+  });
+  bindNav(host,()=>{
+    let okAll=true;
+    host.querySelectorAll('.sr-map').forEach(card=>{
+      const f=SR.files.find(x=>x.id===card.dataset.file), msg=card.querySelector('[data-msg]'), errs=[];
+      REQUIRED.forEach(k=>{ if(!(f.mapping[k]>=0)) errs.push('ستون «'+FIELD_LABEL[k]+'» انتخاب نشده است'); });
+      if(f.start==null||f.end==null) errs.push('تاریخ شروع یا پایان سال مالی معتبر نیست');
+      else if(f.end<f.start) errs.push('پایان سال مالی قبل از شروع آن است');
+      const used={}; Object.entries(f.mapping).forEach(([k,i])=>{ if(i>=0&&['debit','credit','date','doc','kol','moein'].includes(k)){ if(used[i]) errs.push('یک ستون برای «'+FIELD_LABEL[used[i]]+'» و «'+FIELD_LABEL[k]+'» انتخاب شده'); used[i]=k; } });
+      msg.innerHTML=errs.length?`<div class="err">${errs.map(e_).join('<br>')}</div>`:'';
+      if(errs.length) okAll=false;
+    });
+    const fs=SR.files.filter(f=>f.status==='ok'&&f.start!=null).sort((a,b)=>a.start-b.start);
+    for(let i=1;i<fs.length;i++) if(fs[i].start<=fs[i-1].end){ okAll=false; alert('بازهٔ سال مالی «'+fs[i].label+'» با «'+fs[i-1].label+'» هم‌پوشانی دارد.'); break; }
+    if(!okAll) return;
+    SR.files.forEach(f=>{ if(f.status!=='ok') return; f.canon=canonRows(f); f.oc=SRE.suggestOpeningClosing(f.canon,f.start,f.end);
+      if(!f.ocTouched){ f.openingDocs=new Set(f.oc.opening.filter(x=>x.strong).map(x=>x.doc)); f.closingDocs=new Set(f.oc.closing.map(x=>x.doc)); f.hasOpening=f.oc.opening.length>0||f.start!==Math.min(...fs.map(x=>x.start)); } });
+    SR.mapped=true; invalidate('model'); go('s3');
+  });
+}
+function canonRows(f){
+  const keys=Object.keys(FIELD_LABEL).filter(k=>f.mapping[k]>=0);
+  return f.data.map(r=>{ const o={}; keys.forEach(k=>o[k]=r[f.mapping[k]]); return o; });
+}
+
+/* ------------------------------------------- مرحلهٔ ۳: افتتاحیه و اختتامیه */
+function renderOC(){
+  const host=$('srS3'); if(!host) return;
+  const files=SR.files.filter(f=>f.status==='ok').sort((a,b)=>a.start-b.start);
+  const docRow=(f,d,kind)=>`<tr><td><input type="checkbox" data-oc="${kind}" data-file="${f.id}" value="${e_(d.doc)}" ${(kind==='open'?f.openingDocs:f.closingDocs).has(d.doc)?'checked':''}></td>
+    <td>${fa(e_(d.doc))}</td><td>${d.days.map(fmtD).join('، ')}</td><td class="sr-desc">${e_(d.desc)}</td><td>${fa(d.rows)}</td><td>${fmtB(d.debit)}</td><td>${fmtB(d.credit)}</td><td class="hint">${e_(d.reason)}</td></tr>`;
+  host.innerHTML=`
+    <h1>سند افتتاحیه و اختتامیهٔ هر سال</h1>
+    <p class="sub">افتتاحیهٔ اولین سال، مانده‌هایی با «قدمت نامشخص» می‌سازد. افتتاحیهٔ سال‌های بعد با ماندهٔ پایان سال قبل تطبیق داده می‌شود. سند اختتامیه از ماندهٔ پایان کنار گذاشته می‌شود. پیشنهادهای برنامه را تأیید یا اصلاح کنید.</p>
+    ${files.map(f=>`
+    <div class="card" data-file="${f.id}">
+      <h2>${e_(f.label||f.name)} <small class="hint">${fmtD(f.start)} تا ${fmtD(f.end)}</small></h2>
+      <label class="sr-chk"><input type="checkbox" data-hasopen="${f.id}" ${f.hasOpening?'checked':''}> این فایل سند افتتاحیه دارد</label>
+      <p class="hint">اگر فایل سند افتتاحیه ندارد، مانده‌ها از پایان سال قبل منتقل فرض می‌شوند (برای اولین سال: صفر و با هشدار).</p>
+      <h3>سند افتتاحیه</h3>
+      ${f.oc.opening.length?`<div class="scrollx"><table class="sr-t"><thead><tr><th></th><th>سند</th><th>تاریخ</th><th>شرح</th><th>ردیف</th><th>بدهکار</th><th>بستانکار</th><th>مبنای پیشنهاد</th></tr></thead><tbody>${f.oc.opening.map(d=>docRow(f,d,'open')).join('')}</tbody></table></div>`:'<p class="hint">پیشنهادی پیدا نشد.</p>'}
+      <label>شمارهٔ سندهای افتتاحیهٔ دیگر (با ویرگول جدا کنید)<input data-manual="open" data-file="${f.id}" value="${e_([...f.openingDocs].filter(d=>!f.oc.opening.some(x=>x.doc===d)).join('، '))}"></label>
+      <h3>سند اختتامیه</h3>
+      ${f.oc.closing.length?`<div class="scrollx"><table class="sr-t"><thead><tr><th></th><th>سند</th><th>تاریخ</th><th>شرح</th><th>ردیف</th><th>بدهکار</th><th>بستانکار</th><th>مبنای پیشنهاد</th></tr></thead><tbody>${f.oc.closing.map(d=>docRow(f,d,'close')).join('')}</tbody></table></div>`:'<p class="hint">سند اختتامیه‌ای پیدا نشد (اگر فایل اختتامیه ندارد مشکلی نیست).</p>'}
+      ${f.oc.tempClosing.length?`<p class="hint">سندهای «بستن حساب‌های موقت» پیدا شد (${f.oc.tempClosing.map(x=>fa(x.doc)).join('، ')})؛ این‌ها اختتامیه نیستند و روی حساب‌های اشخاص اثری ندارند.</p>`:''}
+      <label>شمارهٔ سندهای اختتامیهٔ دیگر (با ویرگول جدا کنید)<input data-manual="close" data-file="${f.id}" value="${e_([...f.closingDocs].filter(d=>!f.oc.closing.some(x=>x.doc===d)).join('، '))}"></label>
+    </div>`).join('')}
+    ${nav('s2','s4','تأیید و ادامه ←')}`;
+  host.querySelectorAll('[data-oc]').forEach(c=>c.onchange=()=>{ const f=SR.files.find(x=>x.id===c.dataset.file); const set=c.dataset.oc==='open'?f.openingDocs:f.closingDocs; c.checked?set.add(c.value):set.delete(c.value); f.ocTouched=true; invalidate('model'); paint(); });
+  host.querySelectorAll('[data-hasopen]').forEach(c=>c.onchange=()=>{ const f=SR.files.find(x=>x.id===c.dataset.hasopen); f.hasOpening=c.checked; f.ocTouched=true; invalidate('model'); paint(); });
+  host.querySelectorAll('[data-manual]').forEach(i=>i.onchange=()=>{
+    const f=SR.files.find(x=>x.id===i.dataset.file), kind=i.dataset.manual, set=kind==='open'?f.openingDocs:f.closingDocs, sug=kind==='open'?f.oc.opening:f.oc.closing;
+    [...set].forEach(d=>{ if(!sug.some(x=>x.doc===d)) set.delete(d); });
+    SRE.latinDigits(i.value).split(/[,،\s]+/).map(s=>s.trim()).filter(Boolean).forEach(d=>set.add(SRE.normCode(d)));
+    f.ocTouched=true; invalidate('model'); paint();
+  });
+  bindNav(host,()=>{ busy(host,'در حال ساخت رویدادها از اسناد',()=>{ buildModel(); go('s4'); }); });
+}
+function buildModel(){
+  const files=SR.files.filter(f=>f.status==='ok').map(f=>({id:f.id,label:f.label||f.name,name:f.name,start:f.start,end:f.end,rows:f.canon,srcRows:f.srcRows,
+    keyFields:f.keyFields,openingDocs:[...f.openingDocs],closingDocs:[...f.closingDocs],hasOpening:f.hasOpening}));
+  SR.model=SRE.build({files,auditFileId:SR.auditId});
+  const sug=SRE.suggestRoles(SR.model);
+  sug.forEach((v,k)=>{ if(!SR.roles.has(k)) SR.roles.set(k,v); });
+  SR.codingSug=SRE.suggestCoding(SR.model);
+  SR.codingOk=new Set([...SR.codingOk].filter(id=>SR.codingSug.some(s=>s.id===id)));
+  SR.result=null;
+}
+
+/* ------------------------------------------------------ مرحلهٔ ۴: حساب‌ها */
+function renderAccounts(){
+  const host=$('srS4'); if(!host) return;
+  const accs=[...SR.model.accounts.values()].sort((a,b)=>(a.kol+'|'+a.moein).localeCompare(b.kol+'|'+b.moein,'fa',{numeric:true}));
+  const q=SRE.normText(SR.view.accFilter);
+  const shown=accs.filter(a=>!q||SRE.normText(a.kol+' '+a.moein+' '+a.kolT+' '+a.moeinT).includes(q));
+  const pending=[...SR.roles.values()].filter(r=>!r.confirmed).length;
+  host.innerHTML=`
+    <h1>برچسب حساب‌ها و انتخاب حساب‌های مورد رسیدگی</h1>
+    <p class="sub">برنامه از روی عنوان حساب‌ها پیشنهاد داده است. فقط برچسب‌های <b>تأییدشده</b> در تشخیص «گردش مؤثر» (دریافت/پرداخت با بانک، صندوق یا چک) به کار می‌روند. ستون «بررسی شود» تعیین می‌کند کدام حساب‌ها در گزارش بیایند.</p>
+    <div class="card">
+      <div class="sr-row"><input class="sr-search" id="srAccQ" placeholder="جست‌وجوی کد یا عنوان حساب" value="${e_(SR.view.accFilter)}">
+        <button type="button" class="btn" id="srAccAll">تأیید همهٔ پیشنهادها${pending?' ('+fa(pending)+')':''}</button></div>
+      <div class="scrollx sr-tall"><table class="sr-t"><thead><tr><th>بررسی شود</th><th>کد کل/معین</th><th>عنوان</th><th>نوع حساب</th><th>ماهیت</th><th>وضعیت</th></tr></thead><tbody>
+      ${shown.map(a=>{ const r=SR.roles.get(a.id)||{role:'OTHER',nature:'',confirmed:false,selected:false}; return `<tr data-acc="${e_(a.id)}">
+        <td><input type="checkbox" data-sel ${r.selected?'checked':''}></td><td>${fa(e_(a.kol))} / ${fa(e_(a.moein))}</td><td>${e_(a.kolT)} — ${e_(a.moeinT)}</td>
+        <td><select data-role>${Object.keys(ROLE_LABEL).map(k=>`<option value="${k}" ${r.role===k?'selected':''}>${ROLE_LABEL[k]}</option>`).join('')}</select></td>
+        <td><select data-nat><option value="">نامشخص</option><option value="D" ${r.nature==='D'?'selected':''}>بدهکار</option><option value="C" ${r.nature==='C'?'selected':''}>بستانکار</option></select></td>
+        <td>${r.confirmed?'<span class="sr-ok">تأییدشده</span>':'<span class="sr-pend">پیشنهادی</span>'}</td></tr>`; }).join('')}
+      </tbody></table></div>
+    </div>
+    ${SR.codingSug.length?`<div class="card"><h2>تطبیق کدینگ بین سال‌ها</h2>
+      <p class="hint">این کلیدها در سال جدید افتتاحیه دارند ولی در سال قبل وجود نداشتند. اگر حساب واقعاً همان است، تأیید کنید تا منشأ مانده از سال قبل ادامه پیدا کند. بدون تأیید، زنجیره قطع و مانده «قدمت نامشخص» گزارش می‌شود. عنوان یکسان به‌تنهایی کافی نیست.</p>
+      <div class="scrollx"><table class="sr-t"><thead><tr><th>تأیید</th><th>کلید سال قبل</th><th>کلید سال جدید</th><th>قوت پیشنهاد</th><th>مبنا</th></tr></thead><tbody>
+      ${SR.codingSug.map(s=>`<tr><td><input type="checkbox" data-coding="${e_(s.id)}" ${SR.codingOk.has(s.id)?'checked':''}></td><td>${fa(e_(s.fromKey))}<br><small>${e_(s.titleOld)}</small></td><td>${fa(e_(s.toKey))}<br><small>${e_(s.titleNew)}</small></td>
+        <td>${s.strength==='strong'?'قوی':(s.strength==='medium'?'متوسط':'ضعیف')}</td><td>${e_(fa(s.reason))}</td></tr>`).join('')}
+      </tbody></table></div></div>`:''}
+    ${nav('s3','s5','ادامه: تنظیمات ←')}`;
+  const q1=$('srAccQ'); q1.oninput=()=>{ SR.view.accFilter=q1.value; clearTimeout(q1._t); q1._t=setTimeout(()=>{ renderAccounts(); const n=$('srAccQ'); n.focus(); n.setSelectionRange(n.value.length,n.value.length); },250); };
+  $('srAccAll').onclick=()=>{ SR.roles.forEach(r=>r.confirmed=true); invalidate('result'); renderAccounts(); };
+  host.querySelectorAll('tr[data-acc]').forEach(tr=>{
+    const id=tr.dataset.acc, r=SR.roles.get(id)||{role:'OTHER',nature:'',confirmed:false,selected:false}; SR.roles.set(id,r);
+    tr.querySelector('[data-sel]').onchange=e=>{ r.selected=e.target.checked; invalidate('result'); };
+    tr.querySelector('[data-role]').onchange=e=>{ r.role=e.target.value; r.confirmed=true; invalidate('result'); renderAccounts(); };
+    tr.querySelector('[data-nat]').onchange=e=>{ r.nature=e.target.value; r.confirmed=true; invalidate('result'); renderAccounts(); };
+  });
+  host.querySelectorAll('[data-coding]').forEach(c=>c.onchange=()=>{ c.checked?SR.codingOk.add(c.dataset.coding):SR.codingOk.delete(c.dataset.coding); invalidate('result'); });
+  bindNav(host,()=>{ if(![...SR.roles.values()].some(r=>r.selected)){ alert('هیچ حسابی برای بررسی انتخاب نشده است.'); return; } go('s5'); });
+}
+
+/* ------------------------------------------- مرحلهٔ ۵: تنظیمات و بازبینی */
+function currentTags(){
+  const auto=SRE.classify(SR.model,SR.roles);
+  return {auto,tagOf:e=>SR.tagOverrides.get(e.eid)||((auto.get(e.eid)||{}).tag)||'NORMAL'};
+}
+function renderSettings(){
+  const host=$('srS5'); if(!host) return;
+  const st=SR.settings, {auto,tagOf}=currentTags();
+  const selected=new Set([...SR.roles.entries()].filter(([,r])=>r.selected).map(([k])=>k));
+  SR.linkSug=SRE.suggestLinks(SR.model,tagOf).filter(l=>{ const e=SR.model.byId.get(l.laterEid); return e&&selected.has(e.account); });
+  const tagged=SR.model.events.filter(e=>selected.has(e.account)&&(auto.has(e.eid)||SR.tagOverrides.has(e.eid)));
+  const q=SRE.normText(SR.view.tagFilter);
+  const tShown=tagged.filter(e=>!q||SRE.normText(e.descRow+' '+e.descDoc+' '+e.doc+' '+e.key).includes(q)).slice(0,300);
+  const title=k=>(SR.model.keys.get(k)||{}).title||k;
+  host.innerHTML=`
+    <h1>تنظیمات و بازبینی رویدادها</h1>
+    <div class="card"><h2>آستانه‌های رکود و تاریخ مرز</h2>
+      <div class="sr-row">${[6,12,24,36].map(T=>`<label class="sr-chk"><input type="checkbox" data-th="${T}" ${st.thresholds.includes(T)?'checked':''}> ${fa(T)} ماه</label>`).join('')}
+        <label>آستانهٔ دلخواه (ماه)<input type="number" min="1" max="120" id="srThCustom" style="width:90px"></label></div>
+      <div class="sr-row"><label class="sr-chk"><input type="radio" name="srCm" value="months" ${st.cutoffMethod==='months'?'checked':''}> شمارش ماه تقویمی (پیش‌فرض)</label>
+        <label class="sr-chk"><input type="radio" name="srCm" value="days" ${st.cutoffMethod==='days'?'checked':''}> تعداد روز ثابت (۶ ماه = ۱۸۰ روز، ۱۲ ماه = ۳۶۵ روز)</label></div>
+      <div class="sr-row"><label class="sr-chk"><input type="radio" name="srInc" value="1" ${st.inclusive?'checked':''}> ثبت‌شده دقیقاً در روز مرز «قدیمی» حساب شود (پیش‌فرض)</label>
+        <label class="sr-chk"><input type="radio" name="srInc" value="0" ${!st.inclusive?'checked':''}> فقط قبل از روز مرز قدیمی است</label></div>
+      <p class="hint">مثال: پایان سال ${fmtD(SR.model.files.find(f=>f.id===SR.auditId).end)} ← مرز ۶ ماهه ${fmtD(SRE.cutoffDay(SR.model.files.find(f=>f.id===SR.auditId).end,6,st.cutoffMethod))}</p>
+    </div>
+    <div class="card"><h2>اتصال برگشت چک و برگشت سند (${fa(SR.linkSug.length)})</h2>
+      <p class="hint">اتصال تأییدشده باعث می‌شود رویداد اصلی و برگشت آن هر دو از محاسبهٔ لایه‌ها حذف شوند و محاسبه از ابتدا تکرار شود. بدون تأیید، برگشت چک «افزایش مشکوک» با قدمت نامشخص در نظر گرفته می‌شود.</p>
+      ${SR.linkSug.length?`<div class="scrollx"><table class="sr-t"><thead><tr><th>تأیید</th><th>نوع</th><th>حساب</th><th>رویداد اصلی</th><th>برگشت</th><th>مبلغ</th><th>قوت</th><th>مبنا</th></tr></thead><tbody>
+      ${SR.linkSug.map(l=>{ const a=SR.model.byId.get(l.origEid), b=SR.model.byId.get(l.laterEid); return `<tr><td><input type="checkbox" data-link="${e_(l.id)}" ${SR.linkOk.has(l.id)?'checked':''}></td>
+        <td>${l.kind==='CHECK'?'برگشت چک':'برگشت سند'}</td><td>${e_(title(l.key))}</td><td>سند ${fa(e_(a.doc))} — ${fmtD(a.day)}<br><small>${e_(a.descRow||a.descDoc)}</small></td>
+        <td>سند ${fa(e_(b.doc))} — ${fmtD(b.day)}<br><small>${e_(b.descRow||b.descDoc)}</small></td><td>${fmtB(l.amount)}</td><td>${l.strength==='strong'?'قوی':'ضعیف'}</td><td class="hint">${e_(l.reason)}</td></tr>`; }).join('')}
+      </tbody></table></div>`:'<p class="hint">پیشنهادی وجود ندارد.</p>'}
+    </div>
+    <div class="card"><h2>رویدادهای برچسب‌خورده (${fa(tagged.length)})</h2>
+      <p class="hint">برنامه این برچسب‌ها را از روی شرح و ساختار سند پیشنهاد داده است و قابل اصلاح است. برچسب «انتقال» و «برگشت چک» فقط حداکثر را محتاطانه بزرگ‌تر می‌کند و حداقل را تغییر نمی‌دهد. اصلاحیه، برگشت و انتقال «گردش مؤثر» حساب نمی‌شوند.</p>
+      <input class="sr-search" id="srTagQ" placeholder="جست‌وجو در شرح، شمارهٔ سند یا کلید" value="${e_(SR.view.tagFilter)}">
+      <div class="scrollx sr-tall"><table class="sr-t"><thead><tr><th>تاریخ</th><th>سند</th><th>حساب</th><th>بدهکار</th><th>بستانکار</th><th>شرح</th><th>برچسب</th><th>مبنای پیشنهاد</th></tr></thead><tbody>
+      ${tShown.map(e=>`<tr><td>${fmtD(e.day)}</td><td>${fa(e_(e.doc))}</td><td>${e_(title(e.key))}</td><td>${e.side==='D'?fmtB(e.amount):''}</td><td>${e.side==='C'?fmtB(e.amount):''}</td>
+        <td class="sr-desc">${e_(e.descRow||e.descDoc)}</td><td><select data-tag="${e_(e.eid)}">${SRE.TAGS.map(t=>`<option value="${t}" ${tagOf(e)===t?'selected':''}>${TAG_LABEL[t]}</option>`).join('')}</select></td>
+        <td class="hint">${SR.tagOverrides.has(e.eid)?'اصلاح دستی':e_((auto.get(e.eid)||{}).why||'')}</td></tr>`).join('')}
+      </tbody></table></div>${tagged.length>tShown.length?`<p class="hint">${fa(tShown.length)} مورد از ${fa(tagged.length)} نمایش داده شده؛ برای یافتن بقیه جست‌وجو کنید.</p>`:''}
+    </div>
+    ${nav('s4','s6','اجرای محاسبات ←')}`;
+  host.querySelectorAll('[data-th]').forEach(c=>c.onchange=()=>{ const T=Number(c.dataset.th); st.thresholds=c.checked?[...new Set([...st.thresholds,T])].sort((a,b)=>a-b):st.thresholds.filter(x=>x!==T); invalidate('result'); });
+  $('srThCustom').onchange=e=>{ const T=Math.round(Number(SRE.latinDigits(e.target.value))); if(T>0&&T<=120){ st.thresholds=[...new Set([...st.thresholds,T])].sort((a,b)=>a-b); invalidate('result'); renderSettings(); } };
+  host.querySelectorAll('input[name=srCm]').forEach(r=>r.onchange=()=>{ st.cutoffMethod=r.value; invalidate('result'); renderSettings(); });
+  host.querySelectorAll('input[name=srInc]').forEach(r=>r.onchange=()=>{ st.inclusive=r.value==='1'; invalidate('result'); });
+  host.querySelectorAll('[data-link]').forEach(c=>c.onchange=()=>{ c.checked?SR.linkOk.add(c.dataset.link):SR.linkOk.delete(c.dataset.link); invalidate('result'); });
+  host.querySelectorAll('[data-tag]').forEach(s=>s.onchange=()=>{ SR.tagOverrides.set(s.dataset.tag,s.value); invalidate('result'); });
+  const tq=$('srTagQ'); tq.oninput=()=>{ SR.view.tagFilter=tq.value; clearTimeout(tq._t); tq._t=setTimeout(()=>{ renderSettings(); const n=$('srTagQ'); n.focus(); n.setSelectionRange(n.value.length,n.value.length); },300); };
+  bindNav(host,()=>{ if(!st.thresholds.length){ alert('حداقل یک آستانهٔ رکود انتخاب کنید.'); return; } busy(host,'در حال محاسبهٔ لایه‌ها و کران‌ها',()=>{ runAnalysis(); go('s6'); }); });
+}
+function runAnalysis(){
+  const accounts=new Set([...SR.roles.entries()].filter(([,r])=>r.selected).map(([k])=>k));
+  const links=SR.linkSug.filter(l=>SR.linkOk.has(l.id)).map(l=>({origEid:l.origEid,laterEid:l.laterEid}));
+  const aliases=SR.codingSug.filter(s=>SR.codingOk.has(s.id)).map(s=>({fromKey:s.fromKey,toKey:s.toKey,toFileId:s.toFileId}));
+  SR.result=SRE.analyze(SR.model,{roles:SR.roles,tagOverrides:SR.tagOverrides,confirmedTags:new Set(SR.tagOverrides.keys()),links,aliases,accounts,
+    thresholds:SR.settings.thresholds.slice(),cutoffMethod:SR.settings.cutoffMethod,inclusive:SR.settings.inclusive});
+  SR.view.limit=200; SR.view.key=null; SR.view.T=0;
+}
+
+/* ------------------------------------------------------ مرحلهٔ ۶: گزارش‌ها */
+const TABS=[['san','اقلام سنواتی'],['stale','اقلام راکد'],['exc','استثناها'],['next','پیگیری سال بعد'],['detail','نمای ریز حساب'],['help','راهنمای خواندن گزارش']];
+function keysShown(){
+  const R=SR.result, q=SRE.normText(SR.view.filter);
+  return R.keys.filter(k=>k.endSide&&(!q||SRE.normText(k.title+' '+k.key).includes(q))).sort((a,b)=>(b.end>a.end?1:(b.end<a.end?-1:0)));
+}
+function chips(k){
+  const out=[];
+  if(k.checks&&k.checks.length) out.push('<span class="sr-chip bad">کنترل صحت ناموفق</span>');
+  if(k.unreliable) out.push('<span class="sr-chip bad">ردیف نامعتبر دارد</span>');
+  if(!k.person) out.push('<span class="sr-chip warn">فاقد تفصیلی</span>');
+  k.uncertainty.filter(u=>u.code!=='UNALLOCATED_DEC').forEach(u=>out.push(`<span class="sr-chip" title="${fmtB(u.amount)}">${UNC_LABEL[u.code]||u.code}</span>`));
+  return out.join(' ');
+}
+function headerHtml(){
+  const R=SR.result, cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
+  return `<div class="sr-head"><div><b>${e_(cfg.company||'')}</b></div>
+    <div>سال مورد رسیدگی: <b>${e_(R.audit.label)}</b> (${fmtD(R.audit.start)} تا ${fmtD(R.audit.end)}) — سال‌های زنجیره: ${R.chain.map(c=>e_(c.label)).join('، ')}${R.next?' — سال بعد: '+e_(R.next.label):''}</div>
+    <div class="hint">روش تاریخ مرز: ${R.settings.cutoffMethod==='months'?'ماه تقویمی شمسی':'تعداد روز ثابت'}؛ ثبت در روز مرز ${R.settings.inclusive?'قدیمی محسوب می‌شود':'قدیمی محسوب نمی‌شود'}. اثرانگشت محاسبات سال رسیدگی: <span dir="ltr">${e_(R.snapshotDigest)}</span></div></div>`;
+}
+function renderReports(){
+  const host=$('srS6'); if(!host) return;
+  const R=SR.result;
+  if(!R){ host.innerHTML='<div class="card"><div class="err">تنظیمات تغییر کرده است؛ برای دیدن گزارش، دوباره «اجرای محاسبات» را بزنید.</div></div>'+nav('s5',null); bindNav(host,()=>{}); return; }
+  const tab=SR.view.tab;
+  host.innerHTML=`
+    <h1>گزارش اقلام سنواتی و راکد</h1>
+    ${R.checks.length?`<div class="card"><div class="err"><b>کنترل صحت محاسبات در ${fa(R.checks.length)} مورد ناموفق بود.</b> اعداد کلیدهای علامت‌خورده قابل اتکا نیست. ${R.checks.slice(0,5).map(c=>e_((c.key||'')+' — '+c.detail)).join('<br>')}</div></div>`:'<p class="sr-okbar">✓ همهٔ کنترل‌های صحت برقرار است: جمع لایه‌ها با ماندهٔ دفتر (مبلغ و سمت) برابر است، حداقل ≤ حداکثر ≤ مانده، و فایل سال بعد اثری بر سال رسیدگی ندارد.</p>'}
+    <div class="sr-tabs">${TABS.map(([id,l])=>`<button type="button" class="${tab===id?'on':''}" data-tab="${id}">${l}</button>`).join('')}</div>
+    <div class="sr-tools"><input class="sr-search" id="srQ" placeholder="جست‌وجوی حساب یا طرف حساب" value="${e_(SR.view.filter)}">
+      <button type="button" class="btn" id="srPrint">🖨 چاپ این بخش</button><button type="button" class="btn" id="srXlsx">⬇ خروجی اکسل (همهٔ بخش‌ها)</button></div>
+    <div id="srReport" class="card">${headerHtml()}${tabHtml(tab)}</div>
+    ${nav('s5',null)}`;
+  host.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ SR.view.tab=b.dataset.tab; SR.view.limit=200; renderReports(); });
+  const q=$('srQ'); q.oninput=()=>{ SR.view.filter=q.value; clearTimeout(q._t); q._t=setTimeout(()=>{ SR.view.limit=200; const r=$('srReport'); r.innerHTML=headerHtml()+tabHtml(SR.view.tab); bindReport(); },250); };
+  $('srPrint').onclick=printReport; $('srXlsx').onclick=exportXlsx;
+  bindReport(); bindNav(host,()=>{});
+}
+function bindReport(){
+  const r=$('srReport'); if(!r) return;
+  r.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{ SR.view.limit+=200; r.innerHTML=headerHtml()+tabHtml(SR.view.tab); bindReport(); });
+  r.querySelectorAll('[data-key]').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); SR.view.key=a.dataset.key; SR.view.tab='detail'; renderReports(); });
+  r.querySelectorAll('[data-T]').forEach(b=>b.onclick=()=>{ SR.view.T=Number(b.dataset.T); r.innerHTML=headerHtml()+tabHtml(SR.view.tab); bindReport(); });
+  const ks=r.querySelector('#srKeySel'); if(ks) ks.onchange=()=>{ SR.view.key=ks.value; r.innerHTML=headerHtml()+tabHtml('detail'); bindReport(); };
+  r.querySelectorAll('[data-dtag]').forEach(s=>s.onchange=()=>{ SR.tagOverrides.set(s.dataset.dtag,s.value); const n=r.querySelector('#srRerun'); if(n) n.hidden=false; });
+  const rr=r.querySelector('#srRerun'); if(rr) rr.onclick=()=>{ const k=SR.view.key; busy($('srS6'),'در حال محاسبهٔ دوباره',()=>{ runAnalysis(); SR.view.key=k; SR.view.tab='detail'; renderReports(); }); };
+}
+function totalsRow(R,cols){ return ['D','C'].filter(s=>R.totals[s].count).map(s=>{ const t=R.totals[s]; return cols(t,s); }).join(''); }
+function tabHtml(tab){
+  const R=SR.result;
+  if(tab==='san'){
+    const ks=keysShown(), part=ks.slice(0,SR.view.limit);
+    return `<h2>اقلام سنواتی — بخشی از ماندهٔ پایان سال که منشأ آن قبل از ${fmtD(R.audit.start)} است</h2>
+    <p class="hint">چون مشخص نیست هر دریافت/پرداخت بابت کدام بدهی بوده، مبلغ سنواتی به‌صورت <b>حداقل</b> و <b>حداکثر</b> نمایش داده می‌شود. «حداکثر بدون فرض» یعنی اگر بعضی کاهش‌ها پیش‌پرداختِ فاکتورهای بعدی بوده باشند، مبلغ سنواتی تا این حد می‌تواند برسد.</p>
+    <div class="scrollx"><table class="sr-t sr-rep"><thead><tr><th>حساب / طرف حساب</th><th>ماندهٔ پایان</th><th>سمت</th><th>سنواتی حداقل</th><th>سنواتی حداکثر</th><th>قدمت نامشخص</th><th>عرض بازه</th><th>حداکثر بدون فرض</th><th>تفکیک سال منشأ (حداقل–حداکثر، تجمعی)</th><th>هشدارها و منابع عدم‌قطعیت</th></tr></thead><tbody>
+    ${part.map(k=>`<tr><td><a href="#" data-key="${e_(k.key)}">${e_(k.title)}</a><br><small dir="ltr">${e_(k.key)}</small></td><td>${fmtB(k.end)}</td><td>${side(k.endSide)}</td>
+      <td><b>${fmtB(k.sanavati.min)}</b></td><td><b>${fmtB(k.sanavati.max)}</b></td><td>${k.unknown.max>0n?fmtB(k.unknown.min)+' تا '+fmtB(k.unknown.max):'—'}</td><td>${pct(k.width)}</td>
+      <td>${k.sanavati.risk>0n?fmtB(k.sanavati.modelFreeMax):'—'}</td>
+      <td class="sr-small">${k.byOrigin.map(o=>`پیش از ${e_(o.label)}: ${fmtB(o.min)}–${fmtB(o.max)}`).join('<br>')}</td><td>${chips(k)}</td></tr>`).join('')}
+    </tbody><tfoot>${totalsRow(R,(t,s)=>`<tr><th>جمع ${fa(t.count)} حساب ${side(s)}</th><th>${fmtB(t.end)}</th><th>${side(s)}</th><th>${fmtB(t.sanMin)}</th><th>${fmtB(t.sanMax)}</th><th>${fmtB(t.unkMax)}</th><th colspan="4"></th></tr>`)}</tfoot></table></div>
+    ${ks.length>part.length?`<button type="button" class="btn" data-more>نمایش ${fa(Math.min(200,ks.length-part.length))} ردیف بعدی (از ${fa(ks.length)})</button>`:''}
+    ${R.zeroKeys?`<p class="hint">${fa(R.zeroKeys)} کلید ماندهٔ صفر دارند و در جدول نیامده‌اند.</p>`:''}`;
+  }
+  if(tab==='stale'){
+    const i=Math.min(SR.view.T,R.cuts.length-1), c=R.cuts[i], ks=keysShown(), part=ks.slice(0,SR.view.limit);
+    return `<h2>اقلام راکد — مانده با قدمت بیش از ${fa(c.T)} ماه (تاریخ مرز ${fmtD(c.cut)})</h2>
+    <div class="sr-tabs small">${R.cuts.map((x,j)=>`<button type="button" class="${j===i?'on':''}" data-T="${j}">${fa(x.T)} ماه</button>`).join('')}</div>
+    <p class="hint">مبلغ قدمت‌دار و وضعیت فعالیت حساب <b>دو شاخص مستقل</b>‌اند: گردش اخیر، قدمت ماندهٔ باقی‌مانده را از بین نمی‌برد. وضعیت فعالیت در بازهٔ ${fmtD(c.windowFrom)} تا ${fmtD(R.audit.end)} سنجیده شده است. برچسب نهایی «راکد قطعی» صادر نمی‌شود؛ تصمیم با حسابرس است.${R.anyCashConfirmed?'':' <b>هیچ حساب بانک/صندوقی تأیید نشده؛ وضعیت فعالیت نامشخص است.</b>'}</p>
+    <div class="scrollx"><table class="sr-t sr-rep"><thead><tr><th>حساب / طرف حساب</th><th>ماندهٔ پایان</th><th>سمت</th><th>قدیمی‌تر از مرز — حداقل</th><th>حداکثر</th><th>حداکثر بدون فرض</th><th>وضعیت فعالیت</th><th>آخرین گردش مؤثر قطعی</th><th>آخرین گردش محتمل</th><th>آخرین افزایش</th><th>هشدارها</th></tr></thead><tbody>
+    ${part.map(k=>{ const s=k.stale[i], a=k.activity[i]; return `<tr><td><a href="#" data-key="${e_(k.key)}">${e_(k.title)}</a></td><td>${fmtB(k.end)}</td><td>${side(k.endSide)}</td>
+      <td><b>${fmtB(s.min)}</b></td><td><b>${fmtB(s.max)}</b></td><td>${s.risk>0n?fmtB(s.modelFreeMax):'—'}</td>
+      <td><span class="sr-act ${a.status}">${ACT_LABEL[a.status]}</span></td><td>${a.lastFull?fmtD(a.lastFull.day)+' — '+fmtB(a.lastFull.amount):'—'}</td>
+      <td>${a.lastPossible?fmtD(a.lastPossible.day)+' — '+fmtB(a.lastPossible.amount)+'<br><small>'+e_(ACT_LABEL[a.lastPossible.status])+'</small>':'—'}</td><td>${fmtD(k.lastIncrease)}</td><td>${chips(k)}</td></tr>`; }).join('')}
+    </tbody><tfoot>${totalsRow(R,(t,s)=>`<tr><th>جمع ${fa(t.count)} حساب ${side(s)}</th><th>${fmtB(t.end)}</th><th>${side(s)}</th><th>${fmtB(t.stale[i].min)}</th><th>${fmtB(t.stale[i].max)}</th><th colspan="6"></th></tr>`)}</tfoot></table></div>
+    ${ks.length>part.length?`<button type="button" class="btn" data-more>نمایش ردیف‌های بعدی (از ${fa(ks.length)})</button>`:''}`;
+  }
+  if(tab==='exc'){
+    const q=SRE.normText(SR.view.filter), title=k=>k?((SR.model.keys.get(k)||{}).title||k):'';
+    const fl=id=>{ const f=SR.model.files.find(x=>x.id===id); return f?f.label:''; };
+    const list=R.exceptions.filter(x=>!q||SRE.normText((EXC_LABEL[x.code]||x.code)+' '+(x.key||'')+' '+title(x.key)+' '+(x.detail||'')).includes(q));
+    const counts={}; R.exceptions.forEach(x=>counts[x.code]=(counts[x.code]||0)+1);
+    const part=list.slice(0,SR.view.limit);
+    return `<h2>گزارش استثناها (${fa(R.exceptions.length)})</h2>
+    <div class="sr-row">${Object.entries(counts).map(([c,n])=>`<span class="sr-chip">${EXC_LABEL[c]||c}: ${fa(n)}</span>`).join(' ')}</div>
+    <div class="scrollx"><table class="sr-t"><thead><tr><th>نوع</th><th>شدت</th><th>سال</th><th>حساب</th><th>سند / سطر اکسل</th><th>مبلغ</th><th>توضیح</th></tr></thead><tbody>
+    ${part.map(x=>`<tr><td>${EXC_LABEL[x.code]||x.code}</td><td><span class="sr-sev ${x.severity}">${SEV_LABEL[x.severity]||''}</span></td><td>${e_(fl(x.fileId))}</td>
+      <td>${x.key?`<a href="#" data-key="${e_(x.key)}">${e_(title(x.key))}</a>`:e_(x.account||'')}</td><td>${x.doc?'سند '+fa(e_(x.doc)):''}${x.srcRow?' / سطر '+fa(x.srcRow):''}</td><td>${x.amount!=null?fmtB(x.amount):''}</td><td class="sr-desc">${e_(fa(x.detail||''))}</td></tr>`).join('')}
+    </tbody></table></div>${list.length>part.length?`<button type="button" class="btn" data-more>نمایش ردیف‌های بعدی (از ${fa(list.length)})</button>`:''}`;
+  }
+  if(tab==='next'){
+    if(!R.next) return '<h2>پیگیری سال بعد</h2><p class="hint">فایل سال بعد بارگذاری نشده است.</p>';
+    const ks=keysShown().filter(k=>k.next), part=ks.slice(0,SR.view.limit);
+    return `<h2>پیگیری ماندهٔ پایان سال در سال ${e_(R.next.label)} (تا ${fmtD(R.next.lastDay)})</h2>
+    <p class="hint">این بخش روی نسخه‌ای جدا از محاسبات سال رسیدگی انجام شده و هیچ اثری بر گزارش سال رسیدگی ندارد. افزایش و کاهش ناخالص جدا آمده‌اند تا خالص‌شدن آن‌ها چیزی را پنهان نکند.</p>
+    <div class="scrollx"><table class="sr-t sr-rep"><thead><tr><th>حساب / طرف حساب</th><th>ماندهٔ پایان سال رسیدگی</th><th>افزایش ناخالص سال بعد</th><th>کاهش ناخالص سال بعد</th><th>تسویه‌شده از ماندهٔ قبلی (حداقل–حداکثر)</th><th>باقی‌مانده از ماندهٔ قبلی</th><th>اختلاف افتتاحیه</th><th>اسناد مرتبط با سنوات قبل</th></tr></thead><tbody>
+    ${part.map(k=>{ const n=k.next; return `<tr><td><a href="#" data-key="${e_(k.key)}">${e_(k.title)}</a></td><td>${fmtB(k.end)} ${side(k.endSide)}</td><td>${fmtB(n.inc)}</td><td>${fmtB(n.dec)}</td>
+      <td>${n.settled?fmtB(n.settled.min)+' تا '+fmtB(n.settled.max):'—'}</td><td>${n.remaining?fmtB(n.remaining.min)+' تا '+fmtB(n.remaining.max):'—'}</td>
+      <td>${n.openingDiff&&n.openingDiff!==0n?'<span class="sr-chip warn">'+fmtB(n.openingDiff<0n?-n.openingDiff:n.openingDiff)+'</span>':'—'}</td>
+      <td class="sr-small">${n.priorAdj.map(p=>'سند '+fa(e_(p.doc))+' — '+fmtB(p.amount)+' — '+e_(p.desc)).join('<br>')||'—'}</td></tr>`; }).join('')}
+    </tbody></table></div>${ks.length>part.length?`<button type="button" class="btn" data-more>نمایش ردیف‌های بعدی</button>`:''}`;
+  }
+  if(tab==='detail') return detailHtml();
+  if(tab==='help') return helpHtml();
+  return '';
+}
+function layerTable(L){
+  if(!L.length) return '<p class="hint">لایه‌ای باقی نمانده است.</p>';
+  const ORIG={KNOWN:'مشخص',PRE_PERIOD:'قبل از دورهٔ اطلاعاتی',GAP:'پس از شکاف سال',SUSPECT:'مشکوک (اختلاف افتتاحیه/برگشت چک)',TRANSFER:'انتقالی با منشأ نامشخص'};
+  return `<table class="sr-t"><thead><tr><th>تاریخ ایجاد</th><th>بازهٔ تولد ممکن</th><th>مبلغ باقی‌مانده</th><th>سمت</th><th>وضعیت منشأ</th></tr></thead><tbody>
+  ${L.map(x=>`<tr><td>${fmtD(x.day)}</td><td>${x.early===x.late?'—':fmtD(x.early)+' تا '+fmtD(x.late)}</td><td>${fmtB(x.size)}</td><td>${side(x.side)}</td><td>${ORIG[x.origin]||x.origin}</td></tr>`).join('')}</tbody></table>`;
+}
+function detailHtml(){
+  const R=SR.result, ks=keysShown();
+  if(!SR.view.key&&ks[0]) SR.view.key=ks[0].key;
+  const k=R.keys.find(x=>x.key===SR.view.key);
+  const sel=`<label>حساب: <select id="srKeySel">${(k&&!ks.includes(k)?[k,...ks]:ks).slice(0,2000).map(x=>`<option value="${e_(x.key)}" ${x===k?'selected':''}>${e_(x.title)} — ${fmtB(x.end)}</option>`).join('')}</select></label>`;
+  if(!k) return '<h2>نمای ریز حساب</h2>'+sel;
+  const {tagOf}=currentTags();
+  const aliasFrom=new Set(SR.codingSug.filter(s=>SR.codingOk.has(s.id)&&s.toKey===k.key).map(s=>s.fromKey));
+  const evs=[]; R.chain.forEach(c=>{ (SR.model.files.find(f=>f.id===c.id).events||[]).forEach(e=>{ if(e.key===k.key||aliasFrom.has(e.key)) evs.push(e); }); });
+  const act=new Map((k.activityEvents||[]).map(a=>[a.eid,a]));
+  return `<h2>نمای ریز: ${e_(k.title)}</h2>${sel}
+    <p>ماندهٔ پایان: <b>${fmtB(k.end)} ${side(k.endSide)}</b>${k.endSide?` — سنواتی: <b>${fmtB(k.sanavati.min)}</b> تا <b>${fmtB(k.sanavati.max)}</b>`:''}</p>
+    <p class="hint">دو جدول زیر <b>دو تخصیصِ ممکن</b> از میان تخصیص‌های ممکن‌اند (کمینه: کاهش‌ها از قدیمی‌ترین لایه؛ بیشینه: از جدیدترین لایه). هیچ‌کدام به معنای «فاکتور تسویه‌شده» یا «لایهٔ قطعاً تسویه‌شده» نیست.</p>
+    ${k.uncertainty.length?`<h3>منابع عدم‌قطعیت</h3><ul>${k.uncertainty.map(u=>`<li>${UNC_LABEL[u.code]||u.code}: ${fmtB(u.amount)}</li>`).join('')}</ul>`:''}
+    <div class="sr-two"><div><h3>لایه‌های باقی‌مانده — تخصیص کمینه</h3>${layerTable(k.layers.MIN)}</div><div><h3>لایه‌های باقی‌مانده — تخصیص بیشینه</h3>${layerTable(k.layers.MAX)}</div></div>
+    <h3>رویدادها</h3><p class="hint">برچسب هر رویداد را می‌توانید اصلاح کنید؛ پس از اصلاح، «محاسبهٔ دوباره» را بزنید.</p>
+    <button type="button" class="confirm" id="srRerun" hidden>محاسبهٔ دوباره با برچسب‌های جدید</button>
+    <div class="scrollx sr-tall"><table class="sr-t"><thead><tr><th>تاریخ</th><th>سند</th><th>نوع سند</th><th>بدهکار</th><th>بستانکار</th><th>شرح</th><th>برچسب</th><th>گردش مؤثر</th></tr></thead><tbody>
+    ${evs.slice(-1500).map(e=>{ const a=act.get(e.eid); return `<tr><td>${fmtD(e.day)}</td><td>${fa(e_(e.doc))}</td><td>${e.docType==='OPENING'?'افتتاحیه':(e.docType==='CLOSING'?'اختتامیه':'')}</td>
+      <td>${e.side==='D'?fmtB(e.amount):''}</td><td>${e.side==='C'?fmtB(e.amount):''}</td><td class="sr-desc">${e_(e.descRow||e.descDoc)}</td>
+      <td>${e.docType==='NORMAL'?`<select data-dtag="${e_(e.eid)}">${SRE.TAGS.map(t=>`<option value="${t}" ${tagOf(e)===t?'selected':''}>${TAG_LABEL[t]}</option>`).join('')}</select>`:''}</td>
+      <td>${a?`<span class="sr-act ${a.status}" title="${e_(a.why)}">${ACT_LABEL[a.status]}</span>`:''}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
+}
+function helpHtml(){
+  return `<h2>راهنمای خواندن گزارش</h2><div class="sr-help">
+  <p><b>اقلام سنواتی:</b> بخشی از ماندهٔ پایان سال که منشأ آن قبل از شروع سال رسیدگی است. مانده‌ای که از افتتاحیهٔ اولین سالِ موجود آمده، سنواتی است ولی قدمت دقیقش «نامشخص» است.</p>
+  <p><b>حداقل و حداکثر:</b> در اسناد معمولاً مشخص نیست هر دریافت یا پرداخت بابت کدام بدهی بوده است. «حداقل» یعنی اگر همهٔ دریافت‌ها اول بابت قدیمی‌ترین بدهی‌ها بوده باشند؛ «حداکثر» یعنی اگر اول بابت جدیدترین‌ها بوده باشند. مبلغ واقعی بین این دو است، به شرط این‌که پیش‌پرداخت، انتقال یا اصلاحیهٔ پنهانی در کار نباشد.</p>
+  <p><b>حداکثر بدون فرض:</b> اگر برخی کاهش‌ها پیش‌پرداختِ فاکتورهای بعدی بوده باشند، مبلغ قدیمی می‌تواند تا این عدد برسد. حداقل در این حالت هم معتبر می‌ماند.</p>
+  <p><b>اقلام راکد:</b> بخشی از مانده که قدیمی‌تر از آستانه (مثلاً ۶ ماه) است. <b>وضعیت فعالیت</b> جدا نمایش داده می‌شود: «قطعی» فقط وقتی است که در سندی ساده، کاهش حساب در مقابل بانک یا صندوقِ تأییدشده ثبت شده باشد؛ دریافت چکِ وصول‌نشده و سند مرکب «محتمل» است؛ اصلاحیه، برگشت و انتقال گردش مؤثر نیستند.</p>
+  <p><b>پرداخت جزئی</b> قدمت باقی‌ماندهٔ بدهی را جوان نمی‌کند. <b>گردش اخیر حساب</b> قدمت ماندهٔ قدیمی را از بین نمی‌برد.</p>
+  <p><b>نبود تفصیلی:</b> اگر طرف حساب مشخص نباشد، محاسبه در سطح معین انجام می‌شود و قدمت به شخص مشخصی قابل انتساب نیست.</p>
+  <p><b>سال بعد:</b> فقط برای پیگیری سرنوشت مانده است و هیچ عددی از گزارش سال رسیدگی را تغییر نمی‌دهد.</p>
+  <p><b>هوش مصنوعی:</b> در این ماژول هیچ عددی با هوش مصنوعی تولید نمی‌شود؛ همهٔ ارقام با محاسبهٔ قطعی برنامه به دست آمده‌اند.</p></div>`;
+}
+function printReport(){
+  const src=$('srReport'); if(!src) return;
+  if(typeof window.__activePrintRestore==='function') window.__activePrintRestore();
+  const ph=$('printHost'); let done=false; const old=document.title;
+  const rule=document.createElement('style'); rule.textContent='@page{size:A4 landscape;margin:8mm}';
+  const restore=()=>{ if(done) return; done=true; if(window.__activePrintRestore===restore) window.__activePrintRestore=null; document.title=old; document.body.classList.remove('printing'); ph.innerHTML=''; rule.remove(); };
+  ph.innerHTML=`<div class="sr-print" dir="rtl">${src.innerHTML}</div>`;
+  ph.querySelectorAll('select').forEach(s=>{ const t=s.options[s.selectedIndex]?s.options[s.selectedIndex].text:''; s.replaceWith(document.createTextNode(t)); });
+  ph.querySelectorAll('button,.sr-tabs,input').forEach(x=>x.remove());
+  document.head.appendChild(rule); document.body.classList.add('printing'); document.title=' ';
+  if(typeof schedulePrintRestore==='function') schedulePrintRestore(restore); else window.addEventListener('afterprint',restore,{once:true});
+  window.print();
+}
+function exportXlsx(){
+  const R=SR.result, ks=R.keys.filter(k=>k.endSide).sort((a,b)=>(b.end>a.end?1:-1));
+  const N=x=>{ if(x===null||x===undefined) return ''; const n=Number(x); return Number.isSafeInteger(n)?n:String(x); };
+  const D=d=>d===U?'نامشخص':(d==null?'':SRE.formatDay(d));
+  const wb=XLSX.utils.book_new();
+  const san=[['حساب','کلید','مانده پایان','سمت','سنواتی حداقل','سنواتی حداکثر','قدمت نامشخص حداقل','قدمت نامشخص حداکثر','حداکثر بدون فرض',...R.chain.map(c=>'پیش از '+c.label+' (حداقل-حداکثر)'),'منابع عدم‌قطعیت']];
+  ks.forEach(k=>san.push([k.title,k.key,N(k.end),side(k.endSide),N(k.sanavati.min),N(k.sanavati.max),N(k.unknown.min),N(k.unknown.max),N(k.sanavati.modelFreeMax),
+    ...k.byOrigin.map(o=>o.min.toString()+' - '+o.max.toString()),k.uncertainty.map(u=>(UNC_LABEL[u.code]||u.code)+': '+u.amount.toString()).join(' | ')]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(san),'سنواتی');
+  R.cuts.forEach((c,i)=>{
+    const rows=[['حساب','کلید','مانده پایان','سمت','تاریخ مرز','قدیمی‌تر از مرز حداقل','حداکثر','حداکثر بدون فرض','وضعیت فعالیت','آخرین گردش قطعی','آخرین گردش محتمل','آخرین افزایش']];
+    ks.forEach(k=>{ const s=k.stale[i], a=k.activity[i]; rows.push([k.title,k.key,N(k.end),side(k.endSide),D(c.cut),N(s.min),N(s.max),N(s.modelFreeMax),ACT_LABEL[a.status],a.lastFull?D(a.lastFull.day):'',a.lastPossible?D(a.lastPossible.day):'',D(k.lastIncrease)]); });
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'راکد '+c.T+' ماه');
+  });
+  const ex=[['نوع','شدت','سال','کلید','سند','سطر اکسل','مبلغ','توضیح']];
+  R.exceptions.forEach(x=>{ const f=SR.model.files.find(y=>y.id===x.fileId); ex.push([EXC_LABEL[x.code]||x.code,SEV_LABEL[x.severity]||'',f?f.label:'',x.key||x.account||'',x.doc||'',x.srcRow||'',N(x.amount),x.detail||'']); });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ex),'استثناها');
+  if(R.next){
+    const nx=[['حساب','کلید','مانده پایان سال رسیدگی','افزایش ناخالص','کاهش ناخالص','تسویه حداقل','تسویه حداکثر','باقی‌مانده حداقل','باقی‌مانده حداکثر']];
+    ks.forEach(k=>{ const n=k.next; if(n&&n.settled) nx.push([k.title,k.key,N(k.end),N(n.inc),N(n.dec),N(n.settled.min),N(n.settled.max),N(n.remaining.min),N(n.remaining.max)]); });
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(nx),'سال بعد');
+  }
+  wb.Workbook={Views:[{RTL:true}]};
+  XLSX.writeFile(wb,'اقلام-سنواتی-و-راکد-'+R.audit.label+'.xlsx');
+}
+
+/* ------------------------------------------------------------- سبک‌ها */
+const css=document.createElement('style');
+css.textContent=`
+.sr-nav{display:flex;justify-content:space-between;gap:12px;margin:18px 0 30px}
+.sr-file{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.sr-file.error{border-color:var(--bad)}
+.sr-file-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sr-file-b{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:6px;font-size:.88rem;color:var(--muted)}
+.sr-audit{color:var(--ink);font-weight:600}
+.sr-x{padding:4px 10px!important;font-size:.8rem}
+.sr-tag{font-size:.75rem;background:var(--ok-bg);color:var(--ok);border-radius:8px;padding:2px 8px;margin-inline-start:8px}
+.sr-grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:8px}
+.sr-grid3 input,.sr-map select,.card label>input{display:block;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.sr-maprows{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 16px}
+.sr-maprow{display:flex;flex-direction:column;gap:3px;font-size:.85rem}
+.sr-keychk{font-size:.78rem;color:var(--accent)}
+.sr-req{color:var(--bad)}
+.sr-bad{border-color:var(--bad)!important;background:var(--bad-bg)!important}
+.sr-t{width:100%;border-collapse:collapse;font-size:.82rem}
+.sr-t th,.sr-t td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+.sr-t th{background:var(--bg);position:sticky;top:0;z-index:1}
+.sr-t tfoot th{position:static;border-top:2px solid var(--ink)}
+.sr-desc{white-space:normal;min-width:180px;max-width:360px}
+.sr-small{font-size:.75rem;white-space:nowrap}
+.sr-tall{max-height:520px;overflow:auto}
+.sr-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:8px 0}
+.sr-chk{display:inline-flex;gap:6px;align-items:center}
+.sr-search{padding:8px 10px;border:1px solid var(--line);border-radius:8px;min-width:240px;background:var(--panel);color:var(--ink);font:inherit}
+.sr-ok{color:var(--ok);font-weight:600}.sr-pend{color:var(--muted)}
+.sr-okbar{background:var(--ok-bg);color:var(--ok);padding:10px 14px;border-radius:10px;font-size:.88rem}
+.sr-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.sr-tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer;font:inherit;font-size:.85rem}
+.sr-tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sr-tabs.small button{padding:3px 12px;font-size:.8rem}
+.sr-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.sr-head{border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px;font-size:.88rem}
+.sr-chip{display:inline-block;font-size:.72rem;border-radius:8px;padding:1px 7px;background:var(--bg);border:1px solid var(--line);margin:1px;white-space:nowrap}
+.sr-chip.warn{background:#fff4d6;color:#7a5600;border-color:#e8cf8a}.sr-chip.bad{background:var(--bad-bg);color:var(--bad)}
+.sr-act{font-size:.78rem;border-radius:8px;padding:1px 7px;white-space:nowrap}
+.sr-act.FULL{background:var(--ok-bg);color:var(--ok)}.sr-act.POSSIBLE,.sr-act.PROVISIONAL{background:#fff4d6;color:#7a5600}
+.sr-act.NONE{background:var(--bad-bg);color:var(--bad)}.sr-act.UNKNOWN{background:var(--bg);color:var(--muted)}
+.sr-sev.error{color:var(--bad);font-weight:700}.sr-sev.warn{color:#9a6b00}.sr-sev.info{color:var(--muted)}
+.sr-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.sr-help p{margin:0 0 10px}
+.sr-busy{font-weight:600;color:var(--accent)}
+.sr-print{font-family:Tahoma,sans-serif;font-size:8.5pt}
+.sr-print table{width:100%;border-collapse:collapse}.sr-print th,.sr-print td{border:1px solid #999;padding:2px 4px;font-size:7.5pt}
+.sr-print a{color:inherit;text-decoration:none}
+.entry-sr-note{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+`;
+document.head.appendChild(css);
+})();
+/* <<<SR-UI-END>>> */
+</script>
