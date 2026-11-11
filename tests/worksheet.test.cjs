@@ -44,12 +44,12 @@ let x=root.querySelector('[data-row-index="1"][data-amount="dr"]');x.textContent
 let total=root.querySelector('[data-amount="sumdr"]');total.textContent='۳٬۰۰۰٬۰۰۰';total.dispatchEvent(new Event('input',{bubbles:true}));ok(root.querySelector('[data-amount="baldr"]').textContent==='۲٬۶۰۰٬۰۰۰','editable total updates balance');
 let desc=root.querySelector('[data-row-description="1"]');desc.textContent='شرح دستی';desc.dispatchEvent(new Event('input',{bubbles:true}));anaPaintSheet();ok(document.querySelector('[data-row-description="1"]').textContent==='شرح دستی','persist');
 ok(root.querySelector('[data-row-index="1"][data-amount="dr"]').textContent==='۲٬۰۰۰٬۰۰۰','edit stays in rials');
-document.querySelector('#anaAddRow').click();ok(document.querySelectorAll('#anaSheet .descs tbody tr').length===10,'add row');
+ok(document.querySelectorAll('#anaSheet .descs tbody tr').length===9&&!document.querySelector('#anaAddRow')&&!document.querySelector('#anaResetRows'),'fixed worksheet row count; add/reset controls removed');
 let ev=auditVoucherTable(data,[...data.rowMap.keys()]);let t=document.createElement('div');t.innerHTML=ev;ok(t.querySelector('tbody tr td.v-doc').textContent==='۲','sort');ok(t.textContent.includes('پرداخت اول')&&t.textContent.includes('جزئیات ردیف'),'descriptions');ok(t.querySelector('tfoot').textContent.includes('۱٬۲۰۰٬۰۰۰'),'voucher total');
 let target=document.createElement('div');document.body.appendChild(target);const pages=auditTemplatePrintPages(o,document.querySelector('#anaSheet .audit-template'),target);ok(pages.length===1,'print pages jsdom');ok(target.textContent.includes('شرح دستی')&&target.textContent.includes('۲٬۰۰۰٬۰۰۰'),'print edits');ok(!target.querySelector('.acct-meta-strip')&&!target.querySelector('.c-id'),'print metadata/reference removed');
 ok(adNatureText('رویدادهای فروش و دریافت وجه در این حساب ثبت شده است.').startsWith('طی بررسی‌های به‌عمل‌آمده، '),'nature lead-in');ok(adNatureText('حسب رسیدگی‌های انجام‌شده، رویدادهای فروش و دریافت وجه ثبت شده است.').startsWith('حسب رسیدگی‌های'),'nature lead-in not duplicated');
 ok(ROUTER_MODEL==='anthropic/claude-haiku-4.5'&&HesabrasiAI.catalog.find(x=>x.id==='open_router').model==='anthropic/claude-haiku-4.5'&&HesabrasiAI.catalog.find(x=>x.id==='anthropic').model==='claude-haiku-4-5-20251001','Claude Haiku default');ok(HesabrasiAI.pickBestAnalyticalModel([{id:'openai/gpt-5-mini'},{id:'anthropic/claude-haiku-4.5'}])==='anthropic/claude-haiku-4.5','Claude default preference');
-ok(document.getElementById('anaCategorizedDocs').textContent.includes('گردش'),'categories');ok(document.getElementById('anaQuickModelSelect')&&document.querySelectorAll('[data-rerun]').length===3,'controls');
+ok(document.getElementById('anaCategorizedDocs').textContent.includes('گردش'),'categories');ok(!document.getElementById('anaQuickTools')&&!document.getElementById('anaQuickModelSelect')&&!document.querySelector('[data-rerun]'),'active-model and quick rerun panel removed from account analysis');
 const o2={...o,templateRowEdits:{}};ANA.out.push(o2);HesabrasiAI.setActiveModel('openai/gpt-5');ok(ANA.out[1]===o2&&o.templateRowEdits[1].description==='شرح دستی','model preserves');
 const oldLevels=ACCOUNT_LEVELS,oldRows=ACCOUNT_ROWS,oldAccounts=WORKSHEET_ACCOUNTS,oldOut=SHEET_OUT,oldTarget=SAMP_TARGET,oldCfg={...SAMP_CFG};
 ACCOUNT_LEVELS=[{code:'کد حساب',title:'عنوان حساب',label:'معین'}];const sampleW={levelIdx:0,key:'100|آزمایشی',code:'100',title:'آزمایشی',keyPath:['100|آزمایشی'],pathLabel:'معین: آزمایشی'},sampleW2={levelIdx:0,key:'200|بدون انتقال',code:'200',title:'بدون انتقال',keyPath:['200|بدون انتقال'],pathLabel:'معین: بدون انتقال'};
@@ -111,9 +111,9 @@ ok(SHEET_OUT[1].count===2&&SHEET_OUT[1].sel.flatMap(x=>x.rows).includes(ACCOUNT_
 globalTarget=document.querySelector('#sampleOutputSettings .samp-val');globalTarget.value='100';document.querySelector('#applyAllSamplesBtn').click();
 ok(SHEET_OUT[0].count===2&&SHEET_OUT[0].target==='100'&&!SHEET_OUT[0].sel.flatMap(x=>x.rows).includes(ACCOUNT_ROWS[2]),'global preview controls rebuild all worksheets while preserving detected transfer exclusions');
 ACCOUNT_LEVELS=oldLevels;ACCOUNT_ROWS=oldRows;WORKSHEET_ACCOUNTS=oldAccounts;SHEET_OUT=oldOut;SAMP_TARGET=oldTarget;SAMP_CFG=oldCfg;
-ok(typeof HesabrasiAccountBenchmark?.run==='function'&&HesabrasiAccountBenchmark.compare('فروش کالا از مشتریان','فروش کالا از مشتریان').f1===1&&HesabrasiAccountBenchmark.compare('','فروش کالا از مشتریان').f1===null,'account benchmark exposes sequential runner and optional local reference comparison');
+ok(typeof HesabrasiAccountBenchmark==='undefined','account model comparison and benchmark runner removed');
 ok(typeof HesabrasiCapacityBenchmark?.run==='function','OpenRouter capacity probe API is available independently of an account');
-ok(document.getElementById('accountBenchmarkRun')&&document.getElementById('accountBenchmarkReference')&&document.getElementById('accountBenchmarkDownload'),'selected-account worksheet shows reference, run-all-models, and CSV controls');
+ok(!document.getElementById('accountBenchmarkRun')&&!document.getElementById('accountBenchmarkReference')&&!document.getElementById('accountBenchmarkDownload'),'worksheet omits OpenRouter comparison, run, and CSV controls');
 window.testResult='PASS';
 }catch(e){window.testResult=e.stack;}
 `;
