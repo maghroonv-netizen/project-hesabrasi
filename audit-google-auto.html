@@ -11071,7 +11071,12 @@ el('routerForget').onclick=()=>{
   /* OpenRouter is the featured provider; use the configured Claude default model. */
   var CATALOG = [
     { id: 'open_router', name: 'OpenRouter (پیشنهادی · همهٔ مدل‌های متنی)', base: 'https://openrouter.ai/api/v1', kind: 'openai', site: 'https://openrouter.ai/', keys: 'https://openrouter.ai/keys', model: 'anthropic/claude-haiku-4.5', featured: true, hdr: 'openrouter', dynamicModels: true },
-    { id: 'tooken_club', name: 'Tooken Club (OpenAI-compatible)', base: 'https://tooken.club/v1', kind: 'openai', site: 'https://tooken.club/', keys: 'https://tooken.club/dashboard?section=instructions', model: 'gpt-6.1-sol', featured: true, dynamicModels: true },
+    { id: 'tooken_club', name: 'Tooken Club (OpenAI-compatible)', base: 'https://tooken.club/v1', kind: 'openai', site: 'https://tooken.club/', keys: 'https://tooken.club/dashboard?section=instructions', model: 'gpt-6.1-sol', featured: true, dynamicModels: true, fallbackModels: [
+      { id: 'gpt-6.1-sol', name: 'GPT 6.1 Sol' }, { id: 'gpt-6-luna', name: 'GPT 6 Luna' }, { id: 'gpt-6-astra', name: 'GPT 6 Astra' }, { id: 'gpt-6.1-terra', name: 'GPT 6.1 Terra' },
+      { id: 'claude-fable-5-2', name: 'Claude Fable 5.2' }, { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }, { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' }, { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' }, { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
+      { id: 'deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash 1017' }, { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }, { id: 'kimi-k3.1-pro', name: 'Kimi K3.1 Pro' },
+      { id: 'glm-5.3-flash', name: 'GLM 5.3 Flash' }, { id: 'glm-5.3', name: 'GLM 5.3' }, { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }, { id: 'gemini-4-argon', name: 'Gemini 4 Argon' }
+    ] },
     { id: 'openai_api', name: 'OpenAI API (مستقیم)', base: 'https://api.openai.com/v1', kind: 'openai', site: 'https://platform.openai.com/', keys: 'https://platform.openai.com/api-keys', model: 'gpt-5-mini', featured: true },
     { id: 'iranrouter', name: 'ایران‌روتر', base: '', kind: 'iranrouter', site: 'https://iranrouter.net/', keys: 'https://iranrouter.net/', model: 'anthropic/claude-haiku-4.5', featured: true },
     { id: 'tokenrouter', name: 'TokenRouter', base: 'https://api.tokenrouter.com/v1', kind: 'openai', site: 'https://tokenrouter.com/', keys: 'https://tokenrouter.com/', model: 'openai/gpt-5-mini', featured: true },
@@ -11940,9 +11945,11 @@ el('routerForget').onclick=()=>{
     var manualInput = card.querySelector('[data-f="dynamic-model-manual"]');
     var cache = modelCache[providerId];
     if (!select || !modelInput) return;
-    var models = cache && Array.isArray(cache.textModels) ? cache.textModels : [];
+    var liveModels = cache && Array.isArray(cache.textModels) ? cache.textModels : [];
+    var useFallback = !liveModels.length && !!(cache && cache.error && Array.isArray(spec.fallbackModels) && spec.fallbackModels.length);
+    var models = liveModels.length ? liveModels : (useFallback ? spec.fallbackModels : []);
     var current = String(slot.model || spec.model);
-    if (models.length && !(cache && cache.error) && !models.some(function (m) { return m.id === current; })) {
+    if (liveModels.length && !(cache && cache.error) && !models.some(function (m) { return m.id === current; })) {
       current = models[0].id;
       slot.model = current;
       state.slots[providerId] = slot;
@@ -11952,12 +11959,12 @@ el('routerForget').onclick=()=>{
     modelInput.value = current;
     if (manualInput && (!document.activeElement || document.activeElement !== manualInput)) manualInput.value = current;
     select.innerHTML = models.length
-      ? ((cache && cache.error && !models.some(function (m) { return m.id === current; }) ? '<option value="' + esc(current) + '" selected>' + esc(current) + ' (دستی؛ تأییدنشده)</option>' : '') + models.map(function (m) { return '<option value="' + esc(m.id) + '"' + (m.id === current ? ' selected' : '') + '>' + esc(formatOptionLabel(m)) + '</option>'; }).join(''))
+      ? ((cache && cache.error && !models.some(function (m) { return m.id === current; }) ? '<option value="' + esc(current) + '" selected>' + esc(current) + ' (دستی؛ تأییدنشده)</option>' : '') + models.map(function (m) { return '<option value="' + esc(m.id) + '"' + (m.id === current ? ' selected' : '') + '>' + esc(formatOptionLabel(m) + (useFallback ? ' — کاتالوگ ارائه‌شده؛ تأیید زنده نشده' : '')) + '</option>'; }).join(''))
       : '<option value="' + esc(current) + '">' + esc(current) + '</option>';
     if (manualWrap) manualWrap.hidden = !(cache && cache.error);
     if (status) {
       if (cache && cache.loading) status.textContent = 'در حال دریافت فهرست مدل‌ها…';
-      else if (cache && cache.error && /Failed to fetch/i.test(cache.error)) status.textContent = cache.error + ' ممکن است محدودیت CORS، شبکه یا دسترسی به endpoint باشد؛ این پیام به‌تنهایی نامعتبر بودن کلید را ثابت نمی‌کند. شناسهٔ دقیق مدل را از پنل Tooken وارد کنید؛ فهرست زنده تا رفع دسترسی تأییدشده نیست.';
+      else if (cache && cache.error && /Failed to fetch/i.test(cache.error)) status.textContent = cache.error + ' ممکن است محدودیت CORS، شبکه یا دسترسی به endpoint باشد؛ این پیام به‌تنهایی نامعتبر بودن کلید را ثابت نمی‌کند. فهرست زیر از کاتالوگی است که کاربر ارائه کرده، نه پاسخ زندهٔ API؛ شناسه را انتخاب کنید اما دسترسی هر مدل هنوز زنده تأیید نشده است.';
       else if (cache && cache.error) status.textContent = cache.error + ' فهرست زنده تأیید نشد؛ در صورت اطمینان از شناسهٔ مدل در پنل Tooken، می‌توانید آن را دستی وارد کنید.';
       else if (models.length) status.textContent = '✓ ' + models.length.toLocaleString('fa-IR') + ' مدل متنی در دسترس است.';
       else status.textContent = 'کلید را وارد کنید تا مدل‌های حساب بارگذاری شوند.';
