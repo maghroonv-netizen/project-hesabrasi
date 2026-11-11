@@ -11936,11 +11936,13 @@ el('routerForget').onclick=()=>{
     var select = card.querySelector('[data-f="dynamic-model-select"]');
     var modelInput = card.querySelector('[data-f="model"]');
     var status = card.querySelector('[data-dynamic-model-status]');
+    var manualWrap = card.querySelector('[data-dynamic-model-manual-wrap]');
+    var manualInput = card.querySelector('[data-f="dynamic-model-manual"]');
     var cache = modelCache[providerId];
     if (!select || !modelInput) return;
     var models = cache && Array.isArray(cache.textModels) ? cache.textModels : [];
     var current = String(slot.model || spec.model);
-    if (models.length && !models.some(function (m) { return m.id === current; })) {
+    if (models.length && !(cache && cache.error) && !models.some(function (m) { return m.id === current; })) {
       current = models[0].id;
       slot.model = current;
       state.slots[providerId] = slot;
@@ -11948,10 +11950,18 @@ el('routerForget').onclick=()=>{
       syncPrimary();
     }
     modelInput.value = current;
+    if (manualInput && (!document.activeElement || document.activeElement !== manualInput)) manualInput.value = current;
     select.innerHTML = models.length
-      ? models.map(function (m) { return '<option value="' + esc(m.id) + '"' + (m.id === current ? ' selected' : '') + '>' + esc(formatOptionLabel(m)) + '</option>'; }).join('')
+      ? ((cache && cache.error && !models.some(function (m) { return m.id === current; }) ? '<option value="' + esc(current) + '" selected>' + esc(current) + ' (دستی؛ تأییدنشده)</option>' : '') + models.map(function (m) { return '<option value="' + esc(m.id) + '"' + (m.id === current ? ' selected' : '') + '>' + esc(formatOptionLabel(m)) + '</option>'; }).join(''))
       : '<option value="' + esc(current) + '">' + esc(current) + '</option>';
-    if (status) status.textContent = cache && cache.loading ? 'در حال دریافت فهرست مدل‌ها…' : cache && cache.error ? cache.error : models.length ? ('✓ ' + models.length.toLocaleString('fa-IR') + ' مدل متنی در دسترس است.') : 'کلید را وارد کنید تا مدل‌های حساب بارگذاری شوند.';
+    if (manualWrap) manualWrap.hidden = !(cache && cache.error);
+    if (status) {
+      if (cache && cache.loading) status.textContent = 'در حال دریافت فهرست مدل‌ها…';
+      else if (cache && cache.error && /Failed to fetch/i.test(cache.error)) status.textContent = cache.error + ' ممکن است محدودیت CORS، شبکه یا دسترسی به endpoint باشد؛ این پیام به‌تنهایی نامعتبر بودن کلید را ثابت نمی‌کند. شناسهٔ دقیق مدل را از پنل Tooken وارد کنید؛ فهرست زنده تا رفع دسترسی تأییدشده نیست.';
+      else if (cache && cache.error) status.textContent = cache.error + ' فهرست زنده تأیید نشد؛ در صورت اطمینان از شناسهٔ مدل در پنل Tooken، می‌توانید آن را دستی وارد کنید.';
+      else if (models.length) status.textContent = '✓ ' + models.length.toLocaleString('fa-IR') + ' مدل متنی در دسترس است.';
+      else status.textContent = 'کلید را وارد کنید تا مدل‌های حساب بارگذاری شوند.';
+    }
   }
 
   function paintDiagDrawer() {
@@ -12265,7 +12275,7 @@ el('routerForget').onclick=()=>{
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
       : spec.dynamicModels
         ? ('<div class="aihub-grid"><label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API Tooken Club" value="' + esc(sl.key) + '"></label>' +
-          '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
+          '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div><label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل از پنل Tooken (دستی؛ تأیید زنده نشده)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
         : ('<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
           '<label>مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '"></label>' +
@@ -12414,6 +12424,18 @@ el('routerForget').onclick=()=>{
     if (!card) return;
     var id = card.getAttribute('data-aihub-card');
     var f = t.getAttribute('data-f');
+    if (BY_ID[id] && BY_ID[id].dynamicModels && id !== 'open_router' && f === 'dynamic-model-manual') {
+      var manualId = String(t.value || '').trim();
+      if (!manualId) return;
+      var manualModel = card.querySelector('[data-f="model"]');
+      if (manualModel) manualModel.value = manualId;
+      var manualSlot = state.slots[id] || emptySlot(id);
+      manualSlot.model = manualId;
+      manualSlot.modelCustomized = true;
+      state.slots[id] = manualSlot;
+      save(); syncPrimary(); paintDynamicModelSelector(id); paintStatus();
+      return;
+    }
     if (BY_ID[id] && BY_ID[id].dynamicModels && id !== 'open_router' && f === 'dynamic-model-select') {
       var modelField = card.querySelector('[data-f="model"]');
       if (modelField && t.value) modelField.value = t.value;
