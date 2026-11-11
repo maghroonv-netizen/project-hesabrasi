@@ -11124,6 +11124,7 @@ el('routerForget').onclick=()=>{
   /* OpenRouter is the featured provider; use the configured Claude default model. */
   var CATALOG = [
     { id: 'open_router', name: 'OpenRouter (پیشنهادی · همهٔ مدل‌های متنی)', base: 'https://openrouter.ai/api/v1', kind: 'openai', site: 'https://openrouter.ai/', keys: 'https://openrouter.ai/keys', model: 'anthropic/claude-haiku-4.5', featured: true, hdr: 'openrouter', dynamicModels: true },
+    { id: 'tooken_club', name: 'Tooken Club (OpenAI-compatible)', base: 'https://tooken.club/v1', kind: 'openai', site: 'https://tooken.club/', keys: 'https://tooken.club/dashboard?section=instructions', model: 'gpt-6.1-sol', featured: true, dynamicModels: true },
     { id: 'openai_api', name: 'OpenAI API (مستقیم)', base: 'https://api.openai.com/v1', kind: 'openai', site: 'https://platform.openai.com/', keys: 'https://platform.openai.com/api-keys', model: 'gpt-5-mini', featured: true },
     { id: 'iranrouter', name: 'ایران‌روتر', base: '', kind: 'iranrouter', site: 'https://iranrouter.net/', keys: 'https://iranrouter.net/', model: 'anthropic/claude-haiku-4.5', featured: true },
     { id: 'tokenrouter', name: 'TokenRouter', base: 'https://api.tokenrouter.com/v1', kind: 'openai', site: 'https://tokenrouter.com/', keys: 'https://tokenrouter.com/', model: 'openai/gpt-5-mini', featured: true },
@@ -11633,10 +11634,11 @@ el('routerForget').onclick=()=>{
     var url = modelsUrl({ provider: providerId, key: key, model: sl.model });
     if (!url) return null;
 
-    modelCache[providerId] = existing || { raw: null, textModels: [], rejectedCount: 0, totalRaw: 0, fetchedAt: 0, loading: true, error: '', keyFp: keyFp };
+    modelCache[providerId] = (existing && existing.keyFp === keyFp) ? existing : { raw: null, textModels: [], rejectedCount: 0, totalRaw: 0, fetchedAt: 0, loading: true, error: '', keyFp: keyFp };
     modelCache[providerId].loading = true;
     modelCache[providerId].error = '';
     paintModelSelector(providerId);
+    if (providerId !== 'open_router') paintDynamicModelSelector(providerId);
 
     var ctl = new AbortController();
     var timer = setTimeout(function () { ctl.abort(); }, 15000);
@@ -11666,11 +11668,13 @@ el('routerForget').onclick=()=>{
         }
       }
       paintModelSelector(providerId);
+    if (providerId !== 'open_router') paintDynamicModelSelector(providerId);
       return entry;
     } catch (err) {
       modelCache[providerId].loading = false;
-      modelCache[providerId].error = err && err.name === 'AbortError' ? 'مهلت دریافت فهرست مدل‌ها تمام شد.' : ('عدم دریافت فهرست زنده (' + (err && err.message ? err.message : 'خطای شبکه') + ') — فهرست پیشنهادی فعال است.');
+      modelCache[providerId].error = err && err.name === 'AbortError' ? 'مهلت دریافت فهرست مدل‌ها تمام شد.' : ('عدم دریافت فهرست زنده (' + (err && err.message ? err.message : 'خطای شبکه') + ')' + (providerId === 'open_router' ? ' — فهرست پیشنهادی OpenRouter باقی می‌ماند.' : ' — مدل زنده برای این سرویس تأیید نشد.'));
       paintModelSelector(providerId);
+    if (providerId !== 'open_router') paintDynamicModelSelector(providerId);
       return null;
     } finally {
       clearTimeout(timer);
@@ -11975,6 +11979,34 @@ el('routerForget').onclick=()=>{
     }
   }
 
+  function paintDynamicModelSelector(providerId) {
+    var spec = BY_ID[providerId];
+    if (!spec || !spec.dynamicModels || providerId === 'open_router') return;
+    var root = document.getElementById('hesabrasiAiHub');
+    var card = root && root.querySelector('[data-aihub-card="' + providerId + '"]');
+    if (!card) return;
+    var slot = state.slots[providerId] || emptySlot(providerId);
+    var select = card.querySelector('[data-f="dynamic-model-select"]');
+    var modelInput = card.querySelector('[data-f="model"]');
+    var status = card.querySelector('[data-dynamic-model-status]');
+    var cache = modelCache[providerId];
+    if (!select || !modelInput) return;
+    var models = cache && Array.isArray(cache.textModels) ? cache.textModels : [];
+    var current = String(slot.model || spec.model);
+    if (models.length && !models.some(function (m) { return m.id === current; })) {
+      current = models[0].id;
+      slot.model = current;
+      state.slots[providerId] = slot;
+      save();
+      syncPrimary();
+    }
+    modelInput.value = current;
+    select.innerHTML = models.length
+      ? models.map(function (m) { return '<option value="' + esc(m.id) + '"' + (m.id === current ? ' selected' : '') + '>' + esc(formatOptionLabel(m)) + '</option>'; }).join('')
+      : '<option value="' + esc(current) + '">' + esc(current) + '</option>';
+    if (status) status.textContent = cache && cache.loading ? 'در حال دریافت فهرست مدل‌ها…' : cache && cache.error ? cache.error : models.length ? ('✓ ' + models.length.toLocaleString('fa-IR') + ' مدل متنی در دسترس است.') : 'کلید را وارد کنید تا مدل‌های حساب بارگذاری شوند.';
+  }
+
   function paintDiagDrawer() {
     var body = document.getElementById('aihubDiagBody');
     var countEl = document.getElementById('aihubDiagCount');
@@ -12114,9 +12146,19 @@ el('routerForget').onclick=()=>{
     }
     sl.enabled = true;
     save();
-    if (id === 'open_router') {
-      fetchModelsCatalog('open_router', sl.key, false);
+    if (id === 'tooken_club') {
+      var tookenCatalog = await fetchModelsCatalog(id, sl.key, true);
+      if (!tookenCatalog || !tookenCatalog.textModels || !tookenCatalog.textModels.length) {
+        sl.lastOk = false;
+        sl.lastError = 'فهرست مدل‌های Tooken Club با این کلید خوانده نشد؛ کلید و دسترسی API را بررسی کنید.';
+        save(); paintStatus();
+        return { ok: false, detail: sl.lastError };
+      }
+      noteOk(id); syncPrimary();
+      logLine('اتصال Tooken Club با کلید تأیید شد؛ ' + tookenCatalog.textModels.length + ' مدل متنی دریافت شد. برای این آزمایش هیچ متن تولیدی ارسال نشد.');
+      return { ok: true, text: 'OpenAI-compatible model catalog loaded.' };
     }
+    if (BY_ID[id].dynamicModels) fetchModelsCatalog(id, sl.key, false);
     var sx = stampFrom(hydrate(id), { p: null });
     var gemini = isGemini(sx);
     var reason = isReasoningId(sx.model, null);
@@ -12274,7 +12316,10 @@ el('routerForget').onclick=()=>{
 
     var bodyFields = spec.id === 'open_router'
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
-      : ('<div class="aihub-grid">' +
+      : spec.dynamicModels
+        ? ('<div class="aihub-grid"><label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API Tooken Club" value="' + esc(sl.key) + '"></label>' +
+          '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
+        : ('<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
           '<label>مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '"></label>' +
         '</div>');
@@ -12318,6 +12363,7 @@ el('routerForget').onclick=()=>{
     feat.innerHTML = featured.map(cardHtml).join('');
     rest.innerHTML = other.map(cardHtml).join('');
     paintModelSelector('open_router');
+    CATALOG.forEach(function (spec) { if (spec.dynamicModels && spec.id !== 'open_router') paintDynamicModelSelector(spec.id); });
   }
 
   function onHubClick(ev) {
@@ -12346,7 +12392,7 @@ el('routerForget').onclick=()=>{
       save();
       syncPrimary();
       paintStatus();
-      if (id === 'open_router' && state.slots[id].key) fetchModelsCatalog('open_router', state.slots[id].key, false);
+      if (BY_ID[id].dynamicModels && state.slots[id].key) fetchModelsCatalog(id, state.slots[id].key, false);
       logLine(BY_ID[id].name + ' با مدل «' + state.slots[id].model + '» ذخیره شد. برای تأیید نهایی، آزمایش اتصال را بزنید.');
     } else if (act === 'test') {
       btn.disabled = true;
@@ -12390,6 +12436,22 @@ el('routerForget').onclick=()=>{
       }
       return;
     }
+    if (id !== 'open_router' && BY_ID[id] && BY_ID[id].dynamicModels && f === 'key') {
+      var dynamicKey = cleanAsciiToken(t.value);
+      if (t.value && t.value !== dynamicKey) t.value = dynamicKey;
+      if (dynamicKey.length >= 12) {
+        var dynamicSlot = state.slots[id] || emptySlot(id);
+        dynamicSlot.key = dynamicKey;
+        dynamicSlot.enabled = true;
+        var dynamicEnabled = card.querySelector('[data-f="enabled"]');
+        if (dynamicEnabled) dynamicEnabled.checked = true;
+        state.slots[id] = dynamicSlot;
+        save(); syncPrimary();
+        clearTimeout(keyFetchTimers[id]);
+        keyFetchTimers[id] = setTimeout(function () { fetchModelsCatalog(id, dynamicKey, true); }, 420);
+      }
+      return;
+    }
     if (id === 'open_router' && f === 'model') {
       readCard('open_router');
       save();
@@ -12405,6 +12467,16 @@ el('routerForget').onclick=()=>{
     if (!card) return;
     var id = card.getAttribute('data-aihub-card');
     var f = t.getAttribute('data-f');
+    if (BY_ID[id] && BY_ID[id].dynamicModels && id !== 'open_router' && f === 'dynamic-model-select') {
+      var modelField = card.querySelector('[data-f="model"]');
+      if (modelField && t.value) modelField.value = t.value;
+      var dynamicSlot = state.slots[id] || emptySlot(id);
+      dynamicSlot.model = t.value || dynamicSlot.model;
+      dynamicSlot.modelCustomized = true;
+      state.slots[id] = dynamicSlot;
+      readCard(id); save(); syncPrimary(); paintDynamicModelSelector(id); paintStatus();
+      return;
+    }
     if (id === 'open_router' && f === 'model-scope') {
       uiFilterState.scope = t.value || 'all';
       paintModelSelector('open_router');
@@ -12479,8 +12551,8 @@ el('routerForget').onclick=()=>{
     var box = document.createElement('div');
     box.id = 'hesabrasiAiHub';
     box.innerHTML =
-      '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال مستقیم به OpenRouter و مدل‌های تحلیلی</h3>' +
-      '<p class="aihub-note">پیش‌فرض روی <b>OpenRouter + Claude Haiku 4.5 (anthropic/claude-haiku-4.5)</b> است. پس از واردکردن کلید OpenRouter، فهرست مدل‌های متنی مجاز اکانت برای انتخاب بارگذاری می‌شود.</p>' +
+      '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال OpenRouter، Tooken Club و ارائه‌دهندگان سازگار</h3>' +
+      '<p class="aihub-note">پیش‌فرض روی <b>OpenRouter + Claude Haiku 4.5</b> است. در کارت Tooken Club کافی است کلید خود را وارد کنید؛ فهرست مدل‌های حساب برای انتخاب بارگذاری می‌شود و آزمایش اتصال فقط فهرست را می‌خواند، نه اینکه درخواست تولیدی پولی بفرستد.</p>' +
       '<div id="aihubFeatured"></div>' +
       '<details><summary>سایر سکوهای سازگار (بیش از ۵۰ سکوی OpenAI-Compatible)</summary><div id="aihubRest"></div></details>' +
       '<div class="aihub-toolbar">' +
