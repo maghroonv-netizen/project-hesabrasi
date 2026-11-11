@@ -5050,11 +5050,13 @@ function anaAIReady(){return !!ROUTER_KEY;}
 async function routerRequest(messages,maxTokens=4096,meta={}){
   if(!ROUTER_KEY) return {ok:false,detail:'ابتدا کلید را در پنل بالای سایت فعال کنید.'};
   if(messages.some(m=>String(m.content||'').length>180000)) return {ok:false,detail:'پیام از حد ایمن ارسال بزرگ‌تر است؛ درخواست ارسال نشد.'};
-  const usageEntry=typeof usageStart==='function'?usageStart(messages,meta):null;
-  let usageData=null,usageStatus='network_unknown';
+  const requestBody=JSON.stringify({model:ROUTER_MODEL,messages,temperature:0.2,max_tokens:maxTokens}),operationId=usageNewId('operation');let usageEntry=null;
+  try{usageEntry=usageStart(messages,{...meta,model:ROUTER_MODEL,provider:'iranrouter',endpointFamily:'openai-compatible',operationId,jobIndex:1,attemptIndex:1,reason:meta.reason||'initial',requestChars:requestBody.length,requestUtf8Bytes:new TextEncoder().encode(requestBody).length});}catch(error){return {ok:false,detail:error.message};}
+  let usageData=null,usageStatus='network_usage_unknown',usageHttpStatus=null;
   const ctl=new AbortController(), timer=setTimeout(()=>ctl.abort(),AI_TIMEOUT_MS);
   try{
-    const res=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+ROUTER_KEY},body:JSON.stringify({model:ROUTER_MODEL,messages,temperature:0.2,max_tokens:maxTokens}),signal:ctl.signal});
+    const res=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+ROUTER_KEY},body:requestBody,signal:ctl.signal});
+    usageHttpStatus=res.status;if(usageEntry){usageEntry.httpStatus=res.status;usageEntry.transportStatus='response';usageEntry.updatedAt=new Date().toISOString();usageSave();}
     let data;try{data=await res.json();}catch{data={};}
     usageData=data;usageStatus=res.ok?'received':'HTTP '+res.status;
     if(!res.ok){
@@ -5079,7 +5081,7 @@ async function routerRequest(messages,maxTokens=4096,meta={}){
     if(!text)usageStatus='empty_response';
     return text?{ok:true,text,usage:data.usage||null,usageId:usageEntry?.id}:{ok:false,detail:'پاسخ متنی دریافت نشد.'};
   }catch(err){usageStatus=err.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';return {ok:false,detail:err.name==='AbortError'?'مهلت ۱۲۰ ثانیه‌ای تمام شد.':'خطای شبکه؛ اتصال یا محدودیت CORS سرویس را بررسی کنید.'};}
-  finally{clearTimeout(timer);if(typeof usageComplete==='function')usageComplete(usageEntry,usageData,usageStatus);}
+  finally{clearTimeout(timer);if(typeof usageComplete==='function')usageComplete(usageEntry,usageData,usageStatus);if(usageEntry&&usageHttpStatus===null)usageEntry.transportStatus=usageStatus==='timeout_usage_unknown'?'timeout':'network-error';if(usageEntry&&usageHttpStatus!==null)usageEntry.transportStatus='response';if(usageEntry&&usageEntry.transportStatus!=='sending')usageSave();}
 }
 // تقسیم صرفاً بر اساس طول/مرز متن است؛ تفسیر و تلخیص فقط با AI انجام می‌شود.
 function anaSplitEvidence(text,limit=100000){
@@ -6153,59 +6155,82 @@ const USAGE_DEFAULT_PRICES={
   'gpt-5-mini':{input:0.25,output:2.00},
   'gpt-5':{input:1.25,output:10.00}
 };
-let USAGE={started:new Date().toISOString(),entries:[],prices:{...USAGE_DEFAULT_PRICES},fx:null},USAGE_PERSISTED=true;
-try{const saved=JSON.parse(localStorage.getItem(USAGE_STORAGE)||'null');if(saved&&Array.isArray(saved.entries)&&saved.prices){USAGE=saved;USAGE.prices={...USAGE_DEFAULT_PRICES,...saved.prices};}}catch{USAGE_PERSISTED=false;}
-for(const e of USAGE.entries)if(e.status==='sending')e.status='interrupted_usage_unknown';
-function usageSave(){try{localStorage.setItem(USAGE_STORAGE,JSON.stringify(USAGE));USAGE_PERSISTED=true;}catch{USAGE_PERSISTED=false;}}
+let USAGE={schemaVersion:2,started:new Date().toISOString(),entries:[],prices:{...USAGE_DEFAULT_PRICES},fx:null},USAGE_PERSISTED=true,USAGE_LOAD_OK=true;
+try{const raw=localStorage.getItem(USAGE_STORAGE);if(raw){const saved=JSON.parse(raw);if(!saved||!Array.isArray(saved.entries)||!saved.prices)throw Error('invalid usage ledger');USAGE=saved;USAGE.schemaVersion=2;USAGE.prices={...USAGE_DEFAULT_PRICES,...saved.prices};}}catch{USAGE_PERSISTED=false;USAGE_LOAD_OK=false;}
+let USAGE_INTERRUPTED=false;for(const e of USAGE.entries)if(e.status==='sending'){e.status='interrupted_usage_unknown';e.transportStatus='interrupted';e.usageState='unknown';e.billingState='unknown';e.updatedAt=new Date().toISOString();USAGE_INTERRUPTED=true;}
+function usageMergeLatest(){
+  try{const raw=localStorage.getItem(USAGE_STORAGE);if(!raw)return true;const saved=JSON.parse(raw);if(!saved||!Array.isArray(saved.entries)||!saved.prices)throw Error('invalid usage ledger');const merged=new Map(saved.entries.filter(e=>e&&e.id).map(e=>[e.id,e]));for(const e of USAGE.entries){if(!e||!e.id)continue;const old=merged.get(e.id);if(!old||String(e.updatedAt||e.at||'')>=String(old.updatedAt||old.at||''))merged.set(e.id,e);}USAGE.entries=[...merged.values()].sort((a,b)=>String(a.at||'').localeCompare(String(b.at||'')));return true;}catch{USAGE_PERSISTED=false;return false;}
+}
+function usageSave(replace=false){try{if(!replace&&!usageMergeLatest())return false;localStorage.setItem(USAGE_STORAGE,JSON.stringify(USAGE));USAGE_PERSISTED=true;return true;}catch{USAGE_PERSISTED=false;return false;}}
+if(USAGE_INTERRUPTED)usageSave();
 function usageNumber(n){return n===null||n===undefined?'نامشخص':Number(n).toLocaleString('fa-IR',{maximumFractionDigits:8});}
 function usageFinite(v){return typeof v==='number'&&Number.isFinite(v)&&v>=0?v:null;}
+function usageNewId(prefix='id'){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);}
 function usageAccount(purpose){
-  if(purpose==='test'||purpose==='capacity-probe'||typeof ANA==='undefined')return purpose==='capacity-probe'?'ظرفیت مدل — دادهٔ ساختگی':'عمومی';
+  if(purpose==='test'||purpose==='capacity-probe'||purpose==='catalog'||typeof ANA==='undefined')return purpose==='capacity-probe'?'ظرفیت مدل — دادهٔ ساختگی':purpose==='catalog'?'فهرست مدل‌ها':'عمومی';
   const o=ANA.out&&ANA.out[ANA.active];if(!o)return 'عمومی';
   if(!o.usageAlias){const used=new Set([...USAGE.entries.map(e=>e.account),...(ANA.out||[]).map(x=>x.usageAlias)].filter(x=>x&&x!=='عمومی'));let n=1;while(used.has('حساب '+n))n++;o.usageAlias='حساب '+n;}
   return o.usageAlias;
 }
 function usageStart(messages,meta={}){
-  const system=String(messages.find(m=>m.role==='system')?.content||'');
+  if(!USAGE_LOAD_OK||!usageMergeLatest()){USAGE_LOAD_OK=false;throw Error('گزارش قبلی مصرف از مرورگر خوانده نشد؛ برای جلوگیری از ارسال بدون ledger، تا زمان رفع دسترسی به فضای ذخیره‌سازی درخواست ارسال نمی‌شود.');}
+  const system=String((messages||[]).find(m=>m.role==='system')?.content||'');
   let purpose=meta.purpose||((typeof NATURE_SYSTEM!=='undefined'&&system===NATURE_SYSTEM)?'nature':(typeof NATURE_NOTES_SYSTEM!=='undefined'&&system===NATURE_NOTES_SYSTEM)?'nature-notes':'other');
-  const entry={id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),at:new Date().toISOString(),model:meta.model||ROUTER_MODEL,purpose,account:usageAccount(purpose),status:'sending',input:null,output:null,total:null,usageReported:false,accepted:null};
-  USAGE.entries.push(entry);usageSave();return entry;
+  const now=new Date().toISOString(),id=usageNewId('attempt');
+  const entry={schemaVersion:1,recordType:'http_attempt',id,attemptId:id,operationId:meta.operationId||usageNewId('operation'),jobIndex:Number.isInteger(meta.jobIndex)?meta.jobIndex:null,attemptIndex:Number.isInteger(meta.attemptIndex)?meta.attemptIndex:1,reason:meta.reason||'initial',provider:meta.provider||'unknown',endpointFamily:meta.endpointFamily||'unknown',requestClass:meta.requestClass||'generation',model:meta.model||ROUTER_MODEL,purpose,account:usageAccount(purpose),at:now,startedAt:now,updatedAt:now,endedAt:null,requestChars:usageFinite(meta.requestChars),requestUtf8Bytes:usageFinite(meta.requestUtf8Bytes),httpStatus:null,transportStatus:'sending',status:'sending',input:null,output:null,total:null,usageReported:false,usageState:'unknown',billingState:'unknown',adaptiveRate:meta.adaptiveRate||null,accepted:null};
+  USAGE.entries.push(entry);
+  if(!usageSave()){USAGE.entries.pop();throw Error('گزارش پایدار تلاش API در مرورگر در دسترس نیست؛ برای جلوگیری از ارسال بدون ثبت، درخواست ارسال نشد. فضای ذخیره‌سازی مرورگر را بررسی و دوباره تلاش کنید.');}
+  return entry;
+}
+async function usageFetch(url,options,meta={}){
+  const body=typeof options?.body==='string'?options.body:'',messages=Array.isArray(meta.messages)?meta.messages:[],{beforeFetch,...recordMeta}=meta;
+  const entry=usageStart(messages,{...recordMeta,requestChars:body.length,requestUtf8Bytes:new TextEncoder().encode(body).length});
+  try{
+    if(typeof beforeFetch==='function')beforeFetch(entry);
+    const response=await fetch(url,options);entry.httpStatus=response.status;entry.transportStatus='response';entry.updatedAt=new Date().toISOString();usageSave();let finished=false;
+    return {response,entry,finish(data,status){if(finished)return;finished=true;usageComplete(entry,data,status);}};
+  }catch(error){const status=error&&error.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';usageComplete(entry,null,status);if(error&&typeof error==='object')error.usageId=entry.id;throw error;}
 }
 function usageComplete(entry,data,status){
   if(!entry)return;
   const u=data&&data.usage||{};
   entry.input=usageFinite(u.prompt_tokens??u.input_tokens);entry.output=usageFinite(u.completion_tokens??u.output_tokens);
   entry.total=usageFinite(u.total_tokens);if(entry.total===null&&entry.input!==null&&entry.output!==null)entry.total=entry.input+entry.output;
-  entry.usageReported=entry.input!==null||entry.output!==null||entry.total!==null;entry.status=status;usageSave();
+  entry.usageReported=entry.input!==null||entry.output!==null||entry.total!==null;entry.usageState=entry.usageReported?'reported':entry.requestClass==='catalog'?'not_applicable':'unknown';entry.status=status;entry.endedAt=new Date().toISOString();entry.updatedAt=entry.endedAt;
+  if(entry.transportStatus==='sending')entry.transportStatus=status==='timeout_usage_unknown'?'timeout':status==='network_usage_unknown'?'network-error':entry.httpStatus!==null?'response':'unknown';
+  entry.billingState=entry.usageReported?'estimate_if_rate_known':'unknown';usageSave();
 }
-function usageDecision(id,accepted){const entry=USAGE.entries.find(e=>e.id===id);if(entry){entry.accepted=accepted;usageSave();}}
+function usageDecision(id,accepted){const entry=USAGE.entries.find(e=>e.id===id||e.attemptId===id);if(entry){entry.accepted=accepted;entry.updatedAt=new Date().toISOString();usageSave();}}
 function usageEstimate(entry){
-  const p=USAGE.prices[entry.model];
+  const p=entry.adaptiveRate||USAGE.prices[entry.model];
   if(!p||entry.input===null||entry.output===null||usageFinite(p.input)===null||usageFinite(p.output)===null)return null;
   return (entry.input*p.input+entry.output*p.output)/1000000;
 }
 function usageGroup(entries){
-  const known=entries.filter(e=>e.usageReported),estimate=entries.map(usageEstimate);
-  return {calls:entries.length,reported:known.length,unknown:entries.length-known.length,input:entries.reduce((n,e)=>n+(e.input??0),0),output:entries.reduce((n,e)=>n+(e.output??0),0),total:entries.reduce((n,e)=>n+(e.total??0),0),estimatedCalls:estimate.filter(n=>n!==null).length,usd:estimate.reduce((n,v)=>n+(v??0),0)};
+  const attempts=entries.filter(e=>e.recordType==='http_attempt'),legacy=entries.filter(e=>e.recordType!=='http_attempt'),reported=attempts.filter(e=>e.usageReported),metered=attempts.filter(e=>e.requestClass!=='catalog'),estimates=attempts.map(usageEstimate);
+  const knownSum=field=>metered.filter(e=>e[field]!==null&&e[field]!==undefined).reduce((n,e)=>n+e[field],0),unknownCount=field=>metered.filter(e=>e[field]===null||e[field]===undefined).length;
+  return {calls:attempts.length,legacy:legacy.length,reported:reported.length,unknown:attempts.filter(e=>e.usageState==='unknown').length,notApplicable:attempts.filter(e=>e.usageState==='not_applicable').length,input:knownSum('input'),inputUnknown:unknownCount('input'),output:knownSum('output'),outputUnknown:unknownCount('output'),total:knownSum('total'),totalUnknown:unknownCount('total'),estimatedCalls:estimates.filter(n=>n!==null).length,costUnknown:estimates.filter(n=>n===null).length,usd:estimates.reduce((n,v)=>n+(v??0),0)};
 }
-function usagePurpose(p){return ({counterparty:'بررسی طرف حساب حل‌نشده',nature:'شرح ماهیت','nature-notes':'شرح ماهیت — مرحله میانی',analysis:'آنالیز — گروه‌بندی','analysis-repair':'آنالیز — تکمیل','capacity-probe':'آزمون ظرفیت مدل با دادهٔ ساختگی',test:'تست اتصال',other:'سایر'})[p]||'سایر';}
+function usageCostLabel(group){return group.estimatedCalls?'$'+usageNumber(group.usd)+' برای '+usageNumber(group.estimatedCalls)+' تلاش':'برآوردی برای هزینه در دسترس نیست';}
+function usagePurpose(p){return ({counterparty:'بررسی طرف حساب حل‌نشده',nature:'شرح ماهیت','nature-notes':'شرح ماهیت — مرحله میانی',analysis:'آنالیز — گروه‌بندی','analysis-repair':'آنالیز — تکمیل','capacity-probe':'آزمون ظرفیت مدل با دادهٔ ساختگی',catalog:'دریافت فهرست مدل‌ها',test:'تست اتصال',other:'سایر'})[p]||'سایر';}
 function usageRender(){
   const body=document.getElementById('usageContent');if(!body)return;const total=usageGroup(USAGE.entries);
-  const groups=new Map();for(const e of USAGE.entries){const key=e.account+' | '+usagePurpose(e.purpose);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);}
-  body.innerHTML=`<p>شروع دوره: ${esc(USAGE.started)} · ${usageNumber(total.calls)} درخواست ارسال‌شده؛ ${usageNumber(total.reported)} با گزارش مصرف؛ ${usageNumber(total.unknown)} بدون گزارش مصرف.</p><p><b>جمع توکن‌های معلوم:</b> ورودی ${usageNumber(total.input)} · خروجی ${usageNumber(total.output)} · کل گزارش‌شده/قابل محاسبه ${usageNumber(total.total)}.</p><p><b>برآورد نرخ عادی برای ${usageNumber(total.estimatedCalls)} درخواست:</b> $${usageNumber(total.usd)}${USAGE.fx!==null?' · '+usageNumber(total.usd*USAGE.fx)+' تومان':''}. مصرف نامعلوم در این جمع نیست؛ تخفیف کش، تعرفه ویژه و مبلغ قطعی کیف پول تأیید نشده‌اند.</p><small>${USAGE_PERSISTED?'ثبت محلی در این مرورگر فعال است.':'ذخیرهٔ محلی در دسترس نیست؛ پیش از بستن صفحه، گزارش دانلود کنید.'} کلید، نام حساب و متن اسناد در گزارش مصرف ذخیره نمی‌شوند. قبل از تغییر فایل یا مرورگر، CSV دانلود کنید؛ تداوم ذخیره در فایل‌های محلی تضمین نمی‌شود. مصرف گذشتهٔ کلید یا درخواست‌های خارج از این صفحه قابل بازیابی نیست. برای ثبت این دوره فقط یک تب از برنامه باز نگه دارید.</small><div class="usage-scroll"><table><thead><tr><th>حساب / مرحله</th><th>درخواست</th><th>ورودی معلوم</th><th>خروجی معلوم</th><th>بدون usage</th><th>برآورد دلار</th></tr></thead><tbody>${[...groups].map(([label,items])=>{const s=usageGroup(items);return `<tr><td>${esc(label)}</td><td>${usageNumber(s.calls)}</td><td>${usageNumber(s.input)}</td><td>${usageNumber(s.output)}</td><td>${usageNumber(s.unknown)}</td><td>${usageNumber(s.usd)} (${usageNumber(s.estimatedCalls)} درخواست)</td></tr>`;}).join('')}</tbody></table><h3>جزئیات آخرین ۱۰۰ درخواست — فایل CSV شامل همهٔ درخواست‌هاست</h3><table><thead><tr><th>زمان / مدل</th><th>مرحله</th><th>حساب</th><th>ورودی</th><th>خروجی</th><th>وضعیت سرویس</th><th>اعتبار ساختار خروجی</th></tr></thead><tbody>${USAGE.entries.slice(-100).reverse().map(e=>`<tr><td dir="ltr">${esc(e.at)}<br>${esc(e.model)}</td><td>${usagePurpose(e.purpose)}</td><td>${esc(e.account)}</td><td>${usageNumber(e.input)}</td><td>${usageNumber(e.output)}</td><td>${esc(e.status)}</td><td>${e.accepted===null?'ثبت نشده':e.accepted?'پذیرفته':'رد شده'}</td></tr>`).join('')}</tbody></table></div>`;
+  const groups=new Map();for(const e of USAGE.entries){const key=(e.account||'عمومی')+' | '+usagePurpose(e.purpose)+' | '+(e.provider||'تاریخی/نامشخص')+' / '+(e.model||'مدل نامشخص');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);}
+  const costText=usageCostLabel(total)+'؛ '+usageNumber(total.costUnknown)+' هزینه نامعلوم. مبلغ‌های تخمینی صورتحساب قطعی نیستند.';
+  body.innerHTML=`<p>شروع دوره: ${esc(USAGE.started)} · <b>${usageNumber(total.calls)} تلاش واقعی ثبت‌شده</b>؛ ${usageNumber(total.unknown)} تلاش با مصرف توکن نامعلوم؛ ${usageNumber(total.notApplicable)} درخواست فهرست مدل با شمارش توکن نامربوط؛ ${usageNumber(total.legacy)} رکورد تاریخی که تعداد تلاش واقعی آن قابل بازیابی نیست.</p><p><b>توکن‌های تلاش‌های جدید:</b> ورودی معلوم ${usageNumber(total.input)} (نامعلوم در ${usageNumber(total.inputUnknown)} تلاش) · خروجی معلوم ${usageNumber(total.output)} (نامعلوم در ${usageNumber(total.outputUnknown)} تلاش) · کل معلوم ${usageNumber(total.total)} (نامعلوم در ${usageNumber(total.totalUnknown)} تلاش).</p><p><b>برآورد هزینه:</b> ${costText} مصرف نامعلوم در هیچ جمعی صفر فرض نمی‌شود.</p><small>${USAGE_PERSISTED?'ثبت محلی پیش از ارسال انجام می‌شود.':'ذخیرهٔ محلی در دسترس نیست؛ ارسال‌های پولی متوقف می‌شوند.'} کلید، نام حساب و متن درخواست/پاسخ در ledger ذخیره نمی‌شوند. گزارش قدیمی در سطح درخواست منطقی بود و از شمار تلاش‌های آن نمی‌توان مطمئن شد. پیش از تغییر فایل یا مرورگر CSV دانلود کنید؛ برای دقت شمارش، فقط یک تب برنامه را اجرا کنید.</small><div class="usage-scroll"><table><thead><tr><th>حساب / مرحله</th><th>تلاش واقعی</th><th>رکورد تاریخی</th><th>ورودی معلوم (نامعلوم)</th><th>خروجی معلوم (نامعلوم)</th><th>مصرف نامعلوم</th><th>هزینهٔ معلوم / نامعلوم</th></tr></thead><tbody>${[...groups].map(([label,items])=>{const g=usageGroup(items);return `<tr><td>${esc(label)}</td><td>${usageNumber(g.calls)}</td><td>${usageNumber(g.legacy)}</td><td>${usageNumber(g.input)} (${usageNumber(g.inputUnknown)})</td><td>${usageNumber(g.output)} (${usageNumber(g.outputUnknown)})</td><td>${usageNumber(g.unknown)}</td><td>${esc(usageCostLabel(g))} / ${usageNumber(g.costUnknown)} نامعلوم</td></tr>`;}).join('')}</tbody></table><h3>جزئیات آخرین ۱۰۰ رکورد — CSV شامل همهٔ تلاش‌ها و رکوردهای تاریخی است</h3><table><thead><tr><th>زمان</th><th>عملیات / بخش / تلاش</th><th>سرویس و مدل واقعی</th><th>اندازهٔ درخواست</th><th>انتقال / HTTP</th><th>ورودی / خروجی</th><th>پذیرش خروجی</th></tr></thead><tbody>${USAGE.entries.slice(-100).reverse().map(e=>`<tr><td dir="ltr">${esc(e.at||'')}</td><td dir="ltr">${e.recordType==='http_attempt'?esc((e.operationId||'')+' / '+(e.jobIndex??'—')+' / '+(e.attemptIndex??'—')):'تاریخی؛ شناسه تلاش موجود نیست'}</td><td dir="ltr">${esc((e.provider||'نامشخص')+' / '+(e.model||'نامشخص'))}</td><td>${usageNumber(e.requestUtf8Bytes)} بایت</td><td>${esc(e.transportStatus||e.status||'نامشخص')} / ${usageNumber(e.httpStatus)}</td><td>${usageNumber(e.input)} / ${usageNumber(e.output)}</td><td>${e.accepted===null?'ثبت نشده':e.accepted?'پذیرفته':'رد شده'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function usageOpen(){
   let d=document.getElementById('usageDialog');
   if(!d){d=document.createElement('dialog');d.id='usageDialog';d.dir='rtl';d.innerHTML=`<header><b>گزارش مصرف AI — مستقل از کاربرگ چاپی</b><button type="button" id="usageClose">بستن ×</button></header><div id="usageContent"></div><details><summary>تعرفه برای برآورد هزینه — نه مبلغ قطعی سرویس</summary><p>نرخ‌ها دلار به‌ازای یک میلیون توکن‌اند. پیش‌فرض gpt-4o-mini: ورودی ۰٫۱۵ و خروجی ۰٫۶۰، برگرفته از <a href="https://iranrouter.net/models" target="_blank" rel="noopener">صفحه مدل‌های ایران‌روتر</a> در ۲۰۲۶/۱۰/۳۰. برای مدل دیگر نرخ مربوط را وارد کنید. تبدیل تومان فقط با نرخ دلاری است که خودتان وارد می‌کنید.</p><div class="usage-prices"><label>مدل<input id="usageModel" dir="ltr"></label><label>دلار / میلیون ورودی<input id="usageInput" type="number" min="0" step="any"></label><label>دلار / میلیون خروجی<input id="usageOutput" type="number" min="0" step="any"></label><label>تومان برای هر دلار<input id="usageFx" type="number" min="0" step="any" placeholder="اختیاری"></label><button type="button" id="usageSavePrices">اعمال تعرفه</button></div></details><footer><button type="button" id="usageDownload">دانلود گزارش CSV</button><button type="button" id="usageReset">شروع دورهٔ جدید</button></footer>`;document.body.appendChild(d);
     d.querySelector('#usageClose').onclick=()=>d.close();d.querySelector('#usageDownload').onclick=usageDownload;
-    d.querySelector('#usageReset').onclick=()=>{if(USAGE.entries.some(e=>e.status==='sending')){alert('ابتدا تا پایان درخواست جاری صبر کنید.');return;}if(!confirm('گزارش این دوره پاک شود؟ قبل از شروع دوره جدید CSV را دانلود کنید.'))return;USAGE.entries=[];USAGE.started=new Date().toISOString();if(typeof ANA!=='undefined')for(const o of ANA.out||[])delete o.usageAlias;usageSave();usageRender();};
+    d.querySelector('#usageReset').onclick=()=>{if(!usageMergeLatest()){alert('گزارش مصرف در دسترس نیست؛ پاک‌سازی انجام نشد.');return;}if(USAGE.entries.some(e=>e.status==='sending')){alert('ابتدا تا پایان درخواست جاری صبر کنید.');return;}if(!confirm('گزارش این دوره پاک شود؟ قبل از شروع دوره جدید CSV را دانلود کنید.'))return;USAGE.entries=[];USAGE.started=new Date().toISOString();if(typeof ANA!=='undefined')for(const o of ANA.out||[])delete o.usageAlias;usageSave(true);usageRender();};
     d.querySelector('#usageSavePrices').onclick=()=>{const model=d.querySelector('#usageModel').value.trim(),a=d.querySelector('#usageInput').value,b=d.querySelector('#usageOutput').value,fx=d.querySelector('#usageFx').value;if(!model||!a.trim()||!b.trim()||usageFinite(Number(a))===null||usageFinite(Number(b))===null||(fx.trim()&&usageFinite(Number(fx))===null)){alert('مدل و نرخ‌های معتبر را وارد کنید.');return;}USAGE.prices[model]={input:Number(a),output:Number(b)};USAGE.fx=fx.trim()?Number(fx):null;usageSave();usageRender();};
   }
-  d.querySelector('#usageModel').value=ROUTER_MODEL;const rate=USAGE.prices[ROUTER_MODEL];d.querySelector('#usageInput').value=rate?.input??'';d.querySelector('#usageOutput').value=rate?.output??'';d.querySelector('#usageFx').value=USAGE.fx??'';usageRender();if(!d.open)d.showModal();
+  usageMergeLatest();d.querySelector('#usageModel').value=ROUTER_MODEL;const rate=USAGE.prices[ROUTER_MODEL];d.querySelector('#usageInput').value=rate?.input??'';d.querySelector('#usageOutput').value=rate?.output??'';d.querySelector('#usageFx').value=USAGE.fx??'';usageRender();if(!d.open)d.showModal();
 }
 function usageDownload(){
- const heads=['time','account_alias','model','purpose','service_status','output_accepted','input_tokens','output_tokens','total_tokens','usage_reported','estimated_usd_at_current_rates','estimated_toman_at_entered_fx'];
- const rows=USAGE.entries.map(e=>{const estimate=usageEstimate(e);return [e.at,e.account,e.model,e.purpose,e.status,e.accepted,e.input,e.output,e.total,e.usageReported,estimate,estimate!==null&&USAGE.fx!==null?estimate*USAGE.fx:null];});
+ const heads=['record_type','attempt_id','operation_id','job_index','attempt_index','reason','provider','endpoint_family','request_class','model','purpose','account_alias','started_at','ended_at','request_chars','request_utf8_bytes','transport_status','http_status','service_status','input_tokens','output_tokens','total_tokens','usage_reported','usage_state','estimated_usd_at_known_rate','billing_state','output_accepted'];
+ const rows=USAGE.entries.map(e=>{const estimate=e.recordType==='http_attempt'?usageEstimate(e):null;return [e.recordType||'legacy-logical',e.attemptId||'',e.operationId||'',e.jobIndex??'',e.attemptIndex??'',e.reason||'',e.provider||'legacy/unknown',e.endpointFamily||'',e.requestClass||'legacy',e.model||'',e.purpose||'',e.account||'',e.startedAt||e.at||'',e.endedAt||'',e.requestChars??'',e.requestUtf8Bytes??'',e.transportStatus||e.status||'',e.httpStatus??'',e.status||'',e.input??'',e.output??'',e.total??'',e.usageReported??'',e.usageState||(e.usageReported?'legacy-reported':'unknown'),estimate,e.billingState||'legacy-estimate-not-verifiable',e.accepted??''];});
  const csv='\uFEFF'+[heads,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/^[=+@\-\t\r]/,m=>"'"+m).replace(/"/g,'""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='audit-ai-usage.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 // <<<AI-USAGE-END>>>
@@ -7657,7 +7682,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
     const url=(window.HesabrasiAI&&HesabrasiAI.modelsUrl)?HesabrasiAI.modelsUrl({provider:chosenProvider,key,model:id}):(chosenProvider==='google'?AD_GOOGLE_ROOT+'models/'+adGoogleModelId(id):catalogURL);
     if(!url)throw Error('فهرست مدل این سرویس از مرورگر خوانده نمی‌شود.');
     const extraHeaders=(window.HesabrasiAI&&HesabrasiAI.modelsHeaders)?HesabrasiAI.modelsHeaders({provider:chosenProvider,key}):(chosenProvider==='google'?{'x-goog-api-key':key}:{});
-    const response=await fetch(url,{method:'GET',headers:extraHeaders,credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal});if(!response.ok)throw Error('دریافت ظرفیت از سرویس: HTTP '+response.status);catalog=await response.json();
+    const catalogAttempt=await usageFetch(url,{method:'GET',headers:extraHeaders,credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal},{purpose:'catalog',requestClass:'catalog',provider:chosenProvider,model:id,endpointFamily:'model-catalog',operationId:usageNewId('operation'),jobIndex:1,attemptIndex:1,reason:'catalog-read'});try{const response=catalogAttempt.response;if(!response.ok)throw Error('دریافت ظرفیت از سرویس: HTTP '+response.status);catalog=await response.json();catalogAttempt.finish(null,'catalog_received');}catch(error){catalogAttempt.finish(null,error.name==='AbortError'?'timeout_usage_unknown':'catalog_error');throw error;}
     if(chosenProvider!=='google'&&window.HesabrasiAI&&typeof HesabrasiAI.storeCachedCatalog==='function')HesabrasiAI.storeCachedCatalog(chosenProvider,catalog);
    }
    if(serial!==AD.serial||key!==cleanTok(ROUTER_KEY)||id!==cleanTok(ROUTER_MODEL)||chosenProvider!==AD_PROVIDER)return null;
@@ -7671,7 +7696,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  function approve(plan,p,title){return new Promise(resolve=>{
   const dialog=document.createElement('dialog');dialog.dir='rtl';dialog.style.cssText='max-width:540px;width:calc(100% - 32px);border-radius:14px;padding:20px;background:var(--panel,#fff);color:var(--ink,#222);border:1px solid var(--line,#888)';
   const heading=document.createElement('h3');heading.textContent=title;
-  const text=document.createElement('p');text.style.whiteSpace='pre-wrap';text.textContent='مدل: '+p.model+'\nحداکثر '+plan.maxCalls+' درخواست در کل این عملیات.\n'+(plan.cost===null?'برآورد هزینه: نامشخص؛ درخواست می‌تواند اعتبار مصرف کند.':'سقف برآورد مصرف با نرخ فعلی: '+plan.cost.toFixed(6)+' دلار بر اساس نرخ اعلام‌شده، بدون کارمزد و تبدیل ارز؛ مبلغ قطعی نیست.')+'\nبرآورد توکن دقیق نیست. این تأیید شامل مراحل خوانش شرح اسناد و نگارش/دسته‌بندی همین عملیات است (بدون نیاز به بررسی طرف‌حساب)؛ سقف درخواست/برآورد مصرف افزایش خودکار ندارد. هیچ تلاش مجدد پولی خودکار نداریم. نتایج AI نیازمند بازبینی حسابرس هستند.\nآیا کل عملیات را در همین محدوده تأیید می‌کنید؟';
+  const text=document.createElement('p');text.style.whiteSpace='pre-wrap';text.textContent='مدل: '+p.model+'\nحداکثر '+plan.maxCalls+' ارسال واقعی در کل این عملیات؛ هر بخش فقط یک بار فرستاده می‌شود. سوییچ سرویس و retry خودکار غیرفعال است.\n'+(plan.cost===null?'برآورد هزینه: نامشخص؛ درخواست می‌تواند اعتبار مصرف کند.':'سقف برآورد مصرف با نرخ فعلی: '+plan.cost.toFixed(6)+' دلار بر اساس نرخ اعلام‌شده، بدون کارمزد و تبدیل ارز؛ مبلغ قطعی نیست.')+'\nبرآورد توکن دقیق نیست. این تأیید شامل مراحل خوانش شرح اسناد و نگارش/دسته‌بندی همین عملیات است (بدون نیاز به بررسی طرف‌حساب)؛ سقف ارسال/برآورد مصرف افزایش خودکار ندارد. اگر شبکه پاسخ ندهد، مصرف آن تلاش نامعلوم ثبت می‌شود و تکرار نمی‌گردد. نتایج AI نیازمند بازبینی حسابرس هستند.\nآیا کل عملیات را در همین محدوده تأیید می‌کنید؟';
   const accept=document.createElement('button');accept.type='button';accept.dataset.adAccept='';accept.textContent='تأیید و اجرای کل عملیات';const cancel=document.createElement('button');cancel.type='button';cancel.textContent='لغو';cancel.dataset.adCancel='';
   let done=false;const finish=value=>{if(done)return;done=true;if(dialog.open)dialog.close();dialog.remove();resolve(value);};accept.onclick=()=>finish(true);cancel.onclick=()=>finish(false);dialog.oncancel=e=>{e.preventDefault();finish(false);};dialog.onclose=()=>finish(false);dialog.append(heading,text,accept,cancel);document.body.appendChild(dialog);dialog.dataset.adApproval='';try{dialog.showModal();}catch{finish(false);}
  });}
@@ -7684,7 +7709,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  async function beginOperation(p,cpPlan,finalPlan,pending,current,title){
   const plan=adOperationPlan(p,cpPlan,finalPlan,pending),s=stamp(p);
   if(!await approve(plan,p,title))throw Error('عملیات لغو شد؛ هیچ درخواست این عملیات ارسال نشد.');
-  return {plan,stamp:s,current,used:0,spent:0};
+  return {id:usageNewId('operation'),plan,stamp:s,current,used:0,spent:0};
  }
  async function readWireBody(response){
   const ct=String((response&&response.headers&&typeof response.headers.get==='function'&&response.headers.get('content-type'))||'').toLowerCase();
@@ -7733,81 +7758,57 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  async function wire(job,p,s,meta,current,operation){
   if(!fresh(s,current))throw Error('مدل، کلید، ظرفیت یا داده تغییر کرده؛ درخواست بعدی ارسال نشد.');
   if(!adFits(p,job.messages,job.output))throw Error('بستهٔ واقعی در ظرفیت برنامه‌ریزی‌شده جا نشد؛ بدون برش یا درخواست اضافی متوقف شد.');
-  if(operation){adCheckOperationBudget(operation,{maxCalls:1,cost:adCost(p,[job])});operation.used++;operation.spent+=adCost(p,[job])??0;}
-  const entry=typeof usageStart==='function'?usageStart(job.messages,meta):null;if(entry){entry.adaptiveRate={input:p.inputPrice,output:p.outputPrice,source:p.source,at:p.retrievedAt};usageSave();}
-  const attempts=operation?.benchmarkSingleModel?[s]:((window.HesabrasiAI&&typeof HesabrasiAI.readySlots==='function'&&HesabrasiAI.readySlots().length)?HesabrasiAI.readySlots().map(slot=>HesabrasiAI.stampFrom(slot,s)):[s]);
-  let lastFail=null,data=null,status='network_unknown',traceRequest=null,completed=false;
-  const perMs=(attempts.length>1)?Math.min(AI_TIMEOUT_MS,75000):AI_TIMEOUT_MS;
-  for(let i=0;i<attempts.length;i++){
-    const sx=attempts[i];
-    if(window.HesabrasiAI&&sx.slotId&&HesabrasiAI.isCool(sx.slotId)&&attempts.some((a,idx)=>idx>i&&!(a.slotId&&HesabrasiAI.isCool(a.slotId)))) continue;
-    const cleanKey=cleanTok(sx.key);
-    const cleanModel=cleanTok(sx.model);
-    const sxClean={...sx,key:cleanKey,model:cleanModel};
-    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),perMs);
-    const startedAt=Date.now();
-    try{
-      const isReason=!!(p.thinking||adIsReasoningModel(sxClean.model));
-      const gemini=window.HesabrasiAI?HesabrasiAI.isGemini(sxClean):sxClean.provider==='google';
-      const anthropic=!!(window.HesabrasiAI&&HesabrasiAI.isAnthropic(sxClean));
-      const useStream=!gemini&&!anthropic&&(sxClean.slotId==='open_router'||sxClean.provider==='open_router');
-      let payload={model:sxClean.model,messages:job.messages};const field=p.parameters.includes('max_completion_tokens')&&!p.parameters.includes('max_tokens')?'max_completion_tokens':'max_tokens';payload[field]=job.output;
-      if(p.parameters.includes('temperature')&&!isReason)payload.temperature=.2;
-      if(isReason&&(sxClean.slotId==='open_router'||sxClean.provider==='open_router'||p.parameters.includes('reasoning'))){const eff=(sxClean.extra&&sxClean.extra.reasoningEffort)||'low';if(eff&&eff!=='auto')payload.reasoning={effort:eff};}
-      else if(isReason&&sxClean.slotId==='openai_api'){const eff=(sxClean.extra&&sxClean.extra.reasoningEffort)||'low';if(eff&&eff!=='auto')payload.reasoning_effort=eff;}
-      if(useStream){payload.stream=true;payload.stream_options={include_usage:true};}
-      if(gemini)payload=adGooglePayload(job.messages,job.output);
-      else if(anthropic)payload=HesabrasiAI.anthropicPayload(job.messages,job.output,sxClean.model);
-      const requestJSON=JSON.stringify(payload);
-      const url=window.HesabrasiAI?HesabrasiAI.chatUrl(sxClean):(gemini?AD_GOOGLE_ROOT+'models/'+adGoogleModelId(sxClean.model)+':generateContent':AI_ENDPOINT);
-      const headers=window.HesabrasiAI?HesabrasiAI.chatHeaders(sxClean):(gemini?{'Content-Type':'application/json','x-goog-api-key':cleanKey}:{'Content-Type':'application/json',Authorization:'Bearer '+cleanKey});
-      let response;
-      try{
-        response=await fetch(url,{method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',headers:headers,body:requestJSON,signal:ctl.signal});
-      }catch(firstNetErr){
-        // One safe handshake retry ONLY if connection failed in <2.5s before any HTTP response (e.g. mobile VPN wake-up blip).
-        if(firstNetErr&&firstNetErr.name!=='AbortError'&&(Date.now()-startedAt)<2500){
-          await new Promise(res=>setTimeout(res,750));
-          response=await fetch(url,{method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',headers:headers,body:requestJSON,signal:ctl.signal});
-        }else{
-          throw firstNetErr;
-        }
-      }
-      data=await readWireBody(response);
-      if(gemini)data=adGoogleResponse(data);else if(anthropic)data=HesabrasiAI.anthropicResponse(data);
-      const hasMidStreamErr=!!(response.ok&&data&&data.error);
-      status=(response.ok&&!hasMidStreamErr)?'received':'HTTP '+response.status;if(traceRequest){const content=data.choices?.[0]?.message?.content;traceRequest.responseText=typeof content==='string'?(cleanKey?content.split(cleanKey).join('[کلید حذف شد]'):content):'';traceRequest.finishReason=data.googleFinish||data.choices?.[0]?.finish_reason||null;}
-      if(!response.ok||hasMidStreamErr){let message=typeof data.error?.message==='string'?data.error.message:typeof data.error==='string'?data.error:typeof data.message==='string'?data.message:'';message=String(message);if(cleanKey)message=message.split(cleanKey).join('[کلید حذف شد]');message=message.replace(/ir-[A-Za-z0-9_-]+/g,'[کلید حذف شد]').slice(0,600);const codeLabel=hasMidStreamErr?'خطای سرویس در جریان پاسخ':'HTTP '+response.status;lastFail={ok:false,detail:codeLabel+' — '+message+(i<attempts.length-1?'؛ سوییچ به ارائه‌دهندهٔ بعدی.':'؛ تلاش مجدد خودکار انجام نشد.'),usageId:entry?.id};if(window.HesabrasiDebug)HesabrasiDebug.log('wire_http_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,status:response.status,error:lastFail.detail});if(window.HesabrasiAI&&!(operation?.benchmarkSingleModel&&response.status===402)&&HesabrasiAI.shouldSwitch(hasMidStreamErr?502:response.status,message)){HesabrasiAI.noteFail(sxClean.slotId,lastFail.detail);status='switched';continue;}completed=true;return lastFail;}
-      if(data.choices?.[0]?.finish_reason==='length'){status='truncated';completed=true;return {ok:false,detail:'پاسخ ناقص به سقف خروجی رسید؛ '+(traceRequest?'درخواست '+traceRequest.index+' — ':'')+(meta.purpose==='nature-notes'?'یادداشت میانی ماهیت':meta.purpose==='nature'?'نگارش نهایی ماهیت':meta.purpose==='counterparty'?'بررسی طرف حساب':'دسته‌بندی')+'، سقف '+job.output+' توکن؛ بدون تلاش پولیِ مجدد متوقف شد.',usageId:entry?.id};}
-      if(gemini&&data.googleFinish!=='STOP'){status='blocked_or_unfinished';completed=true;return {ok:false,detail:'گوگل پاسخ کامل قابل استفاده نداد: '+String(data.googleFinish).slice(0,80)+'؛ بدون تلاش مجدد.',usageId:entry?.id};}
-      const text=data.choices?.[0]?.message?.content;if(typeof text!=='string'||!text.trim()){status='empty_response';lastFail={ok:false,detail:'پاسخ متنی معتبر دریافت نشد.',usageId:entry?.id};if(window.HesabrasiDebug)HesabrasiDebug.log('wire_empty_response',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,raw:JSON.stringify(data||{}).slice(0,2000)});if(window.HesabrasiAI&&attempts.length>1){HesabrasiAI.noteFail(sxClean.slotId,'empty');continue;}completed=true;return lastFail;}
-      if(!fresh(sx,current)){status='stale_response';completed=true;return {ok:false,detail:'پاسخ مربوط به تنظیمات/دادهٔ قبلی است؛ استفاده نشد.',usageId:entry?.id};}
-      if(window.HesabrasiAI&&sxClean.slotId)HesabrasiAI.noteOk(sxClean.slotId);completed=true;return {ok:true,text:text.trim(),usage:data.usage||null,usageId:entry?.id};
-    }catch(error){
-      const elapsedSec=Math.round((Date.now()-startedAt)/100)/10;
-      let errMsg=String((error&&(error.name?error.name+': ':'')+(error.message||error))||'Unknown network error');
-      if(cleanKey)errMsg=errMsg.split(cleanKey).join('[کلید حذف شد]');
-      status=error&&error.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';
-      const vpnHint=/openrouter\.ai/i.test(url)&&error?.name!=='AbortError'?' (اتصال مستقیم به سرور OpenRouter قطع یا مسدود شد — روشن و پایدار بودن VPN و صحت کلید API را بررسی کنید)':'';
-      lastFail={ok:false,detail:error&&error.name==='AbortError'?('مهلت درخواست پس از '+elapsedSec+' ثانیه تمام شد؛ مصرف احتمالی نامشخص است.'):('خطای شبکه پس از '+elapsedSec+' ثانیه ('+errMsg.slice(0,180)+')'+vpnHint+'؛ تکرار پولی خودکار انجام نشد.'),usageId:entry?.id};
-      if(window.HesabrasiDebug)HesabrasiDebug.log('wire_network_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,elapsedSec,url,error:errMsg});
-      if(window.HesabrasiAI&&sxClean.slotId&&i<attempts.length-1){HesabrasiAI.noteFail(sxClean.slotId,lastFail.detail);continue;}
-      completed=true;return lastFail;
-    }
-    finally{clearTimeout(timer);if(traceRequest)traceRequest.status=status;if(completed&&typeof usageComplete==='function')usageComplete(entry,data,status);}
-  }
-  if(!completed&&typeof usageComplete==='function')usageComplete(entry,data,status);
-  return lastFail||{ok:false,detail:'هیچ ارائه‌دهندهٔ آماده‌ای باقی نماند.',usageId:entry?.id};
+  const sx=s,cleanKey=cleanTok(sx.key),cleanModel=cleanTok(sx.model||p.model),sxClean={...sx,key:cleanKey,model:cleanModel};
+  const isReason=!!(p.thinking||adIsReasoningModel(sxClean.model));
+  const gemini=window.HesabrasiAI?HesabrasiAI.isGemini(sxClean):sxClean.provider==='google';
+  const anthropic=!!(window.HesabrasiAI&&HesabrasiAI.isAnthropic(sxClean));
+  const useStream=!gemini&&!anthropic&&(sxClean.slotId==='open_router'||sxClean.provider==='open_router');
+  let payload={model:sxClean.model,messages:job.messages};const field=p.parameters.includes('max_completion_tokens')&&!p.parameters.includes('max_tokens')?'max_completion_tokens':'max_tokens';payload[field]=job.output;
+  if(p.parameters.includes('temperature')&&!isReason)payload.temperature=.2;
+  if(isReason&&(sxClean.slotId==='open_router'||sxClean.provider==='open_router'||p.parameters.includes('reasoning'))){const eff=(sxClean.extra&&sxClean.extra.reasoningEffort)||'low';if(eff&&eff!=='auto')payload.reasoning={effort:eff};}
+  else if(isReason&&sxClean.slotId==='openai_api'){const eff=(sxClean.extra&&sxClean.extra.reasoningEffort)||'low';if(eff&&eff!=='auto')payload.reasoning_effort=eff;}
+  if(useStream){payload.stream=true;payload.stream_options={include_usage:true};}
+  if(gemini)payload=adGooglePayload(job.messages,job.output);
+  else if(anthropic)payload=HesabrasiAI.anthropicPayload(job.messages,job.output,sxClean.model);
+  const requestJSON=JSON.stringify(payload);
+  const url=window.HesabrasiAI?HesabrasiAI.chatUrl(sxClean):(gemini?AD_GOOGLE_ROOT+'models/'+adGoogleModelId(sxClean.model)+':generateContent':AI_ENDPOINT);
+  const headers=window.HesabrasiAI?HesabrasiAI.chatHeaders(sxClean):(gemini?{'Content-Type':'application/json','x-goog-api-key':cleanKey}:{'Content-Type':'application/json',Authorization:'Bearer '+cleanKey});
+  const callCost=adCost(p,[job]),jobIndex=operation?operation.used+1:(Number.isInteger(meta.jobIndex)?meta.jobIndex:1),operationId=operation?.id||meta.operationId||usageNewId('operation');
+  if(operation)adCheckOperationBudget(operation,{maxCalls:1,cost:callCost});
+  let tracked=null,entry=null,data=null,status='network_usage_unknown',response=null;
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),AI_TIMEOUT_MS),startedAt=Date.now();
+  try{
+    tracked=await usageFetch(url,{method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',headers:headers,body:requestJSON,signal:ctl.signal},{...meta,messages:job.messages,model:sxClean.model,provider:sxClean.provider||sxClean.slotId||AD_PROVIDER,endpointFamily:gemini?'gemini':anthropic?'anthropic':'openai-compatible',operationId,jobIndex,attemptIndex:1,reason:meta.reason||(meta.purpose==='capacity-probe'?'capacity-probe':'initial'),adaptiveRate:{input:p.inputPrice,output:p.outputPrice,source:p.source,at:p.retrievedAt},beforeFetch:()=>{if(operation){operation.used++;if(callCost!==null)operation.spent+=callCost;}}});
+    entry=tracked.entry;response=tracked.response;
+    data=await readWireBody(response);
+    if(gemini)data=adGoogleResponse(data);else if(anthropic)data=HesabrasiAI.anthropicResponse(data);
+    const hasMidStreamErr=!!(response.ok&&data&&data.error);
+    status=(response.ok&&!hasMidStreamErr)?'received':'HTTP '+response.status;
+    if(!response.ok||hasMidStreamErr){let message=typeof data.error?.message==='string'?data.error.message:typeof data.error==='string'?data.error:typeof data.message==='string'?data.message:'';message=String(message);if(cleanKey)message=message.split(cleanKey).join('[کلید حذف شد]');message=message.replace(/ir-[A-Za-z0-9_-]+/g,'[کلید حذف شد]').slice(0,600);const codeLabel=hasMidStreamErr?'خطای سرویس در جریان پاسخ':'HTTP '+response.status;if(window.HesabrasiDebug)HesabrasiDebug.log('wire_http_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,status:response.status,error:codeLabel+' — '+message});return {ok:false,detail:codeLabel+' — '+message+'؛ تلاش خودکار دیگری انجام نشد.',usageId:entry.id};}
+    if(data.choices?.[0]?.finish_reason==='length'){status='truncated';return {ok:false,detail:'پاسخ ناقص به سقف خروجی رسید؛ سقف '+job.output+' توکن؛ تلاش خودکار دیگری انجام نشد.',usageId:entry.id};}
+    if(gemini&&data.googleFinish!=='STOP'){status='blocked_or_unfinished';return {ok:false,detail:'گوگل پاسخ کامل قابل استفاده نداد: '+String(data.googleFinish).slice(0,80)+'؛ تلاش خودکار دیگری انجام نشد.',usageId:entry.id};}
+    const text=data.choices?.[0]?.message?.content;
+    if(typeof text!=='string'||!text.trim()){status='empty_response';if(window.HesabrasiDebug)HesabrasiDebug.log('wire_empty_response',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,raw:JSON.stringify(data||{}).slice(0,2000)});return {ok:false,detail:'پاسخ متنی معتبر دریافت نشد؛ تلاش خودکار دیگری انجام نشد.',usageId:entry.id};}
+    if(!fresh(sx,current)){status='stale_response';return {ok:false,detail:'پاسخ مربوط به تنظیمات/دادهٔ قبلی است؛ استفاده نشد.',usageId:entry.id};}
+    if(window.HesabrasiAI&&sxClean.slotId)HesabrasiAI.noteOk(sxClean.slotId);
+    return {ok:true,text:text.trim(),usage:data.usage||null,usageId:entry.id};
+  }catch(error){
+    if(!error?.usageId&&!entry)return {ok:false,detail:String(error?.message||error)};
+    const elapsedSec=Math.round((Date.now()-startedAt)/100)/10;let errMsg=String((error&&(error.name?error.name+': ':'')+(error.message||error))||'Unknown network error');if(cleanKey)errMsg=errMsg.split(cleanKey).join('[کلید حذف شد]');
+    status=error&&error.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';const vpnHint=/openrouter\.ai/i.test(url)&&error?.name!=='AbortError'?' (اتصال مستقیم به سرور OpenRouter قطع یا مسدود شد — روشن و پایدار بودن VPN و صحت کلید API را بررسی کنید)':'';
+    const detail=error&&error.name==='AbortError'?('مهلت درخواست پس از '+elapsedSec+' ثانیه تمام شد؛ مصرف احتمالی نامشخص است.'):('خطای شبکه پس از '+elapsedSec+' ثانیه ('+errMsg.slice(0,180)+')'+vpnHint+'؛ تلاش خودکار دیگری انجام نشد.');
+    if(window.HesabrasiDebug)HesabrasiDebug.log('wire_network_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,elapsedSec,url,error:errMsg});return {ok:false,detail,usageId:entry?.id||error?.usageId};
+  }finally{clearTimeout(timer);if(tracked)tracked.finish(data,status);}
  }
  async function run(job,p,s,purpose,current,operation){const r=await wire(job,p,s,{purpose},current,operation);if(!r.ok){if(typeof usageDecision==='function')usageDecision(r.usageId,false);throw Error(r.detail);}return r;}
  const decision=(r,used)=>{if(typeof usageDecision==='function')usageDecision(r.usageId,used);};
  async function review(job,onProgress,current,operation){
   const check=()=>current()&&job.isFresh();if(!check())throw Error('بستهٔ طرف حساب منقضی شده است.');if(!job.pending.length)return {...anaCounterpartyValidate(job,'{"resolutions":[]}'),reviewRequestCount:0};
-  const p=await profile(),s=stamp(p),packet=JSON.parse(anaCounterpartyResolverFacts(job)),plan=adPlanCounterpart(p,packet,AI_CP_RESOLVE_SYSTEM);
-  if(!await authorize(plan,p,'بررسی طرف حساب — برنامهٔ درخواست‌ها',operation))throw Error('بررسی طرف حساب توسط کاربر لغو شد؛ درخواست‌های این مرحله ارسال نشدند.');
+  const p=await profile(),s=stamp(p),packet=JSON.parse(anaCounterpartyResolverFacts(job)),plan=adPlanCounterpart(p,packet,AI_CP_RESOLVE_SYSTEM),activeOperation=operation||await beginOperation(p,plan,{jobs:[],maxCalls:0,cost:0},0,check,'بررسی طرف حساب — تأیید یک‌بارهٔ کل عملیات');
+  if(!await authorize(plan,p,'بررسی طرف حساب — برنامهٔ درخواست‌ها',activeOperation))throw Error('بررسی طرف حساب توسط کاربر لغو شد؛ درخواست‌های این مرحله ارسال نشدند.');
   const answers=[],responses=[];
   for(let i=0;i<plan.jobs.length;i++){
-   onProgress('بررسی طرف حساب، بخش '+(i+1)+' از '+plan.jobs.length);const r=await run(plan.jobs[i],p,s,'counterparty',check,operation);responses.push(r);
+   onProgress('بررسی طرف حساب، بخش '+(i+1)+' از '+plan.jobs.length);const r=await run(plan.jobs[i],p,s,'counterparty',check,activeOperation);responses.push(r);
    let parsed;try{const cleanCp=r.text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');const a0=cleanCp.indexOf('{'),b0=cleanCp.lastIndexOf('}');parsed=JSON.parse(a0>=0&&b0>a0?cleanCp.slice(a0,b0+1):cleanCp);}catch{decision(r,false);throw Error('پاسخ بخش طرف حساب JSON معتبر نیست؛ بدون تلاش مجدد متوقف شد.');}
    const allowed=new Set(plan.jobs[i].units.map(u=>u.id));if(!Array.isArray(parsed.resolutions)||parsed.resolutions.some(a=>!allowed.has(a?.id))){decision(r,false);throw Error('شناسهٔ پاسخ طرف حساب متعلق به بخش ارسالی نیست.');}answers.push(...parsed.resolutions);
   }
@@ -7844,14 +7845,14 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
   const selectedModels=models.filter(m=>m.stages.length);for(const m of selectedModels){m.plannedStages=m.stages.length;m.planCost=m.stages.reduce((n,x)=>n+x.cost,0);m.status='در صف آزمون';if(m.stages.length<m.candidateStages.length+1)m.reason='probe پایه برنامه‌ریزی شد؛ اندازه‌های بالاتر به‌علت سقف بودجه اجرا نمی‌شوند';}
   for(const m of excluded){m.plannedStages=0;m.planCost=0;m.status='فقط کاتالوگ';}
   const plannedTotal=selectedModels.reduce((n,m)=>n+m.planCost,0),stageCount=Math.max(0,...selectedModels.map(m=>m.stages.length)),factorPercent=Math.round(Math.max(0,...selectedModels.flatMap(m=>m.stages.map(x=>x.factor)))*100),budgetSkipped=excluded.map(m=>({...m}));selected=selectedModels.length?{models:selectedModels,skipped:budgetSkipped,cost:plannedTotal,stageCount,factorPercent}:null;
-  const skipped=all.filter(m=>m.reason);const report={startedAt:new Date().toISOString(),runStatus:'preflight',models:all.map(m=>({...m})),results:[],plannedCost:selected?.cost||0,maxCalls:selected?selected.models.reduce((n,m)=>n+m.stages.length,0):0,factorPercent:selected?.factorPercent||0,stageCount:selected?.stageCount||0,actualCalls:0,budgetUsd:budget};for(const m of selected?.models||[])Object.assign(report.models.find(x=>x.model===m.model)||{}, {status:m.status,plannedStages:m.plannedStages,planCost:m.planCost,reason:m.reason||''});for(const m of budgetSkipped)Object.assign(report.models.find(x=>x.model===m.model)||{}, {status:m.status,plannedStages:0,planCost:0,reason:m.reason});if(!selected){report.runStatus='no_affordable_probes';onProgress('بودجهٔ $10 برای حتی یک probe ساختگی پایه کافی نیست؛ هیچ درخواست تولیدی ارسال نشد.');return report;}if(!await capacityConsent({models:selected.models,skipped:[...skipped,...budgetSkipped],maxCalls:report.maxCalls,cost:selected.cost,factorPercent:selected.factorPercent,stageCount:selected.stageCount})){report.runStatus='cancelled_before_start';return report;}const current=()=>((window.HesabrasiAI?.readySlots?.()||[]).find(x=>x.id==='open_router')?.key||'')===slot.key;const op={plan:{maxCalls:report.maxCalls,cost:selected.cost},used:0,spent:0,reportedSpent:0,benchmarkSingleModel:true};const previousProfile=AD.profile;AD.running++;window.HesabrasiBenchmarkBusy=true;report.runStatus='running';try{for(let i=0;i<selected.models.length;i++){const m=selected.models[i];if(!current()){report.runStatus='stopped_key_changed';break;}AD.profile=m.p;const stamp={p:m.p,key,model:m.model,provider:'open_router',failover:true,slotId:'open_router',extra:{}},row={model:m.model,status:'در حال اجرا',probeEstimate:null,inputChars:null,plannedCost:m.stages.reduce((n,x)=>n+x.cost,0),contextTokens:m.contextTokens,maxInputTokens:m.inputTokens,maxOutputTokens:m.outputTokens,seconds:0,inputTokens:null,outputTokens:null,costUsd:0,costBasis:'تجمیع usageهای مراحل',text:'',error:'',trials:[],largestSuccess:null,nextFailed:null};for(let j=0;j<m.stages.length;j++){if(!current()){report.runStatus='stopped_key_changed';break;}const stage=m.stages[j],started=Date.now(),measured=adMeasure(stage.job.messages);row.probeEstimate=measured.estimatedTokens;row.inputChars=measured.chars;onProgress('مدل '+(i+1)+' از '+selected.models.length+': '+m.model+' — پلهٔ '+(j+1)+' از '+m.stages.length+', هدف '+Math.round(stage.factor*100)+'٪');const r=await wire(stage.job,m.p,stamp,{purpose:'capacity-probe',model:m.model},current,op);report.actualCalls++;const trial={factor:stage.factor,probeEstimate:measured.estimatedTokens,inputChars:measured.chars,seconds:(Date.now()-started)/1000,status:r.ok?'پاسخ متنی دریافت شد':'ناموفق',error:r.ok?'':r.detail,inputTokens:null,outputTokens:null,costUsd:null};row.seconds+=trial.seconds;if(r.usage){trial.inputTokens=usageFinite(r.usage.prompt_tokens??r.usage.input_tokens);trial.outputTokens=usageFinite(r.usage.completion_tokens??r.usage.output_tokens);if(trial.inputTokens!==null&&trial.outputTokens!==null){trial.costUsd=trial.inputTokens*m.p.inputPrice+trial.outputTokens*m.p.outputPrice;row.costUsd+=trial.costUsd;row.inputTokens=(row.inputTokens||0)+trial.inputTokens;row.outputTokens=(row.outputTokens||0)+trial.outputTokens;op.reportedSpent+=trial.costUsd;}}if(r.ok){decision(r,true);trial.text=r.text;row.status='پاسخ متنی دریافت شد';row.text=r.text;row.largestSuccess={factor:trial.factor,probeEstimate:trial.probeEstimate,inputChars:trial.inputChars,inputTokens:trial.inputTokens};}else{trial.error=r.detail;row.status='ناموفق';row.error=r.detail;row.nextFailed={factor:trial.factor,probeEstimate:trial.probeEstimate,inputChars:trial.inputChars,error:trial.error};if(r.usageId)decision(r,false);}if(trial.costUsd===null){trial.costUsd=stage.cost;row.costUsd+=stage.cost;trial.costBasis='برآورد از بایت/قیمت کاتالوگ';}else trial.costBasis='usage واقعی OpenRouter';row.trials.push(trial);if(op.reportedSpent>10){report.runStatus='stopped_budget';report.stopReason='usage گزارش‌شده از سقف $10 گذشت؛ probeهای بعدی متوقف شدند.';break;}if(!r.ok)break;}report.results.push(row);if(report.runStatus==='stopped_budget'||report.runStatus==='stopped_key_changed')break;onProgress('تکمیل '+(i+1)+' از '+selected.models.length+' مدل؛ درخواست واقعی '+report.actualCalls);}
+  const skipped=all.filter(m=>m.reason);const report={startedAt:new Date().toISOString(),runStatus:'preflight',models:all.map(m=>({...m})),results:[],plannedCost:selected?.cost||0,maxCalls:selected?selected.models.reduce((n,m)=>n+m.stages.length,0):0,factorPercent:selected?.factorPercent||0,stageCount:selected?.stageCount||0,actualCalls:0,budgetUsd:budget};for(const m of selected?.models||[])Object.assign(report.models.find(x=>x.model===m.model)||{}, {status:m.status,plannedStages:m.plannedStages,planCost:m.planCost,reason:m.reason||''});for(const m of budgetSkipped)Object.assign(report.models.find(x=>x.model===m.model)||{}, {status:m.status,plannedStages:0,planCost:0,reason:m.reason});if(!selected){report.runStatus='no_affordable_probes';onProgress('بودجهٔ $10 برای حتی یک probe ساختگی پایه کافی نیست؛ هیچ درخواست تولیدی ارسال نشد.');return report;}if(!await capacityConsent({models:selected.models,skipped:[...skipped,...budgetSkipped],maxCalls:report.maxCalls,cost:selected.cost,factorPercent:selected.factorPercent,stageCount:selected.stageCount})){report.runStatus='cancelled_before_start';return report;}const current=()=>((window.HesabrasiAI?.readySlots?.()||[]).find(x=>x.id==='open_router')?.key||'')===slot.key;const op={id:usageNewId('operation'),plan:{maxCalls:report.maxCalls,cost:selected.cost},used:0,spent:0,reportedSpent:0,benchmarkSingleModel:true};const previousProfile=AD.profile;AD.running++;window.HesabrasiBenchmarkBusy=true;report.runStatus='running';try{for(let i=0;i<selected.models.length;i++){const m=selected.models[i];if(!current()){report.runStatus='stopped_key_changed';break;}AD.profile=m.p;const stamp={p:m.p,key,model:m.model,provider:'open_router',failover:true,slotId:'open_router',extra:{}},row={model:m.model,status:'در حال اجرا',probeEstimate:null,inputChars:null,plannedCost:m.stages.reduce((n,x)=>n+x.cost,0),contextTokens:m.contextTokens,maxInputTokens:m.inputTokens,maxOutputTokens:m.outputTokens,seconds:0,inputTokens:null,outputTokens:null,costUsd:0,costBasis:'تجمیع usageهای مراحل',text:'',error:'',trials:[],largestSuccess:null,nextFailed:null};for(let j=0;j<m.stages.length;j++){if(!current()){report.runStatus='stopped_key_changed';break;}const stage=m.stages[j],started=Date.now(),measured=adMeasure(stage.job.messages);row.probeEstimate=measured.estimatedTokens;row.inputChars=measured.chars;onProgress('مدل '+(i+1)+' از '+selected.models.length+': '+m.model+' — پلهٔ '+(j+1)+' از '+m.stages.length+', هدف '+Math.round(stage.factor*100)+'٪');const r=await wire(stage.job,m.p,stamp,{purpose:'capacity-probe',model:m.model},current,op);report.actualCalls++;const trial={factor:stage.factor,probeEstimate:measured.estimatedTokens,inputChars:measured.chars,seconds:(Date.now()-started)/1000,status:r.ok?'پاسخ متنی دریافت شد':'ناموفق',error:r.ok?'':r.detail,inputTokens:null,outputTokens:null,costUsd:null};row.seconds+=trial.seconds;if(r.usage){trial.inputTokens=usageFinite(r.usage.prompt_tokens??r.usage.input_tokens);trial.outputTokens=usageFinite(r.usage.completion_tokens??r.usage.output_tokens);if(trial.inputTokens!==null&&trial.outputTokens!==null){trial.costUsd=trial.inputTokens*m.p.inputPrice+trial.outputTokens*m.p.outputPrice;row.costUsd+=trial.costUsd;row.inputTokens=(row.inputTokens||0)+trial.inputTokens;row.outputTokens=(row.outputTokens||0)+trial.outputTokens;op.reportedSpent+=trial.costUsd;}}if(r.ok){decision(r,true);trial.text=r.text;row.status='پاسخ متنی دریافت شد';row.text=r.text;row.largestSuccess={factor:trial.factor,probeEstimate:trial.probeEstimate,inputChars:trial.inputChars,inputTokens:trial.inputTokens};}else{trial.error=r.detail;row.status='ناموفق';row.error=r.detail;row.nextFailed={factor:trial.factor,probeEstimate:trial.probeEstimate,inputChars:trial.inputChars,error:trial.error};if(r.usageId)decision(r,false);}if(trial.costUsd===null){trial.costUsd=stage.cost;row.costUsd+=stage.cost;trial.costBasis='برآورد از بایت/قیمت کاتالوگ';}else trial.costBasis='usage واقعی OpenRouter';row.trials.push(trial);if(op.reportedSpent>10){report.runStatus='stopped_budget';report.stopReason='usage گزارش‌شده از سقف $10 گذشت؛ probeهای بعدی متوقف شدند.';break;}if(!r.ok)break;}report.results.push(row);if(report.runStatus==='stopped_budget'||report.runStatus==='stopped_key_changed')break;onProgress('تکمیل '+(i+1)+' از '+selected.models.length+' مدل؛ درخواست واقعی '+report.actualCalls);}
   }finally{AD.running--;window.HesabrasiBenchmarkBusy=false;AD.profile=previousProfile;}if(report.runStatus==='running')report.runStatus='completed';report.finishedAt=new Date().toISOString();report.plannedCost=selected.cost;report.reportedSpendUsd=op.reportedSpent;report.estimatedSpendUsd=op.spent;report.factorPercent=selected.factorPercent;return report;}
  async function runCapacity(onProgress=()=>{}){if(window.HesabrasiBenchmarkBusy)throw Error('یک بنچمارک دیگر در حال اجراست.');window.HesabrasiBenchmarkBusy=true;try{return await runCapacityInner(onProgress);}finally{window.HesabrasiBenchmarkBusy=false;}}
  window.HesabrasiCapacityBenchmark={run:runCapacity,render:capacityRender,download:capacityDownload};
  const previousResolve=anaCounterpartyResolve,previousAuto=anaAIAuto,previousReport=reportRun;
- anaCounterpartyResolve=async function(job,progress=()=>{},current=()=>true){if(!ROUTER_KEY)return previousResolve(job,progress,current);return review(job,progress,current);};
+ anaCounterpartyResolve=async function(job,progress=()=>{},current=()=>true,operation){if(!ROUTER_KEY)return previousResolve(job,progress,current);return review(job,progress,current,operation);};
  routerRequest=async function(messages,maxTokens=4096,meta={}){
-  if(!ROUTER_KEY)return {ok:false,detail:'ابتدا کلید را فعال کنید.'};AD.running++;try{const p=await profile(),s=stamp(p),output=adOutput(p,maxTokens);if(!adFits(p,messages,output))throw Error('این درخواست مستقل در ظرفیت مدل جا نمی‌شود؛ باید از مسیر ساختاریافتهٔ تقسیم استفاده شود.');const plan={maxCalls:1,jobs:[{messages,output}],cost:adCost(p,[{messages,output}])};if(!await approve(plan,p,'تأیید یک درخواست AI'))return {ok:false,detail:'ارسال توسط کاربر لغو شد.'};return await wire({messages,output},p,s,meta,()=>true);}catch(error){return {ok:false,detail:error.message};}finally{AD.running--;}
+  if(!ROUTER_KEY)return {ok:false,detail:'ابتدا کلید را فعال کنید.'};AD.running++;try{const p=await profile(),s=stamp(p),output=adOutput(p,maxTokens);if(!adFits(p,messages,output))throw Error('این درخواست مستقل در ظرفیت مدل جا نمی‌شود؛ باید از مسیر ساختاریافتهٔ تقسیم استفاده شود.');const plan={maxCalls:1,jobs:[{messages,output}],cost:adCost(p,[{messages,output}])};if(!await approve(plan,p,'تأیید یک درخواست AI'))return {ok:false,detail:'ارسال توسط کاربر لغو شد.'};const operation={id:usageNewId('operation'),plan:{maxCalls:1,cost:plan.cost},used:0,spent:0};return await wire({messages,output},p,s,meta,()=>true,operation);}catch(error){return {ok:false,detail:error.message};}finally{AD.running--;}
  };
  anaAIAuto=async function(){
   if(!window.sharedOpeningReady?.()||!ROUTER_KEY||ANA.out[ANA.active]?.A?.rows?.every(anaIsOpening))return previousAuto();
@@ -7946,11 +7947,13 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
    listing=true;el('googleFetchModels').disabled=true;const serial=listSerial,ctl=new AbortController();listController=ctl;const timer=setTimeout(()=>ctl.abort(),20000),seen=new Set(),models=[];
    showGoogleStatus('در حال دریافت فهرست از گوگل… این مرحله تولید متن ندارد.');
    try{
-    let token='';do{const url=new URL(AD_GOOGLE_ROOT+'models');if(token)url.searchParams.set('pageToken',token);
-     const r=await fetch(url,{headers:{'x-goog-api-key':key},credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',signal:ctl.signal});
-     if(!r.ok){let message='';try{const data=await r.json();if(typeof data.error?.message==='string')message=data.error.message.split(key).join('[کلید حذف شد]').slice(0,400);}catch{}
+    const listOperationId=usageNewId('operation');let pageIndex=0,token='';do{const url=new URL(AD_GOOGLE_ROOT+'models');if(token)url.searchParams.set('pageToken',token);pageIndex++;
+     const tracked=await usageFetch(url,{headers:{'x-goog-api-key':key},credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store',signal:ctl.signal},{purpose:'catalog',requestClass:'catalog',provider:'google',model:'model-catalog',endpointFamily:'model-catalog',operationId:listOperationId,jobIndex:pageIndex,attemptIndex:1,reason:'google-model-page'}),r=tracked.response;let data;
+     try{if(!r.ok){let message='';try{const errorData=await r.json();if(typeof errorData.error?.message==='string')message=errorData.error.message.split(key).join('[کلید حذف شد]').slice(0,400);}catch{}
       throw Error('گوگل فهرست نداد — HTTP '+r.status+(message?' — '+message:'')+'؛ این خطا از سرویس است. تکرار خودکار انجام نشد.');}
-     const data=await r.json();if(!Array.isArray(data.models))throw Error('پاسخ گوگل فهرست مدل معتبر ندارد.');
+      data=await r.json();tracked.finish(null,'catalog_received');
+     }catch(error){tracked.finish(null,error.name==='AbortError'?'timeout_usage_unknown':'catalog_error');throw error;}
+     if(!Array.isArray(data.models))throw Error('پاسخ گوگل فهرست مدل معتبر ندارد.');
      models.push(...data.models.filter(m=>m.supportedGenerationMethods?.includes('generateContent')&&/^models\/[A-Za-z0-9._-]+$/.test(m.name)));
      token=data.nextPageToken||'';if(token&&seen.has(token))throw Error('صفحه‌بندی سرویس تکراری است.');seen.add(token);
     }while(token);
@@ -10975,17 +10978,19 @@ el('routerForget').onclick=()=>{
 
     var ctl = new AbortController();
     var timer = setTimeout(function () { ctl.abort(); }, 15000);
+    var catalogAttempt=null;
     try {
-      var resp = await fetch(url, {
+      catalogAttempt = await global.usageFetch(url, {
         method: 'GET',
         headers: modelsHeaders({ provider: providerId, key: key }),
         credentials: 'omit',
         cache: 'no-store',
         referrerPolicy: 'no-referrer',
         signal: ctl.signal
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      var json = await resp.json();
+      },{purpose:'catalog',requestClass:'catalog',provider:providerId,model:sl.model||'model-catalog',endpointFamily:'model-catalog',operationId:global.usageNewId('operation'),jobIndex:1,attemptIndex:1,reason:'provider-model-catalog'});
+      var resp = catalogAttempt.response;
+      if (!resp.ok) {catalogAttempt.finish(null,'HTTP '+resp.status);throw new Error('HTTP ' + resp.status);}
+      var json = await resp.json();catalogAttempt.finish(null,'catalog_received');
       var entry = storeCachedCatalog(providerId, json, keyFp);
       /* If current model is legacy or unavailable in live catalog and user has not manually locked another custom model, auto-pick best ChatGPT-5 analytical model. */
       if (providerId === 'open_router' && entry.textModels.length) {
@@ -11004,6 +11009,7 @@ el('routerForget').onclick=()=>{
     if (providerId !== 'open_router') paintDynamicModelSelector(providerId);
       return entry;
     } catch (err) {
+      if(catalogAttempt)catalogAttempt.finish(null,err&&err.name==='AbortError'?'timeout_usage_unknown':'catalog_error');
       modelCache[providerId].loading = false;
       modelCache[providerId].error = err && err.name === 'AbortError' ? 'مهلت دریافت فهرست مدل‌ها تمام شد.' : ('عدم دریافت فهرست زنده (' + (err && err.message ? err.message : 'خطای شبکه') + ')' + (providerId === 'open_router' ? ' — فهرست پیشنهادی OpenRouter باقی می‌ماند.' : ' — مدل زنده برای این سرویس تأیید نشد.'));
       paintModelSelector(providerId);
@@ -11525,23 +11531,24 @@ el('routerForget').onclick=()=>{
       payload = { model: sx.model, messages: [{ role: 'user', content: TEST_PROMPT }], max_tokens: 32, temperature: 0 };
     }
     if (id === 'open_router') payload.stream = true;
-    var ctl = new AbortController();
-    var timer = setTimeout(function () { ctl.abort(); }, 30000);
+    var requestBody=JSON.stringify(payload),ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, 30000),tracked=null,response=null,data=null,usageStatus='network_usage_unknown';
     try {
-      var response = await fetch(chatUrl(sx), {
+      tracked = await global.usageFetch(chatUrl(sx), {
         method: 'POST',
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
         headers: chatHeaders(sx),
-        body: JSON.stringify(payload),
+        body: requestBody,
         signal: ctl.signal
-      });
+      },{purpose:'test',requestClass:'connection-test',provider:sx.provider||id,model:sx.model,endpointFamily:gemini?'gemini':isAnthropic(sx)?'anthropic':'openai-compatible',operationId:global.usageNewId('operation'),jobIndex:1,attemptIndex:1,reason:'connection-test',messages:[{role:'user',content:TEST_PROMPT}]});
+      response=tracked.response;usageStatus='HTTP '+response.status;
       var data = await readTestResponse(response);
       if (gemini && typeof adGoogleResponse === 'function') data = adGoogleResponse(data);
       else if (isAnthropic(sx)) data = anthropicResponse(data);
       if (!response.ok || (data && data.error)) {
-        var message = (data && data.error && (data.error.message || data.error)) || data.message || '';
-        sl.lastOk = false;
+        usageStatus='HTTP '+response.status;var message = (data && data.error && (data.error.message || data.error)) || data.message || '';
+        if(tracked)global.usageDecision(tracked.entry.id,false);sl.lastOk = false;
         sl.lastError = (response.ok ? 'خطای جریان پاسخ' : ('HTTP ' + response.status)) + (message ? ' — ' + String(message).slice(0, 240) : '');
         if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_test_failed', { provider: id, model: sx.model, error: spec.name + ': ' + sl.lastError });
         save(); paintStatus();
@@ -11549,23 +11556,24 @@ el('routerForget').onclick=()=>{
       }
       var text = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
       if (typeof text !== 'string' || !text.trim()) {
-        sl.lastOk = false;
+        usageStatus='empty_response';if(tracked)global.usageDecision(tracked.entry.id,false);sl.lastOk = false;
         sl.lastError = 'پاسخ متنی معتبر نیامد.';
         save(); paintStatus();
         return { ok: false, detail: sl.lastError };
       }
-      noteOk(id);
+      usageStatus='received';if(tracked)global.usageDecision(tracked.entry.id,true);noteOk(id);
       syncPrimary();
       logLine('اتصال ' + spec.name + ' با مدل «' + sx.model + '» تأیید شد.');
       return { ok: true, text: text.trim() };
     } catch (err) {
+      usageStatus=err&&err.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';if(err&&err.usageId)global.usageDecision(err.usageId,false);
       sl.lastOk = false;
       sl.lastError = err && err.name === 'AbortError' ? 'مهلت آزمایش تمام شد (VPN یا سرعت شبکه را بررسی کنید).' : ('خطای شبکه/VPN: ' + (err && err.message ? err.message : err));
       if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_network_error', { provider: id, model: sx.model, error: spec.name + ': ' + sl.lastError });
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
     } finally {
-      clearTimeout(timer);
+      clearTimeout(timer);if(tracked)tracked.finish(data,usageStatus);
     }
   }
 
