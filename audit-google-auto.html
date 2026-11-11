@@ -4469,7 +4469,7 @@ function renderAnalysisOutput(){
       <div class="ana-output-actions"><button class="btn ghost" id="anaBackToAccounts">← بازگشت به انتخاب</button><button class="btn primary" id="anaPrint">چاپ / ذخیره PDF</button></div>
     </header>
     ${ANA.out.length>1?`<div class="ana-account-switcher">${ANA.out.map((o,i)=>`<button type="button" class="ana-account-switch ${i===ANA.active?'on':''}" data-i="${i}">${fa(i+1)} · ${esc(o.a.title||o.a.pathLabel)}</button>`).join('')}</div>`:''}
-    <div id="anaAIBox"></div><div id="reportControls"></div><div id="auditDebugBox"></div><div id="anaQuickTools"></div><div id="anaSheet"></div><div id="anaCategorizedDocs"></div>
+    <div id="anaAIBox"></div><div id="reportControls"></div><div id="anaSheet"></div><div id="anaCategorizedDocs"></div>
   </section>`;
   el.querySelectorAll('.ana-account-switch').forEach(t=>t.addEventListener('click',()=>{
     ANA.active=Number(t.dataset.i); const sl=anaAISlot();
@@ -4480,13 +4480,13 @@ function renderAnalysisOutput(){
   document.getElementById('anaPrint').addEventListener('click',()=>auditTemplatePrint(document.getElementById('anaSheet')));
   anaPaintAI(); anaPaintSheet();
   const reportHost=document.getElementById('reportControls');
-  if(reportHost){reportHost.innerHTML=reportControlsHTML(ANA.out[ANA.active]);document.getElementById('reportRun').addEventListener('click',()=>reportRun());}if(window.HesabrasiDebug)HesabrasiDebug.paint();
-  auditWorksheetControls(ANA.out[ANA.active]);auditCategorizedDocs(ANA.out[ANA.active]);
+  if(reportHost){reportHost.innerHTML=reportControlsHTML(ANA.out[ANA.active]);document.getElementById('reportRun').addEventListener('click',()=>reportRun());}
+  auditCategorizedDocs(ANA.out[ANA.active]);
 }
 
 // ---- خودِ کاربرگ ----
 function anaPaintSheet(){
-  const host=document.getElementById('anaSheet'),o=ANA.out[ANA.active];if(host&&o)auditTemplatePaint(o,host);
+  const host=document.getElementById('anaSheet'),o=ANA.out[ANA.active];if(o)o.unitMode='rial';if(host&&o)auditTemplatePaint(o,host);
 }
 function onAnalysisModuleEnter(){
   if(CUR_STEP==='a2') renderAnalysisAccounts();
@@ -5380,236 +5380,7 @@ function anaCounterpartySummaryHTML(result){
 }
 // <<<AI-COUNTERPARTY-END>>>
 
-// <<<NATURE-EVIDENCE-LAB-BEGIN>>>
-// Stage 1 ONLY: local evidence contract; no AI, no semantic classification,
-// no writes to source rows/manual decisions/official output. UI is opt-in build.
-const NE_ROW_IDS=new WeakMap(),NE_FIELD_IDS=new WeakMap(),NE_DOC_IDS=new WeakMap(),NE_CAND_IDS=new WeakMap(),NE_PACKAGES=new WeakMap();
-function natureEvidenceId(prefix){
-  if(typeof crypto==='undefined'||!crypto.getRandomValues)throw new Error('تولید شناسهٔ مستقل در این مرورگر ممکن نیست؛ شناسهٔ حدسی ساخته نشد.');
-  const bytes=crypto.getRandomValues(new Uint8Array(16));return prefix+'-'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
-}
-function natureEvidenceRowId(row){if(!row||typeof row!=='object')throw new Error('ردیف منبع معتبر نیست.');if(!NE_ROW_IDS.has(row))NE_ROW_IDS.set(row,natureEvidenceId('ROW'));return NE_ROW_IDS.get(row);}
-function natureEvidenceFieldId(row,field){if(!NE_FIELD_IDS.has(row))NE_FIELD_IDS.set(row,new Map());const map=NE_FIELD_IDS.get(row);if(!map.has(field))map.set(field,natureEvidenceId('E'));return map.get(field);}
-function natureEvidenceDocumentId(source,key){if(!NE_DOC_IDS.has(source))NE_DOC_IDS.set(source,new Map());const map=NE_DOC_IDS.get(source);if(!map.has(key))map.set(key,natureEvidenceId('DOC'));return map.get(key);}
-function natureEvidenceCandidateId(row,key){if(!NE_CAND_IDS.has(row))NE_CAND_IDS.set(row,new Map());const map=NE_CAND_IDS.get(row);if(!map.has(key))map.set(key,natureEvidenceId('CP'));return map.get(key);}
-function natureEvidenceValue(value){
-  if(value===undefined)return {type:'undefined',value:null};
-  if(value===null)return {type:'null',value:null};
-  if(typeof value==='number')return {type:'number',value:Number.isFinite(value)?value:String(value)};
-  if(typeof value==='string'||typeof value==='boolean')return {type:typeof value,value};
-  throw new Error('نوع غیرمتنی/غیرعددیِ پشتیبانی‌نشده در ردیف منبع؛ بسته بدون تبدیل حدسی متوقف شد.');
-}
-function natureEvidenceContext(A){
-  return {title:String(A.title??A.عنوان??A.w?.title??''),path:String(A.pathLabel??A.w?.pathLabel??''),level:String(A.lvl??A.w?.levelLabel??''),entity_viewpoint:'واحد مورد رسیدگی',entity_name:typeof SHEET_CFG==='undefined'?'':String(SHEET_CFG.company??''),fiscal_year:typeof SHEET_CFG==='undefined'?'':String(SHEET_CFG.year??''),purpose:'local experimental nature evidence only'};
-}
-function natureEvidenceLegacySnapshot(A,options){
-  const review=options?.existingReview;
-  if(!review||typeof review.byRow?.get!=='function')return [];
-  return (A.rows||[]).flatMap(row=>{const r=review.byRow.get(row);return r?.source==='ai'?[{row_id:natureEvidenceRowId(row),source:'ai',model_status:'candidate',human_review_status:'not_reviewed',freshness:'unverified_legacy_snapshot',applied:false,names:[...r.names],legacy_candidate_ids:[...r.selected],quoted_texts:[...(r.evidence||[])],reason:String(r.reason||''),note:'Legacy quotes have no explicit row/field locator; they are not automatically converted into verified evidence references.'}]:[];});
-}
-function natureEvidenceCapture(A,options={}){
-  if(typeof FULL_ROWS==='undefined'||!Array.isArray(FULL_ROWS)||!FULL_ROWS.length)throw new Error('منبع FULL_ROWS برای ساخت بستهٔ شواهد موجود نیست.');
-  const source=FULL_ROWS,targets=[...(A.rows||[])],members=new Set(source);
-  if(members.size!==source.length)throw new Error('یک شیء ردیف در منبع چند بار تکرار شده است؛ تناظر هر رخداد نیازمند بازبینی است.');
-  if(new Set(targets).size!==targets.length)throw new Error('مرجع یک ردیف هدف تکرار شده است؛ ادغام یا دوباره‌شماری انجام نشد.');
-  if(targets.some(r=>!members.has(r)))throw new Error('یک ردیف عملیاتی به ردیف اصلی FULL_ROWS متصل نیست؛ اتصال از روی متن یا مبلغ حدس زده نشد.');
-  const meta=typeof CP_LAB_META!=='undefined'&&CP_LAB_META.source===source?CP_LAB_META:null;
-  const sourceData=source.map(row=>({id:natureEvidenceRowId(row),fields:Object.keys(row).sort().map(k=>[k,natureEvidenceValue(row[k])]),manual:typeof CP_WS_DECISIONS==='undefined'?null:CP_WS_DECISIONS.get(row)||null})).sort((a,b)=>a.id.localeCompare(b.id));
-  const settings={levels:ACCOUNT_LEVELS,opening_overrides:typeof TYPE_OVERRIDES==='undefined'?[]:[...TYPE_OVERRIDES].sort((a,b)=>String(a[0]).localeCompare(String(b[0]))),import_generation:meta?.generation??null,mapping:meta?.columns??null,company:typeof SHEET_CFG==='undefined'?'':SHEET_CFG.company??'',year:typeof SHEET_CFG==='undefined'?'':SHEET_CFG.year??'',current_headers:typeof currentHeaders==='undefined'?null:currentHeaders};
-  const datasetSignature=JSON.stringify({rows:sourceData,source_order:source.map(natureEvidenceRowId),settings});
-  const account=natureEvidenceContext(A);
-  const legacyObservations=natureEvidenceLegacySnapshot(A,options);
-  const packageSignature=JSON.stringify({datasetSignature,legacyObservations,target_ids:targets.map(natureEvidenceRowId),account,official:[A.openingBalance,A.debit,A.credit,A.closingBalance]});
-  return {source,targets,meta,datasetSignature,packageSignature,account,legacyObservations};
-}
-async function natureEvidenceDigest(text){
-  if(typeof crypto==='undefined'||!crypto.subtle)throw new Error('محاسبهٔ نسخهٔ داده در این محیط ممکن نیست؛ بسته ساخته نشد.');
-  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
-}
-function natureEvidenceOpening(row){return anaIsOpening(row);}
-async function natureEvidenceBuild(A,options={}){
-  const snap=natureEvidenceCapture(A,options),source=snap.source,ctx=cpLabContext(source),targetSet=new Set(snap.targets),docKeys=new Set();
-  const notes=[];
-  for(const row of snap.targets){const key=ctx.key(row);if(key)docKeys.add(key);else notes.push({row_id:natureEvidenceRowId(row),code:'INCOMPLETE_DOCUMENT_KEY',message:'شماره/تاریخ/ابعاد سند در این ردیف ناقص است.'});}
-  const catalog=[],rowBindings=new Map(),fieldBindings=new Map();
-  const describe=row=>{
-    const rowId=natureEvidenceRowId(row),key=ctx.key(row),fields=[...new Set([...Object.keys(row),'شرح سند','شرح ردیف','بدهکار','بستانکار'])].sort(),refs=Object.create(null);
-    rowBindings.set(rowId,row);
-    for(const field of fields){
-      const evidenceId=natureEvidenceFieldId(row,field),present=Object.prototype.hasOwnProperty.call(row,field),raw=natureEvidenceValue(row[field]);
-      const item={evidence_id:evidenceId,source_row_id:rowId,field,text:String(row[field]??''),raw_value:raw,present,origin:field==='نوع سند'?'software_document_type':'mapped_source_field'};
-      catalog.push(item);refs[field]=evidenceId;fieldBindings.set(evidenceId,{row,field,item});
-    }
-    const debit=cpLabAmount(row['بدهکار']),credit=cpLabAmount(row['بستانکار']),amountValid=debit!==null&&credit!==null&&debit>=0&&credit>=0&&!(debit>0&&credit>0);
-    const path=cpWorksheetDisplayLevels(row).map(level=>({level:String(level.label??''),title:String(row[level.title]??'')}));
-    return {row_id:rowId,is_target:targetSet.has(row),document_id:key?natureEvidenceDocumentId(source,key):null,document_key_validity:key?'valid':'incomplete',account:{title:path.map(p=>p.title).filter(Boolean).at(-1)||String(row['نام حساب']??''),path},description:String(row['شرح سند']??''),line_description:String(row['شرح ردیف']??''),opening:natureEvidenceOpening(row),side:!amountValid?'invalid':debit>0?'debit':credit>0?'credit':'zero',amounts:{raw_debit:natureEvidenceValue(row['بدهکار']),raw_credit:natureEvidenceValue(row['بستانکار']),debit,credit,valid:amountValid},evidence_refs:refs,provenance:snap.meta?.locations.get(row)||null,operational_membership:typeof ACCOUNT_ROWS!=='undefined'&&ACCOUNT_ROWS.includes(row),model_assessment:{status:'not_run',origin:null},human_review:{status:'not_reviewed',scope:'voucher_description_only'}};
-  };
-  const rows=snap.targets.map(describe);
-  const documents=[...docKeys].map(key=>{
-    const observed=snap.targets.filter(r=>ctx.key(r)===key);
-    return {document_id:natureEvidenceDocumentId(source,key),scope:'target_account_rows_only',row_ids:observed.map(natureEvidenceRowId),key_validity:'valid',key_fields:['شماره سند','تاریخ',...ctx.dimensions]};
-  });
-  const totals={opening:0,debit:0,credit:0,closing:0};
-  for(const row of snap.targets){const d=n0(row['بدهکار']),c=n0(row['بستانکار']);if(natureEvidenceOpening(row))totals.opening+=d-c;else{totals.debit+=d;totals.credit+=c;}}
-  totals.closing=totals.opening+totals.debit-totals.credit;
-  const official={opening:A.openingBalance,debit:A.debit,credit:A.credit,closing:A.closingBalance};
-  const comparisons=Object.keys(totals).map(field=>({field,contract:totals[field],official:official[field]??null,equal:Number.isFinite(official[field])&&Math.abs(totals[field]-official[field])<=0.01}));
-  const dataset_revision='sha256:'+await natureEvidenceDigest(snap.datasetSignature),package_revision='sha256:'+await natureEvidenceDigest(snap.packageSignature);
-  const now=natureEvidenceCapture(A,options);if(now.source!==source||now.packageSignature!==snap.packageSignature)throw new Error('داده یا تنظیمات در زمان ساخت بسته تغییر کرده‌اند؛ بستهٔ قبلی منتشر نشد.');
-  const bundle={format:'nature-evidence-contract-v1',experimental:true,stage:1,network_requests:0,identity_scope:'Opaque session identity bound to exact source object, stable across filtering/reordering and field edits; fresh import/new objects receive new identities. Not durable across reload without an explicit import identity manifest.',dataset_revision,package_revision,account_context:snap.account,target_row_ids:snap.targets.map(natureEvidenceRowId),rows,documents,evidence_catalog:catalog,existing_ai_observations:snap.legacyObservations,totals:{target_only:totals,official,comparisons,match:comparisons.every(c=>c.equal),calculation:'same local n0 + anaIsOpening; no AI arithmetic; context rows are never added to target totals'},validation:{all_targets_bound:true,all_fields_bound:true,completeness_asserted:false,semantic_assessment:'not_performed',valid_source_amounts:rows.every(r=>r.amounts.valid)},diagnostics:notes,limitations:['No economic event recognition or sentence-to-claim linkage implemented in stage 1.','Verbatim field binding does not prove semantic relevance or sufficiency.','Human counterparty choice is not human approval of an economic event.','Mapped source fields are preserved; unavailable/unmapped original fields are not invented.','This local package may contain confidential accounting data; it is not uploaded or automatically persisted.']};
-  NE_PACKAGES.set(bundle,{A,options,source,signature:snap.packageSignature,rowBindings,fieldBindings});return bundle;
-}
-function natureEvidenceIsFresh(bundle){
-  const state=NE_PACKAGES.get(bundle);if(!state)return false;
-  try{const capture=natureEvidenceCapture(state.A,state.options);return capture.source===state.source&&capture.packageSignature===state.signature;}catch{return false;}
-}
-function natureEvidenceResolveRow(bundle,rowId){if(!natureEvidenceIsFresh(bundle))return null;return NE_PACKAGES.get(bundle).rowBindings.get(rowId)||null;}
-function natureEvidenceValidateQuote(bundle,ref){
-  if(!natureEvidenceIsFresh(bundle))return {ok:false,reason:'stale_or_unbound_package'};
-  if(!ref||typeof ref!=='object')return {ok:false,reason:'explicit_evidence_row_field_required'};
-  const binding=NE_PACKAGES.get(bundle).fieldBindings.get(ref.evidence_id);
-  if(!binding||ref.source_row_id!==binding.item.source_row_id||ref.field!==binding.field)return {ok:false,reason:'wrong_evidence_row_or_field'};
-  const quote=ref.quote;if(typeof quote!=='string'||!quote.trim())return {ok:false,reason:'empty_quote'};
-  const text=binding.item.text;
-  const start=ref.start===undefined?text.indexOf(quote):ref.start;
-  if(!Number.isInteger(start)||start<0||text.slice(start,start+quote.length)!==quote)return {ok:false,reason:'quote_not_exact_in_bound_field'};
-  return {ok:true,evidence_id:ref.evidence_id,source_row_id:ref.source_row_id,field:ref.field,start,end:start+quote.length,offset_units:'UTF-16 code units',authenticity:'exact_source_field_only',semantic_relevance:'not_evaluated',sufficiency:'not_evaluated'};
-}
-// Lab-only UI: attached outside worksheet/print content, never calls anaAIAuto.
-if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true&&typeof document!=='undefined'){
-  const style=document.createElement('style');style.textContent='@media print{#natureEvidenceLab{display:none!important}}#natureEvidenceLab{margin:12px 0;padding:12px;border:1px dashed #b68d32;border-radius:12px}#natureEvidenceLab pre{max-height:420px;overflow:auto;white-space:pre-wrap;direction:ltr;text-align:left;overflow-wrap:anywhere}';document.head.appendChild(style);
-  const saved=new WeakMap();
-  const attach=()=>{
-    const host=document.querySelector('#anaOutput .ana-output-workspace');if(!host||host.querySelector('#natureEvidenceLab'))return;
-    const panel=document.createElement('details');panel.id='natureEvidenceLab';
-    panel.innerHTML='<summary>آزمایش محلی قرارداد شواهد — بدون ارسال به AI</summary><p>مرحلهٔ اول فقط ردیف‌ها و شواهد را به منبع وصل می‌کند؛ تشخیص رویداد و متن رسمی تغییر نمی‌کند. اطلاعات محرمانه را عمومی نکنید.</p><button type="button" class="btn ghost" data-ne-build>ساخت بستهٔ شواهد — بدون AI</button><p role="status" data-ne-status></p><pre data-ne-output hidden></pre>';
-    const current=typeof ANA==='undefined'?null:ANA.out[ANA.active],previous=current&&saved.get(current);
-    if(previous){panel.querySelector('[data-ne-status]').textContent=natureEvidenceIsFresh(previous)?'بستهٔ قبلی موجود است؛ برای مشاهده دوباره بسازید.':'بستهٔ قبلی منقضی شده است؛ دوباره بسازید.';}
-    panel.querySelector('[data-ne-build]').onclick=async()=>{
-      const output=panel.querySelector('[data-ne-output]'),status=panel.querySelector('[data-ne-status]'),button=panel.querySelector('button'),o=ANA.out[ANA.active];if(!o)return;
-      button.disabled=true;status.textContent='در حال اتصال محلی ردیف‌ها و شواهد…';output.hidden=true;
-      try{
-        const bundle=await natureEvidenceBuild(o.A,{existingReview:ANA.aiBy?.[ANA.active]?.counterpartEvidence});
-        if(ANA.out[ANA.active]!==o||!panel.isConnected)throw new Error('حساب یا صفحه تغییر کرده است؛ بستهٔ قبلی نمایش داده نشد.');
-        saved.set(o,bundle);panel.evidenceBundle=bundle;
-        output.textContent=JSON.stringify(bundle,null,2);output.hidden=false;
-        status.textContent='بسته ساخته شد؛ '+bundle.target_row_ids.length.toLocaleString('fa-IR')+' ردیف هدف، '+bundle.documents.length.toLocaleString('fa-IR')+' گروه سند، '+bundle.evidence_catalog.length.toLocaleString('fa-IR')+' شاهد. تطبیق ارقام: '+(bundle.totals.match?'برابر با محاسبات رسمی':'نیازمند بازبینی؛ خروجی رسمی تغییر نکرد')+'؛ درخواست AI: صفر.';
-      }catch(error){status.textContent=error.message;panel.evidenceBundle=null;}finally{button.disabled=false;}
-    };
-    host.insertBefore(panel,host.querySelector('#anaSheet'));
-  };
-  new MutationObserver(attach).observe(document.body,{childList:true,subtree:true});attach();
-}
-// <<<NATURE-EVIDENCE-LAB-END>>>
 
-// <<<NATURE-EVENT-LAB-BEGIN>>>
-// Stage 2 local protocol/structural validation ONLY. No AI transport or official writes.
-const NEL_REQUESTS=new WeakMap();
-function natureEventRequest(bundle,options={}){
-  if(!natureEvidenceIsFresh(bundle))throw Error('بستهٔ شواهد منقضی یا نامتصل است.');
-  const payload=JSON.parse(JSON.stringify(bundle));
-  const request={format:'nature-event-request-v1',dataset_revision:bundle.dataset_revision,package_revision:bundle.package_revision,evidence:payload,rules:{viewpoint:'entity',independent_targets:true,context_is_not_pairing:true,no_inferred_settlement:true,no_ai_arithmetic:true,human_review:'not_reviewed',allowed_status:['supported','insufficient','ambiguous'],quote_authenticity_is_not_semantic_support:true}};
-  const bytes=new TextEncoder().encode(JSON.stringify(request)).length;
-  const maxBytes=options.maxBytes??1000000;
-  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||bytes>maxBytes)throw Error('بسته از سقف محلی بزرگ‌تر است؛ ارسال، حذف ردیف یا تلاش مجدد انجام نشد.');
-  const freeze=o=>{if(o&&typeof o==='object'){Object.values(o).forEach(freeze);Object.freeze(o);}return o;};
-  freeze(request);NEL_REQUESTS.set(request,{bundle,bytes});return request;
-}
-function natureEventExample(request){
-  if(!NEL_REQUESTS.has(request))throw Error('درخواست ناشناخته است.');
-  return {format:'nature-event-response-v1',dataset_revision:request.dataset_revision,package_revision:request.package_revision,claims:[],assessments:request.evidence.target_row_ids.map(row_id=>({row_id,status:'insufficient',claim_ids:[],unknowns:['این پاسخ صرفاً شبیه‌سازی آزمایش است؛ ارزیابی اقتصادی انجام نشده است.']})),sentences:[]};
-}
-function natureEventValidate(request,input){
-  const errors=[],state=NEL_REQUESTS.get(request),fail=code=>{errors.push(code);};
-  const result=()=>({ok:errors.length===0,errors,validation_scope:'structure_and_exact_source_binding_only',semantic_review:'not_performed',human_review_status:'not_reviewed',official_output_changed:false,network_requests:0});
-  if(!state){fail('unknown_request');return result();}
-  if(!natureEvidenceIsFresh(state.bundle)){fail('stale_package');return result();}
-  let response;
-  try{const raw=typeof input==='string'?input:JSON.stringify(input);if(typeof raw!=='string'||new TextEncoder().encode(raw).length>1000000)throw Error();response=JSON.parse(raw);}catch{fail('invalid_or_oversized_json');return result();}
-  if(!response||response.format!=='nature-event-response-v1'){fail('invalid_format');return result();}
-  if(response.dataset_revision!==request.dataset_revision||response.package_revision!==request.package_revision)fail('wrong_revision');
-  if(!Array.isArray(response.claims)||!Array.isArray(response.assessments)||!Array.isArray(response.sentences)){fail('missing_arrays');return result();}
-  if(response.claims.length>request.evidence.target_row_ids.length*4||response.assessments.length!==request.evidence.target_row_ids.length||response.sentences.length>2){fail('invalid_counts');return result();}
-  const targets=new Set(request.evidence.target_row_ids),rows=new Map(request.evidence.rows.map(r=>[r.row_id,r])),claims=new Map(),assessments=new Map();
-  const text=v=>typeof v==='string'&&v.trim().length>0&&v.length<=4000;
-  const unique=a=>Array.isArray(a)&&new Set(a).size===a.length;
-  const quote=ref=>natureEvidenceValidateQuote(state.bundle,ref).ok;
-  for(const c of response.claims){
-    if(!c||!text(c.claim_id)||claims.has(c.claim_id)){fail('invalid_or_duplicate_claim_id');continue;}claims.set(c.claim_id,c);
-    if(!text(c.interpretation)||!unique(c.target_row_ids)||!c.target_row_ids.length||c.target_row_ids.some(id=>!targets.has(id))){fail('invalid_claim_targets_or_text');continue;}
-    if(!Array.isArray(c.evidence)||!c.evidence.length||!Array.isArray(c.counterevidence)||!Array.isArray(c.unknowns)||c.unknowns.some(v=>!text(v))){fail('missing_claim_evidence_or_unknowns');continue;}
-    for(const ref of [...c.evidence,...c.counterevidence]){
-      if(!quote(ref)){fail('invalid_quote_binding');continue;}
-      const row=rows.get(ref.source_row_id);
-      if(!row||!c.target_row_ids.some(id=>id===ref.source_row_id||(row.document_id&&row.document_id===rows.get(id)?.document_id)))fail('evidence_outside_target_document');
-    }
-    for(const id of c.target_row_ids)if(!c.evidence.some(ref=>ref.source_row_id===id&&quote(ref)))fail('target_has_no_own_evidence');
-  }
-  for(const a of response.assessments){
-    if(!a||!targets.has(a.row_id)||assessments.has(a.row_id)){fail('unknown_or_duplicate_assessment');continue;}assessments.set(a.row_id,a);
-    if(!['supported','insufficient','ambiguous'].includes(a.status)||!unique(a.claim_ids)||!Array.isArray(a.unknowns)||a.unknowns.some(v=>!text(v))){fail('invalid_assessment');continue;}
-    if(a.status==='supported'&&!a.claim_ids.length)fail('supported_without_claim');
-    if(a.status!=='supported'&&(!a.unknowns.length||a.claim_ids.length))fail('unresolved_requires_unknowns_and_no_claims');
-    for(const id of a.claim_ids)if(!claims.has(id)||!Array.isArray(claims.get(id).target_row_ids)||!claims.get(id).target_row_ids.includes(a.row_id))fail('assessment_claim_mismatch');
-  }
-  for(const id of targets)if(!assessments.has(id))fail('missing_target_assessment');
-  for(const [id,c] of claims)for(const rowId of (Array.isArray(c.target_row_ids)?c.target_row_ids:[]))if(!assessments.get(rowId)?.claim_ids?.includes(id)||assessments.get(rowId)?.status!=='supported')fail('orphan_or_unresolved_claim');
-  for(const sentence of response.sentences){
-    if(!sentence||!text(sentence.text)||/[0-9۰-۹٠-٩\n\r#*`{}\[\]:：]/u.test(sentence.text)||!unique(sentence.claim_ids)||!sentence.claim_ids.length){fail('invalid_formal_sentence');continue;}
-    for(const id of sentence.claim_ids)if(!claims.has(id))fail('sentence_unknown_claim');
-  }
-  const output=result();
-  if(output.ok){output.assessments=response.assessments.map(a=>({...a,model_status:a.status,human_review_status:'not_reviewed'}));output.claims=response.claims;output.sentences=response.sentences;output.proposed_nature=response.sentences.map(s=>s.text.trim()).join(' ');output.coverage=response.assessments.every(a=>a.status==='supported')?'all_targets_model_assessed':'partial_or_unresolved';output.release_status='experimental_candidate_requires_semantic_review';}
-  return output;
-}
-// Counts exact source objects, never matches rows by text/amount similarity.
-function natureEventScopeAudit(job){
-  const ctx=cpLabContext(job.source),sourceSet=new Set(job.source),targets=new Set(job.rows),keys=new Set(job.rows.map(r=>ctx.key(r)).filter(Boolean)),observed=new Set(),unique=new Set();
-  let occurrences=0,outside=0,unbound=0,largest=0,verified=true;
-  for(const key of keys){const doc=ctx.documents.get(key)||[];largest=Math.max(largest,doc.length);doc.forEach(r=>observed.add(r));}
-  const detail=r=>({description:String(r['شرح سند']??''),lineDescription:String(r['شرح ردیف']??''),debit:cpLabAmount(r['بدهکار']),credit:cpLabAmount(r['بستانکار'])});
-  job.rows.forEach((row,i)=>{
-    const m=cpWorksheetModel(row,ctx);let groups=m.groups;
-    if(!groups.length&&m.evidence.document.length){const summary=ctx.summaries.get(ctx.key(row)),own=summary?.amounts.get(row);if(summary?.valid&&own&&(own.d>0)!==(own.c>0))groups=cpWorksheetGroups(own.d>0?summary.credit:summary.debit,ctx);}
-    const record=job.records[i];
-    if(!record||groups.length!==record.candidates.length){verified=false;return;}
-    groups.forEach((group,j)=>{
-      const candidate=record.candidates[j];
-      if(group.name!==candidate.name||JSON.stringify(group.rows.map(detail))!==JSON.stringify(candidate.rows)){verified=false;return;}
-      for(const r of group.rows){occurrences++;unique.add(r);if(!sourceSet.has(r))unbound++;if(!ctx.key(row)||ctx.key(r)!==ctx.key(row))outside++;}
-    });
-  });
-  const union=new Set([...targets,...unique]);
-  return {source_rows:job.source.length,target_rows:job.rows.length,target_unique_rows:targets.size,targets_outside_source:job.rows.filter(r=>!sourceSet.has(r)).length,target_document_groups:keys.size,observed_rows_in_target_documents:observed.size,largest_target_document_rows:largest,candidate_occurrences:occurrences,unique_candidate_source_rows:unique.size,repeated_candidate_occurrences:occurrences-unique.size,candidates_outside_own_target_document:outside,candidates_not_bound_to_source:unbound,candidate_mapping_verified:verified,unique_targets_and_candidate_rows:union.size,entire_source_represented:verified&&job.source.length>0&&union.size===sourceSet.size&&[...sourceSet].every(r=>union.has(r)),scope_definition:'current mapped document key; not independent proof of correct source mapping or economic relationship',known_counterpart_candidate_chars:job.records.filter(r=>r.source==='code'||r.source==='user').reduce((n,r)=>n+JSON.stringify(r.candidates).length,0),unresolved_candidate_chars:job.records.filter(r=>r.source==='unresolved').reduce((n,r)=>n+JSON.stringify(r.candidates).length,0)};
-}
-if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true&&typeof document!=='undefined'){
-  const attach=()=>{
-    const host=document.getElementById('natureEvidenceLab');if(!host||host.querySelector('[data-event-lab]'))return;
-    const box=document.createElement('details');box.dataset.eventLab='';
-    box.innerHTML='<summary>مرحلهٔ دوم آزمایشی — اعتبارسنجی پاسخ، بدون AI</summary><p>صحت ارجاع به معنی صحت برداشت اقتصادی نیست. متن این بخش وارد ماهیت رسمی نمی‌شود.</p><button type="button" data-event-example>ساخت پاسخ شبیه‌سازی‌شده از بستهٔ تازه</button><textarea data-event-input aria-label="پاسخ ساختاریافتهٔ آزمایشی" rows="8" style="width:100%;direction:ltr"></textarea><button type="button" data-event-validate>اعتبارسنجی محلی پاسخ</button><pre data-event-result role="status"></pre>';
-    const diagnostic=document.createElement('div');
-    diagnostic.innerHTML='<button type="button" data-local-size>بررسی محلی حجم بسته — بدون AI</button><pre data-local-size-result role="status" style="white-space:pre-wrap"></pre>';
-    diagnostic.querySelector('button').onclick=()=>{
-      const out=diagnostic.querySelector('pre');
-      try{
-        const A=ANA.out[ANA.active]?.A;if(!A)throw Error('ابتدا حساب را انتخاب کنید.');
-        const base=anaTargetNatureFacts(A),job=anaCounterpartyCreate(A),nature=anaCounterpartyNatureFacts(base,{records:job.records}),resolver=job.pending.length?anaCounterpartyResolverFacts(job):'';
-        const strings=new Map();const scan=v=>{if(typeof v==='string'&&v.length>=20)strings.set(v,(strings.get(v)||0)+1);else if(Array.isArray(v))v.forEach(scan);else if(v&&typeof v==='object')Object.values(v).forEach(scan);};scan(JSON.parse(nature));
-        let repeated=0;for(const [text,count] of strings)repeated+=text.length*Math.max(0,count-1);
-        const report=ANA.out[ANA.active]?.report;const scope=natureEventScopeAudit(job);
-        const lines=['گزارش محلی — بدون شرح، نام حساب، مبلغ یا کلید','تعداد ردیف هدف: '+A.rows.length,'موارد تعیین‌شده با آزمون جدید شرح/مبلغ: '+job.records.filter(r=>r.event_match?.status==='supported_locally').length,'موارد دارای گزینهٔ مستند برای بررسی طرف حساب AI: '+job.pending.length,'موارد نامشخصِ خارج از بررسی AI به‌علت نبود شاهد اختصاصی/تکمیل‌نشدن کنترل: '+job.records.filter(r=>r.review_scope&&!r.eligible).length,'ردیف افتتاحیهٔ حساب، محاسبه‌شده محلی و خارج از AI: '+(A.rows||[]).filter(r=>anaIsOpening(r)).length,'ردیف جاری هدف در بستهٔ طرف حساب AI: '+job.rows.length,'طول خلاصهٔ پایه: '+base.length+' کاراکتر','طول بستهٔ ماهیت و طرف حساب: '+nature.length+' کاراکتر','طول بستهٔ بررسی طرف حساب: '+resolver.length+' کاراکتر','ظرفیت فعال: '+(typeof adaptiveAIStatus==='function'&&adaptiveAIStatus().profile?((adaptiveAIStatus().profile.contextTokens??'نامشخص')+' توکن؛ حد کاراکتر دستی: '+(adaptiveAIStatus().profile.charLimit??'ندارد')):'نامشخص؛ در تنظیمات اتصال تعیین کنید'),'حجم نهایی هر بخش، همراه دستورها و ذخیرهٔ خروجی، پیش از ارسال کنترل می‌شود؛ طول کاراکتر به‌تنهایی حد مدل نیست','تکرار عین رشته‌های طولانی در بستهٔ ماهیت: '+repeated+' کاراکتر (صرفاً اندازه‌گیری؛ نه حجم قابل حذفِ تأییدشده)','ردیف دسته‌بندی‌نشده در آخرین پاسخ: '+(report?.coverage?.missingIds?.length??'پاسخ ثبت نشده'),'درخواست شبکه یا AI توسط این دکمه: صفر','هیچ ردیف، شاهد یا انتخابی تغییر نکرد.'];const reasons={missing_candidate_account_identity:'عنوان قابل اتکای حساب گزینه‌ها موجود نیست',no_event_specific_evidence:'شرح یا ارجاع اختصاصیِ قابل اتکا پیدا نشد',invalid_or_unbalanced_document:'کنترل اعتبار مبالغ/توازن سند تأیید نشد',conflicting_target_references:'ارجاع‌های هدف متعارض‌اند',event_review_search_budget_exceeded:'جست‌وجوی مستند از بودجهٔ محلی فراتر رفت؛ بررسی انسانی لازم است',candidate_source_mapping_mismatch:'تناظر گزینه با ردیف منبع تأیید نشد'};job.records.filter(r=>r.review_scope&&!r.eligible).forEach((r,i)=>lines.push('مورد نامشخصِ ارسال‌نشوندهٔ '+(i+1)+': '+r.review_scope.initial_candidates+' گزینهٔ اولیه محلی؛ '+(reasons[r.review_scope.reason]||'شاهد کافی برای درخواست محدود فراهم نشد')+'؛ ردیف و مبلغ محفوظ است.'));job.records.forEach((record,index)=>{if(!record.review_scope||record.eligible)return;const sourceRow=job.rows[index];lines.splice(1,0,'شماره سندِ مورد نامشخص: '+String(sourceRow['شماره سند']??'ثبت نشده')+' | تاریخ: '+String(sourceRow['تاریخ']??'ثبت نشده')+' | تعداد گزینهٔ اولیه: '+record.review_scope.initial_candidates);});const pendingPayload=resolver?JSON.parse(resolver).unresolved:[];pendingPayload.forEach((r,i)=>lines.push('مورد حل‌نشدهٔ '+(i+1)+': '+r.candidates.length+' گزینه، '+r.candidates.reduce((n,c)=>n+c.rows.length,0)+' ردیف پشتیبان، '+JSON.stringify(r).length+' کاراکتر'));lines.push('--- کنترل دامنهٔ گزینه‌های محلی، نسخهٔ ۳ ---','شمارش زیر مربوط به گزینه‌های کاملِ محلی است؛ طول بستهٔ متنی واقعی در بالای گزارش آمده است.','ردیف‌های کل دفتر: '+scope.source_rows,'ردیف هدف خارج از منبع: '+scope.targets_outside_source,'تعداد اسناد مرتبط طبق کلید فعلی: '+scope.target_document_groups,'تعداد ردیف مشاهده‌شده در این اسناد: '+scope.observed_rows_in_target_documents,'بزرگ‌ترین سند مرتبط، تعداد ردیف: '+scope.largest_target_document_rows,'تعداد درج ردیف در گزینه‌های طرف حساب: '+scope.candidate_occurrences,'ردیف منحصربه‌فرد در گزینه‌ها: '+scope.unique_candidate_source_rows,'تعداد درج تکراریِ همان ردیف‌های منبع: '+scope.repeated_candidate_occurrences,'گزینهٔ خارج از سند همان هدف: '+scope.candidates_outside_own_target_document,'گزینهٔ فاقد اتصال به منبع: '+scope.candidates_not_bound_to_source,'تطبیق ردیف‌های شمرده‌شده با رکوردهای محلی موتور: '+(scope.candidate_mapping_verified?'برابر':'نامعتبر؛ نتیجه نیازمند بررسی است'),'ردیف منحصربه‌فرد هدف و گزینه‌ها روی هم: '+scope.unique_targets_and_candidate_rows,'آیا تمام ردیف‌های منبع در هدف یا گزینه‌های محلی آمده‌اند؟ '+(scope.candidate_mapping_verified?(scope.entire_source_represented?'بله':'خیر'):'قابل اعلام نیست'),'حجم گزینه‌های طرف حساب کدی/دستی: '+scope.known_counterpart_candidate_chars+' کاراکتر','حجم گزینه‌های حل‌نشده: '+scope.unresolved_candidate_chars+' کاراکتر','این کنترل براساس نگاشت فعلی سند است؛ صحت نگاشت فایل و رابطهٔ اقتصادی را اثبات نمی‌کند.');out.textContent=lines.join('\n');
-      }catch(e){out.textContent='بررسی محلی انجام نشد: '+e.message;}
-    };
-    host.insertBefore(diagnostic,host.querySelector('[data-ne-build]'));
-    let request=null;
-    const output=box.querySelector('[data-event-result]'),input=box.querySelector('textarea');
-    box.querySelector('[data-event-example]').onclick=()=>{try{request=natureEventRequest(host.evidenceBundle);input.value=JSON.stringify(natureEventExample(request),null,2);output.textContent='پاسخ شبیه‌سازی شد؛ ارزیابی اقتصادی انجام نشده؛ درخواست AI: صفر.';}catch(e){request=null;output.textContent=e.message;}};
-    box.querySelector('[data-event-validate]').onclick=()=>{output.textContent=JSON.stringify(natureEventValidate(request,input.value),null,2);};host.appendChild(box);
-  };new MutationObserver(attach).observe(document.body,{childList:true,subtree:true});attach();
-}
-// <<<NATURE-EVENT-LAB-END>>>
-
-// <<<CP-EVENT-MATCH-LAB-BEGIN>>>
 // Experimental AI-path only. Official worksheet/manual matching is not replaced.
 function cpEventEvidence(row,ctx){
   const summary=ctx.summaries.get(ctx.key(row)),own=summary?.amounts.get(row);
@@ -6237,24 +6008,6 @@ function reportOpenReference(ref){
  dialog.innerHTML=`<header><b>مستندات ${esc(group?.label||ref)} · حساب انتخابی</b><button type="button" id="reportEvidenceClose">بستن ×</button></header><small>تمام ردیف‌های منبع؛ مبالغ به ریال. ردیف داخلی در عنوان هر شماره قابل مشاهده است.</small>${auditVoucherTable(d,ids)}`;
  document.getElementById('reportEvidenceClose').onclick=()=>dialog.close();dialog.showModal();
 }
-function auditWorksheetControls(o){
- const host=document.getElementById('anaQuickTools');if(!host)return;const q=window.HesabrasiAI?.quickModelList(),models=q?.models||[],busy=window.HesabrasiBenchmarkBusy||Object.values(ANA.aiBy||{}).some(x=>x.busy)||ANA.out.some(x=>x.report?.busy);o.unitMode='rial';
- host.innerHTML=`<div class="ana-model-rerun-bar"><label>مدل فعال (${esc(q?.providerName||'سرویس')}): <select id="anaQuickModelSelect">${models.map(m=>`<option value="${esc(m.id)}" ${m.id===q.activeModel?'selected':''}>${esc(m.label)}</option>`).join('')}<option value="__custom">مدل دیگر…</option></select></label><input id="anaQuickModelCustom" dir="ltr" placeholder="شناسه مدل در همین سرویس" hidden><div class="ana-rerun-btns"><button data-rerun="nature" ${busy?'disabled':''}>اجرای مجدد شرح ماهیت</button><button data-rerun="analysis" ${busy?'disabled':''}>اجرای مجدد آنالیز حساب</button></div><small class="ana-sheet-hint">این بخش همیشه برای همین حساب در دسترس است. مدل را انتخاب کنید و شرح ماهیت یا آنالیز را جداگانه اجرا کنید؛ در هر اجرا پیش از ارسال تأیید گرفته می‌شود.</small></div><div class="ana-sheet-tools"><b>تمام مبالغ کاربرگ به ریال</b><div class="ana-sheet-tool-btns"><button id="anaAddRow">+ افزودن ردیف به جدول آنالیز</button><button id="anaResetRows">↺ بازنشانی ویرایش‌های جدول</button></div><small class="ana-sheet-hint">مبالغ منبع و جمع‌ها بدون تبدیل به میلیون ریال نمایش داده می‌شوند؛ ویرایش‌ها محلی و مستقل از داده‌های منبع هستند.</small></div>`;
- const select=host.querySelector('#anaQuickModelSelect'),custom=host.querySelector('#anaQuickModelCustom');select.onchange=()=>{custom.hidden=select.value!=='__custom';};
- host.querySelector('#anaAddRow').onclick=()=>{const rows=auditTemplateRows(o);o.manualRowTarget=rows.length-2+1;anaPaintSheet();};
- host.querySelector('#anaResetRows').onclick=()=>{if(!confirm('ویرایش شرح و ارقام ردیف‌های جدول بازنشانی شود؟'))return;o.templateRowEdits={};o.templateTotalEdits={};o.manualRowTarget=7;anaPaintSheet();};
- host.querySelectorAll('[data-rerun]').forEach(btn=>btn.onclick=async()=>{
-  if(ANA.out[ANA.active]!==o||window.HesabrasiBenchmarkBusy||Object.values(ANA.aiBy||{}).some(x=>x.busy)||ANA.out.some(x=>x.report?.busy))return;
-  const mode=btn.dataset.rerun,id=select.value==='__custom'?custom.value.trim():select.value;if(!id){alert('شناسه مدل معتبر را انتخاب کنید.');return;}
-  if(document.querySelector('#anaSheet [aria-invalid="true"]')){alert('ابتدا مبلغ نامعتبر را اصلاح کنید.');return;}
-  if(mode==='analysis'&&Object.keys(o.templateRowEdits||{}).length&&!confirm('اجرای موفق آنالیز، ویرایش‌های ردیف‌های جدول را بازنشانی می‌کند؛ ادامه می‌دهید؟'))return;
-  if(!window.HesabrasiAI?.setActiveModel(id)){alert('شناسه مدل معتبر را انتخاب کنید.');return;}
-  if(mode==='nature'){
-   const slot=anaAISlot(),before={...slot},oldSec=o.sec['ماهیت'];await anaAIRun();if(slot.error||(!slot.nature&&!slot.noEvidence)){const error=slot.error,detail=slot.detail;Object.assign(slot,before,{error,detail,busy:false});o.sec['ماهیت']=oldSec;if(ANA.out[ANA.active]===o)renderAnalysisOutput();}
-  }
-  if(mode==='analysis'&&ANA.out[ANA.active]===o){const state=reportState(o),before={...state};await reportRun();if(!state.prepared){const error=state.error;Object.assign(state,before,{error,busy:false});}else{o.templateRowEdits={};o.templateTotalEdits={};o.manualRowTarget=7;}if(ANA.out[ANA.active]===o)renderAnalysisOutput();}
- });
-}
 // <<<ACCOUNT-ANALYSIS-END>>>
 
 // <<<ACCOUNT-T-BEGIN>>>
@@ -6469,7 +6222,7 @@ function auditTemplateDisplay(o,v){return v===null||v===undefined?'':reportNumbe
 function auditTemplateRows(o){
  const m=reportTModel(o),state=reportState(o),rows=[{description:'افتتاحیه',dr:m.opening>=0?m.opening:null,cr:m.opening<0?-m.opening:null,kind:'opening',ref:'O1'}];
  if(state.prepared)for(const g of state.categories.filter(g=>!g.opening))rows.push({description:g.label,dr:g.debit===0?null:g.debit,cr:g.credit===0?null:g.credit,ref:g.id});
- while(rows.length<Math.max(7,o.manualRowTarget||7))rows.push({description:'',dr:null,cr:null});
+ while(rows.length<7)rows.push({description:'',dr:null,cr:null});
  rows.forEach((r,i)=>{const e=(o.templateRowEdits||{})[i]||{};if(e.description!==undefined)r.description=e.description;if(e.dr!==undefined)r.dr=e.dr;if(e.cr!==undefined)r.cr=e.cr;});
  // All source values, edits and recalculated totals remain in full rials.
  const value=v=>v==null?0:v;
@@ -8005,7 +7758,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
       if(useStream){payload.stream=true;payload.stream_options={include_usage:true};}
       if(gemini)payload=adGooglePayload(job.messages,job.output);
       else if(anthropic)payload=HesabrasiAI.anthropicPayload(job.messages,job.output,sxClean.model);
-      const requestJSON=JSON.stringify(payload);if(operation?.trace){traceRequest={index:operation.trace.requests.length+1,at:new Date().toISOString(),purpose:meta.purpose,provider:sxClean.provider,model:sxClean.model,requestJSON:cleanKey?requestJSON.split(cleanKey).join('[کلید حذف شد]'):requestJSON,status:'attempted_not_delivery_proven'};operation.trace.requests.push(traceRequest);}
+      const requestJSON=JSON.stringify(payload);
       const url=window.HesabrasiAI?HesabrasiAI.chatUrl(sxClean):(gemini?AD_GOOGLE_ROOT+'models/'+adGoogleModelId(sxClean.model)+':generateContent':AI_ENDPOINT);
       const headers=window.HesabrasiAI?HesabrasiAI.chatHeaders(sxClean):(gemini?{'Content-Type':'application/json','x-goog-api-key':cleanKey}:{'Content-Type':'application/json',Authorization:'Bearer '+cleanKey});
       let response;
@@ -8105,7 +7858,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
   if(ANA.out.some(o=>o.report?.busy))return;const index=ANA.active,slot=anaAISlot(),store=ANA.aiBy,o=ANA.out[index];if(!o||slot.busy||slot.nature||slot.noEvidence)return;
   const sourceRef=FULL_ROWS,rowsSnap=[...(o.A.rows||[])];let counterpartContextSignature=null;
   const isFresh=()=>sourceRef===FULL_ROWS&&rowsSnap.length===(o.A.rows||[]).length&&rowsSnap.every((r,idx)=>r===o.A.rows[idx])&&(counterpartContextSignature===null||JSON.stringify(anaNatureCounterpartContext(o.A))===counterpartContextSignature);
-  const current=()=>ANA.aiBy===store&&ANA.out[index]===o&&ANA.active===index,paint=()=>{if(current()){ANA.ai.busy=slot.busy;anaAIShow();}};slot.busy=true;slot.error='';slot.detail='';slot.noEvidence=false;slot.adaptiveCalls=0;slot.counterpartEvidence=null;slot.receivedNature='';slot.aiTrace=null;AD.running++;const started=Date.now();
+  const current=()=>ANA.aiBy===store&&ANA.out[index]===o&&ANA.active===index,paint=()=>{if(current()){ANA.ai.busy=slot.busy;anaAIShow();}};slot.busy=true;slot.error='';slot.detail='';slot.noEvidence=false;slot.adaptiveCalls=0;slot.counterpartEvidence=null;slot.receivedNature='';AD.running++;const started=Date.now();
   try{
    slot.stage='بررسی ظرفیت مدل و آماده‌سازی شرح اسناد…';paint();
    const base=NATURE_SEND_MODE==='target'?anaTargetNatureFacts(o.A):NATURE_SEND_MODE==='full'?anaNatureFactsText(o.A):anaCompactNatureFacts(o.A,NATURE_TOP_N);
@@ -8113,10 +7866,9 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
    counterpartContextSignature=prepared.counterpartContext?JSON.stringify(prepared.counterpartContext):null;
    let packet;try{packet=JSON.parse(prepared.facts);}catch{packet={format:'nature-full-text-v1',account:{title:o.A.title,path:o.A.pathLabel},full_facts:base,...(prepared.counterpartContext?{counterpart_context:prepared.counterpartContext}:{})};}
    const requestChars=JSON.stringify(packet).length,emptyCpPlan={jobs:[],maxCalls:0,cost:0};
-   slot.aiTrace=adTraceCreate('nature',o.A,reportBuild(o.A));
    const initialProfile=await profile(),initialFinal=adPlanNature(initialProfile,packet,adNaturePrompt(natureSystem),natureNotesSystem);
    const operation=await beginOperation(initialProfile,emptyCpPlan,initialFinal,0,()=>current()&&isFresh(),'تهیهٔ ماهیت — تأیید یک‌بارهٔ کل عملیات');
-   operation.trace=slot.aiTrace;slot.counterpartReviewRequests=0;
+   slot.counterpartReviewRequests=0;
    slot.inputChars=requestChars;slot.sendMode=NATURE_SEND_MODE;slot.counterpartContextIncluded=!!slot.includeCounterpartAccounts;
    const r=await writeNature(packet,()=>current()&&isFresh(),stage=>{slot.stage=stage;paint();},operation,natureSystem,natureNotesSystem);
    slot.receivedNature=r.text;try{r.text=adNatureText(r.text);}catch(error){try{const fix=await routerRequest([{role:'system',content:'فقط یک پاراگراف فارسی ماهیت حساب، آماده درج در کاربرگ. هیچ رقم، مبلغ، تاریخ، شماره سند، کد، عنوان یا فهرست ننویس. اگر رقم بنویسی متن رد می‌شود.'},{role:'user',content:'متن زیر به‌خاطر عدد رد شد. همان معنا را کاملاً بدون رقم بازنویس:\n'+String(r.text||'')}],512,{purpose:'nature'});if(!fix||!fix.ok)throw error;r.text=adNatureText(fix.text);}catch(e2){const cleaned=typeof adNatureSanitize==='function'?adNatureSanitize(r.text):'';if(cleaned&&cleaned.length>=40&&!/[0-9۰-۹٠-٩]/.test(cleaned)){r.text=adNatureText(cleaned);if(window.HesabrasiDebug)HesabrasiDebug.log('nature_fallback_sanitized',{cleaned});}else{decision(r,false);throw error;}}}slot.receivedNature='';decision(r,true);slot.usage=r.usage;slot.elapsedSeconds=Math.round((Date.now()-started)/1000);slot.adaptiveCalls=r.adaptiveCalls;slot.noEvidence=r.text==='__NO_SUPPORTED_NATURE__';slot.nature=slot.noEvidence?'':r.text;slot.analysis='';o.sec['ماهیت']={k:'ماهیت',t:'ماهیت حساب',kind:'text',text:slot.nature};delete o.sec['آنالیز'];
@@ -8125,16 +7877,14 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  };
  reportRun=async function(){
   if(!window.sharedOpeningReady?.()||!ROUTER_KEY)return previousReport();const o=ANA.out[ANA.active];if(!o)return;const state=reportState(o);if(state.busy||Object.values(ANA.aiBy||{}).some(s=>s.busy))return;
-  const data=reportBuild(o.A);Object.assign(state,{data,error:'',categories:[],sections:null,coverage:null,classificationRaw:'',prepared:false,pending:null,counterpartEvidence:null,rowProtocol:null,mathVerified:false,partial:false,aiTrace:null});if(data.invalidRows.length||data.mismatch){state.error='کنترل مبالغ/تطبیق تأیید نشد؛ درخواستی ارسال نشد.';renderAnalysisOutput();return;}if(!data.totals.rowCount){state.error='حساب ردیفی ندارد.';renderAnalysisOutput();return;}if(!data.groups.some(g=>!g.opening))return previousReport();
+  const data=reportBuild(o.A);Object.assign(state,{data,error:'',categories:[],sections:null,coverage:null,classificationRaw:'',prepared:false,pending:null,counterpartEvidence:null,rowProtocol:null,mathVerified:false,partial:false});if(data.invalidRows.length||data.mismatch){state.error='کنترل مبالغ/تطبیق تأیید نشد؛ درخواستی ارسال نشد.';renderAnalysisOutput();return;}if(!data.totals.rowCount){state.error='حساب ردیفی ندارد.';renderAnalysisOutput();return;}if(!data.groups.some(g=>!g.opening))return previousReport();
   const sourceRef=FULL_ROWS,rowsSnap=[...(o.A.rows||[])];
   const isFresh=()=>sourceRef===FULL_ROWS&&rowsSnap.length===(o.A.rows||[]).length&&rowsSnap.every((r,idx)=>r===o.A.rows[idx]);
   const current=()=>ANA.out.includes(o)&&ANA.out[ANA.active]===o&&o.report===state,paint=()=>{if(current())renderAnalysisOutput();};state.busy=true;state.stage='برنامه‌ریزی ظرفیت مدل بر اساس شرح اسناد…';state.duplicateIds=[];state.rowProtocol={ignoredUnknownDeclarations:0,expected:0,classified:0,duplicateIds:[],missingIds:[],explicitUnknownIds:[],invalidCategoryRows:[]};state.mathVerified=false;state.receivedClassification=[];paint();AD.running++;
   try{
-   state.aiTrace=adTraceCreate('analysis',o.A,data);
    const packet=JSON.parse(reportClassificationFacts(o,data)),emptyCpPlan={jobs:[],maxCalls:0,cost:0};
    const initialProfile=await profile(),initialFinal=adPlanAnalysis(initialProfile,packet,AD_ROW_CLASSIFY_SYSTEM);
    const operation=await beginOperation(initialProfile,emptyCpPlan,initialFinal,0,()=>current()&&isFresh(),'آنالیز حساب — تأیید یک‌بارهٔ کل عملیات');
-   operation.trace=state.aiTrace;
    const p=await profile(),s=stamp(p),plan=adPlanAnalysis(p,packet,AD_ROW_CLASSIFY_SYSTEM);if(!await authorize(plan,p,'آنالیز حساب — برنامهٔ درخواست‌ها',operation))throw Error('آنالیز توسط کاربر لغو شد؛ درخواست‌های گروه‌بندی ارسال نشدند.');const groups=[],responses=[];
    for(let i=0;i<plan.jobs.length;i++){state.stage='طبقه‌بندی شرح اسناد، بخش '+(i+1)+' از '+plan.jobs.length;paint();const r=await run(plan.jobs[i],p,s,'analysis',()=>current()&&isFresh(),operation);responses.push(r);state.receivedClassification.push(r.text);let answer={};try{answer=reportJSON(r.text);}catch(err){if(window.HesabrasiDebug)HesabrasiDebug.log('analysis_json_invalid',{raw:String(r.text||'').slice(0,20000),error:err.message});answer={format:'row-classification-v1',categories:[],assignments:[]};}const allowed=new Set(plan.jobs[i].units.map(u=>u.id));let checked=adRowAssignments(answer,allowed);state.duplicateIds.push(...checked.duplicateIds);state.rowProtocol.ignoredUnknownDeclarations+=checked.ignoredUnknownDeclaration?1:0;state.rowProtocol.expected+=checked.expected;state.rowProtocol.classified+=checked.classified;for(const key of ['duplicateIds','missingIds','explicitUnknownIds','invalidCategoryRows'])state.rowProtocol[key].push(...checked[key]);groups.push(...checked.groups);}
    const leftover=new Set(data.groups.filter(g=>!g.opening).map(g=>g.id));groups.forEach(g=>(g.refs||[]).forEach(id=>leftover.delete(id)));if(leftover.size)groups.push(...adLocalFillGroups([...leftover],data));
@@ -8245,403 +7995,31 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
 }
 // <<<ADAPTIVE-AI-LAB-END>>>
 
-// <<<AI-TRACE-LAB-BEGIN>>>
-// Read-only, local snapshots. No fetch, credentials, persistent storage or inference.
-function adTraceClone(value){return JSON.parse(JSON.stringify(value));}
-function adTraceCreate(kind,accountOrJob,data){
- const ids=new Map([...data.rowMap].map(([id,row])=>[row,id]));
- const fields=[...new Set(['شماره سند','تاریخ','نوع سند','شرح سند','شرح ردیف','بدهکار','بستانکار',...ACCOUNT_LEVELS.flatMap(l=>[l.code,l.title])])];
- const srcRows=Array.isArray(accountOrJob?.records)?accountOrJob.rows:(data.groups||[]).filter(g=>!g.opening).map(g=>data.rowMap.get(g.id)).filter(Boolean);
- return {format:'local-ai-trace-v1',kind,createdAt:new Date().toISOString(),preview:false,requests:[],importedResponses:[],rows:srcRows.map((r,i)=>{const rid=ids.get(r)||('R'+(i+1));return {id:rid,targetId:accountOrJob?.records?.[i]?.id||rid,sourceFields:adTraceClone(Object.fromEntries(fields.filter(f=>Object.prototype.hasOwnProperty.call(r,f)).map(f=>[f,r[f]]))),localCounterpartBefore:null};})};
-}
-function adTraceJSONs(text){
- const objects=[];let start=-1,depth=0,quoted=false,escaped=false;
- for(let i=0;i<text.length;i++){const c=text[i];if(start<0){if(c==='{'){start=i;depth=1;quoted=false;escaped=false;}continue;}
-  if(quoted){if(escaped)escaped=false;else if(c==='\\')escaped=true;else if(c==='"')quoted=false;continue;}
-  if(c==='"')quoted=true;else if(c==='{')depth++;else if(c==='}'&&!--depth){objects.push(JSON.parse(text.slice(start,i+1)));start=-1;}
- }
- if(start>=0)throw Error('یک شیء JSON ناقص است؛ متن کامل پاسخ را کپی کنید.');
- if(!objects.length)throw Error('پاسخ JSON پیدا نشد.');return objects;
-}
-function adTraceInspect(trace,id){
- const row=trace.rows.find(r=>r.id===id);if(!row)throw Error('شناسه به ردیف همین بسته متصل نیست.');
- const attempts=[];
- for(const req of trace.requests){
-  const body=JSON.parse(req.requestJSON);let packet;try{packet=JSON.parse(body.messages?body.messages.at(-1).content:body.contents.at(-1).parts.map(p=>p.text||'').join(''));}catch{continue;}
-  let sent=null;
-  if(req.purpose==='analysis')sent=packet.rows?.find(r=>r.id===id);
-  else if(req.purpose==='nature'||req.purpose==='nature-notes')sent=packet.groups?{format:packet.format,groupsCount:packet.groups.length}:null;
-  if(!sent)continue;
-  let response=null;try{const parsed=adTraceJSONs(req.responseText||'')[0];response=req.purpose==='analysis'?{assignments:parsed.assignments?.filter(a=>a.row_id===id)||[],categories:parsed.categories||[]}:null;}catch{}
-  attempts.push({requestIndex:req.index,purpose:req.purpose,model:req.model||body.model,status:req.status,finishReason:req.finishReason||null,sentEntry:sent,responseForRow:response});
- }
- const imported=trace.importedResponses.map((p,i)=>({part:i+1,scope:'پاسخ چسبانده‌شده؛ درخواست اصلی موجود نیست',assignments:p.assignments.filter(a=>a.row_id===id),categories:p.categories||[]}));
- const analysis=attempts.filter(a=>a.purpose==='analysis');
- const answers=trace.importedResponses.length?imported.flatMap(p=>p.assignments):analysis.flatMap(a=>a.responseForRow?.assignments||[]);
- let outcome='پاسخی برای بررسی ثبت نشده است.';
- if(!analysis.length&&!trace.importedResponses.length&&trace.kind==='nature')outcome='این مرحله پاسخ ردیفی ندارد؛ پاسخ آن شرح ماهیت کل حساب بر اساس شرح اسناد است. برای دسته‌بندی همین ردیف، مقایسهٔ آنالیز را باز کنید.';
- if(trace.importedResponses.length||analysis.some(a=>a.responseForRow))outcome=answers.length>1?'شناسه در پاسخ تکرار شده است.':answers.length===0?(trace.importedResponses.length?'در پاسخ چسبانده‌شده نیست؛ دامنهٔ درخواست قبلی معلوم نیست.':'برای این ردیف ارسالی، انتسابی در پاسخ دریافت‌شده نیست.'):answers[0].category_id==='U'?'هوش مصنوعی صریحاً U داده؛ علت نامشخص‌بودن از این کد معلوم نمی‌شود.':'هوش مصنوعی دسته پیشنهاد داده؛ صحت معنایی هنوز تأیید نشده است.';
- const sent=analysis[0]?.sentEntry;
- const comparison=sent?{descriptionEqual:String(row.sourceFields['شرح سند']??'').trim()===String(sent.description??'').trim(),lineDescriptionEqual:String(row.sourceFields['شرح ردیف']??'').trim()===String(sent.lineDescription??'').trim(),sentCounterpartPresent:Object.prototype.hasOwnProperty.call(sent,'counterpart')}:null;
- return {id,targetId:row.targetId,sourceFields:row.sourceFields,comparison,outcome,attempts,imported,previewPacket:trace.previewPacket?.rows?.find(r=>r.id===id)||null};
-}
-if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
- const escTrace=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const pretty=v=>JSON.stringify(v,null,2);
- function tracePanel(kind){return '<div class="report-controls adaptive-screen-only"><button type="button" data-ai-trace="'+kind+'">مقایسهٔ اکسل، شرح اسناد ارسالی و پاسخ — بدون AI</button><small>محلی و محرمانه؛ بدون ارسال شبکه یا تغییر ردیف و دسته‌بندی. درخواست‌های نسخهٔ قبلی قابل بازیابی خودکار نیستند.</small></div>';}
- const reportControls=reportControlsHTML;
- reportControlsHTML=function(o){return reportControls(o)+tracePanel('analysis');};
- const naturePanel=anaAIPanelHtml;
- anaAIPanelHtml=function(){return naturePanel()+tracePanel('nature');};
- let activeTrace=null;
- function drawRow(dialog){
-  const id=dialog.querySelector('[data-trace-row]').value,view=adTraceInspect(activeTrace,id);
-  dialog.querySelector('[data-trace-result]').textContent=view.outcome;
-  dialog.querySelector('[data-trace-source-summary]').textContent='شرح سند: '+String(view.sourceFields['شرح سند']??'ارائه نشده')+'\nشرح ردیف: '+String(view.sourceFields['شرح ردیف']??'ارائه نشده')+'\nمبنای تحلیل: صرفاً شرح سند و شرح ردیف حساب هدف (بدون ارسال طرف‌حساب)';
-  const lines=view.attempts.map(a=>{const stage={analysis:'دسته‌بندی شرح اسناد',nature:'نگارش ماهیت','nature-notes':'یادداشت ماهیت'}[a.purpose]||a.purpose;
-   return 'درخواست '+a.requestIndex+'، '+stage+' — وضعیت: '+a.status;});
-  if(view.comparison)lines.push('شرح سندِ ارسالی '+(view.comparison.descriptionEqual?'با منبع برابر است.':'با منبع تفاوت دارد؛ جزئیات را مقایسه کنید.')+' شرح ردیفِ ارسالی '+(view.comparison.lineDescriptionEqual?'با منبع برابر است.':'با منبع تفاوت دارد.'));
-  dialog.querySelector('[data-trace-sent-summary]').textContent=lines.length?lines.join('\n'):'سابقهٔ ارسال واقعی برای این ردیف در این مرحله موجود نیست. پیش‌نمایش محلی، اثبات اطلاعات ارسال‌شدهٔ قبلی نیست.';
-  dialog.querySelector('[data-trace-source]').textContent=pretty({sourceFields:view.sourceFields});
-  dialog.querySelector('[data-trace-sent]').textContent=view.attempts.length?pretty(view.attempts.map(a=>({requestIndex:a.requestIndex,purpose:a.purpose,model:a.model,status:a.status,sentEntry:a.sentEntry}))):activeTrace.previewPacket?'ارسال واقعی ثبت نشده است. بستهٔ زیر فقط با وضعیت محلی فعلی ساخته شده، نه بازیابی درخواست قبلی:\n'+pretty(view.previewPacket):'برای این ردیف در این مرحله رکورد خامِ ارسالی ثبت نشده است.';
-  dialog.querySelector('[data-trace-response]').textContent=pretty({outcome:view.outcome,comparison:view.comparison,responses:view.attempts.map(a=>({requestIndex:a.requestIndex,purpose:a.purpose,responseForRow:a.responseForRow})),imported:view.imported});
-  const all=dialog.querySelector('[data-trace-requests]');all.replaceChildren();
-  for(const req of activeTrace.requests){const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent='درخواست '+req.index+' — '+req.purpose+' — '+req.status;pre.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';details.addEventListener('toggle',()=>{pre.textContent=details.open?req.requestJSON+'\n\nپاسخ دریافت‌شده:\n'+(req.responseText||'پاسخ متنی ثبت نشده است.'):'';});details.append(summary,pre);all.append(details);}
- }
- function openTrace(kind){
-  const o=ANA.out[ANA.active];if(!o)throw Error('ابتدا حساب را انتخاب کنید.');
-  const state=kind==='analysis'?reportState(o):anaAISlot();
-  let trace=state.aiTrace;
-  if(!trace){const data=reportBuild(o.A);trace=adTraceCreate(kind,o.A,data);trace.preview=true;trace.previewPacket=JSON.parse(reportClassificationFacts(o,data));state.aiTrace=trace;}
-  activeTrace=trace;
-  let dialog=document.getElementById('adTraceDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='adTraceDialog';dialog.dir='rtl';dialog.className='adaptive-screen-only';dialog.style.cssText='width:min(1000px,calc(100% - 24px));max-height:90vh;overflow:auto;background:var(--panel,#fff);color:var(--ink,#222);border-radius:12px';document.body.appendChild(dialog);}
-  dialog.innerHTML='<h3>مسیر اطلاعات همین حساب — بدون AI</h3><button type="button" data-trace-close>بستن</button><p>این بخش چیزی به AI نمی‌فرستد و در خروجی چاپی نیست. مبنای تحلیل، صرفاً «شرح سند» و «شرح ردیف» ردیف‌های همین حساب است و هیچ طرف‌حسابی ارسال نمی‌شود.</p><p data-trace-scope></p><label>ردیف حساب<select data-trace-row></select></label><p data-trace-result></p><h4>۱. اطلاعات منبع (ردیف حساب در اکسل)</h4><p data-trace-source-summary style="white-space:pre-wrap"></p><pre data-trace-source></pre><h4>۲. رکوردی که در درخواست واقعی قرار گرفت</h4><p data-trace-sent-summary style="white-space:pre-wrap"></p><pre data-trace-sent></pre><h4>۳. جواب هوش مصنوعی برای همین ردیف</h4><pre data-trace-response></pre><details><summary>درخواست‌ها و پاسخ‌های کامل؛ حاوی اطلاعات محرمانهٔ سایر ردیف‌های همین عملیات</summary><div data-trace-requests></div></details><details><summary>بررسی پاسخ قبلی با کپی متن — بدون ارسال و بدون اعمال در کاربرگ</summary><p>می‌توانید چند JSON یا چند بخش کد را با هم بچسبانید. فقط پاسخِ همین فایل و همین حساب را وارد کنید.</p><textarea data-trace-import rows="7" style="width:100%"></textarea><button type="button" data-trace-read>بررسی محلی پاسخ چسبانده‌شده</button><p data-trace-import-status></p></details>';
-  dialog.querySelectorAll('pre').forEach(p=>p.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;direction:rtl;text-align:start');
-  dialog.querySelector('[data-trace-scope]').textContent=trace.preview?'این صفحه فقط پیش‌نمایش اطلاعات محلی فعلی است؛ درخواست واقعی قبلی در حافظهٔ این نسخه نیست.':'بدنهٔ درخواست‌ها درست پیش از تلاش برای ارسال ذخیره شده است. «تلاش ارسال» اثبات رسیدن به سرویس نیست؛ دریافت پاسخ جدا مشخص می‌شود. درخواست‌های خلاصه‌سازی الزاماً رکورد خام هر ردیف را ندارند.';
-  const select=dialog.querySelector('[data-trace-row]');for(const r of trace.rows){const option=document.createElement('option');option.value=r.id;option.textContent=r.id+' — سند '+String(r.sourceFields['شماره سند']??'ثبت نشده');select.appendChild(option);}
-  const preferred=state.rowProtocol?.explicitUnknownIds?.[0]||state.rowProtocol?.missingIds?.[0];if(preferred&&trace.rows.some(r=>r.id===preferred))select.value=preferred;
-  select.onchange=()=>drawRow(dialog);dialog.querySelector('[data-trace-close]').onclick=()=>dialog.close();
-  dialog.querySelector('[data-trace-read]').onclick=()=>{const status=dialog.querySelector('[data-trace-import-status]');try{const parsed=adTraceJSONs(dialog.querySelector('[data-trace-import]').value);if(parsed.some(p=>p.format!=='row-classification-v1'||!Array.isArray(p.assignments)||!Array.isArray(p.categories)||p.assignments.some(a=>!a||typeof a.row_id!=='string'||typeof a.category_id!=='string')))throw Error('پاسخ باید قالب ردیف‌محور با categories و assignments داشته باشد.');trace.importedResponses=adTraceClone(parsed);const allowed=new Set(trace.rows.map(r=>r.id)),ids=parsed.flatMap(p=>p.assignments.map(a=>a.row_id)),unique=new Set(ids);status.textContent='بخش‌ها: '+parsed.length+'؛ انتساب‌ها: '+ids.length+'؛ شناسه‌های یکتا: '+unique.size+'؛ خارج از حساب فعلی: '+ids.filter(id=>!allowed.has(id)).length+'؛ ردیف محلیِ غایب در متن: '+trace.rows.filter(r=>!unique.has(r.id)).length+'. هیچ دسته یا مبلغی تغییر نکرد.';drawRow(dialog);}catch(error){status.textContent=error.message;}};
-  if(trace.rows.length)drawRow(dialog);if(!dialog.open)dialog.showModal();
- }
- document.addEventListener('click',event=>{const button=event.target.closest('[data-ai-trace]');if(!button)return;try{openTrace(button.dataset.aiTrace);}catch(error){button.textContent='بررسی محلی آماده نشد: '+error.message;}});
-}
-// <<<AI-TRACE-LAB-END>>>
-/* Hesabrasi debug pack — download nature + analysis outputs for review. No API keys. */
+
+/* Minimal in-memory diagnostics; no programmer export or account-output package. */
 (function (global) {
   'use strict';
   var events = [];
-
-  function now() { return new Date().toISOString(); }
-
+  function safe(value) {
+    try { return JSON.parse(JSON.stringify(value, function (key, item) {
+      if (typeof item === 'string' && /key|authorization|token|bearer/i.test(key) && item.length > 6) return '[حذف شد]';
+      if (typeof item === 'string' && /^(sk-|ir-|AQ\.|nvapi-|or-)/.test(item)) return '[حذف شد]';
+      if (typeof item === 'string' && item.length > 60000) return item.slice(0,60000)+'\n…[برش شد]';
+      return item;
+    })); } catch (error) { return {error:'serialize-failed'}; }
+  }
   function log(type, data) {
-    events.push({ at: now(), type: type, data: data || {} });
+    events.push({at:new Date().toISOString(),type:type,data:safe(data||{})});
     if (events.length > 250) events.shift();
-    paint();
   }
-
-  function stripSecrets(value) {
-    try {
-      return JSON.parse(JSON.stringify(value, function (k, v) {
-        if (typeof v === 'string' && /key|authorization|token|bearer/i.test(k) && v.length > 6) return '[حذف شد]';
-        if (typeof v === 'string' && /^(sk-|ir-|AQ\.|nvapi-|or-)/.test(v)) return '[حذف شد]';
-        if (typeof v === 'string' && v.length > 60000) return v.slice(0, 60000) + '\n…[برش شد]';
-        return v;
-      }));
-    } catch (e) {
-      return { error: 'serialize-failed', message: String(e) };
-    }
-  }
-
-  function summarizeGroups(groups) {
-    if (!Array.isArray(groups)) return [];
-    return groups.slice(0, 400).map(function (g) {
-      return {
-        id: g.id,
-        opening: !!g.opening,
-        category: g.category || g.group || '',
-        document: g.document || g.doc || '',
-        description: String(g.description || g.documentDescription || g.ds || '').slice(0, 500),
-        debit: g.debit,
-        credit: g.credit,
-        refs: Array.isArray(g.refs) ? g.refs.slice(0, 80) : undefined
-      };
-    });
-  }
-
-  function pack() {
-    var accounts = [];
-    try {
-      (typeof ANA !== 'undefined' && ANA.out ? ANA.out : []).forEach(function (o, i) {
-        var slot = (ANA.aiBy && ANA.aiBy[i]) || {};
-        var report = o.report || {};
-        var a = o.a || {};
-        accounts.push({
-          index: i,
-          active: typeof ANA !== 'undefined' && ANA.active === i,
-          account: {
-            title: a.title || '',
-            pathLabel: a.pathLabel || '',
-            code: a.code || a.fullCode || ''
-          },
-          nature: {
-            acceptedText: slot.nature || '',
-            rejectedRaw: slot.receivedNature || '',
-            analysisSlot: slot.analysis || '',
-            error: slot.error || '',
-            detail: slot.detail || '',
-            stage: slot.stage || '',
-            noEvidence: !!slot.noEvidence,
-            sendMode: slot.sendMode || '',
-            inputChars: slot.inputChars || 0,
-            usage: slot.usage || null,
-            elapsedSeconds: slot.elapsedSeconds || null,
-            adaptiveCalls: slot.adaptiveCalls || 0,
-            counterpartEvidence: slot.counterpartEvidence || null
-          },
-          analysis: {
-            error: report.error || '',
-            prepared: !!report.prepared,
-            busy: !!report.busy,
-            stage: report.stage || '',
-            classificationRaw: report.classificationRaw || '',
-            categories: report.categories || [],
-            coverage: report.coverage || null,
-            groups: summarizeGroups(report.data && report.data.groups),
-            groupCount: report.data && report.data.groups ? report.data.groups.length : 0,
-            invalidRows: report.data && report.data.invalidRows,
-            mismatch: report.data && report.data.mismatch,
-            totals: report.data && report.data.totals
-          }
-        });
-      });
-    } catch (e) {
-      accounts.push({ error: String(e && e.message || e) });
-    }
-    return {
-      format: 'hesabrasi-debug-v1',
-      createdAt: now(),
-      app: 'project-hesabrasi',
-      version: '9.19',
-      note: 'خروجی بازبینی برای پیدا کردن باگ شرح ماهیت و دسته‌بندی. کلید API داخل نیست.',
-      runtime: {
-        provider: typeof AD_PROVIDER !== 'undefined' ? AD_PROVIDER : '',
-        model: typeof ROUTER_MODEL !== 'undefined' ? ROUTER_MODEL : '',
-        sendMode: typeof NATURE_SEND_MODE !== 'undefined' ? NATURE_SEND_MODE : '',
-        aiReady: typeof anaAIReady === 'function' ? !!anaAIReady() : false,
-        badge: (global.HesabrasiAI && HesabrasiAI.badgeText) ? HesabrasiAI.badgeText() : ''
-      },
-      events: events,
-      accounts: accounts
-    };
-  }
-
-  function toText(p) {
-    var lines = [];
-    lines.push('خروجی بازبینی حسابرسی');
-    lines.push('زمان: ' + p.createdAt);
-    lines.push('مدل: ' + (p.runtime.model || '-') + ' | سرویس: ' + (p.runtime.provider || '-'));
-    lines.push('');
-    (p.accounts || []).forEach(function (acc, n) {
-      lines.push('======== حساب ' + (n + 1) + (acc.active ? ' (فعال)' : '') + ' ========');
-      lines.push('عنوان: ' + ((acc.account && acc.account.pathLabel) || (acc.account && acc.account.title) || '-'));
-      lines.push('');
-      lines.push('--- شرح ماهیت ---');
-      if (acc.nature.acceptedText) {
-        lines.push('وضعیت: پذیرفته شد');
-        lines.push(acc.nature.acceptedText);
-      } else if (acc.nature.rejectedRaw) {
-        lines.push('وضعیت: قالب پذیرفته نشد');
-        lines.push('خطا: ' + (acc.nature.detail || acc.nature.error || '-'));
-        lines.push('متن خام مدل:');
-        lines.push(acc.nature.rejectedRaw);
-      } else {
-        lines.push('وضعیت: خالی');
-        lines.push('خطا: ' + (acc.nature.detail || acc.nature.error || '-'));
-      }
-      lines.push('');
-      lines.push('--- آنالیز / دسته‌بندی ---');
-      lines.push('آماده‌شده: ' + (acc.analysis.prepared ? 'بله' : 'خیر'));
-      if (acc.analysis.error) lines.push('خطا: ' + acc.analysis.error);
-      if (acc.analysis.coverage) {
-        try { lines.push('پوشش: ' + JSON.stringify(acc.analysis.coverage)); } catch (e1) {}
-      }
-      if (acc.analysis.categories && acc.analysis.categories.length) {
-        lines.push('دسته‌ها:');
-        acc.analysis.categories.forEach(function (c) {
-          var name = c.label || c.category || c.title || c.name || '?';
-          var count = (c.rows && c.rows.length) || (c.refs && c.refs.length) || c.count || '';
-          lines.push(' • ' + name + (count !== '' ? ' (' + count + ')' : ''));
-        });
-      }
-      if (acc.analysis.groups && acc.analysis.groups.length) {
-        lines.push('نمونه ردیف‌ها (' + acc.analysis.groupCount + '):');
-        acc.analysis.groups.slice(0, 80).forEach(function (g) {
-          lines.push(' - ' + (g.id || '') + ' | ' + (g.category || (g.opening ? 'افتتاحیه' : '')) + ' | ' + (g.description || g.document || ''));
-        });
-      }
-      if (acc.analysis.classificationRaw) {
-        lines.push('پاسخ خام دسته‌بندی:');
-        lines.push(acc.analysis.classificationRaw);
-      }
-      lines.push('');
-    });
-    if (p.events && p.events.length) {
-      lines.push('======== رویدادها ========');
-      p.events.forEach(function (ev) {
-        lines.push('[' + ev.at + '] ' + ev.type);
-        if (ev.data) {
-          var metaParts = [];
-          if (ev.data.provider) metaParts.push('provider=' + ev.data.provider);
-          if (ev.data.model) metaParts.push('model=' + ev.data.model);
-          if (ev.data.purpose) metaParts.push('purpose=' + ev.data.purpose);
-          if (ev.data.status !== undefined) metaParts.push('status=' + ev.data.status);
-          if (ev.data.elapsedSec !== undefined) metaParts.push('elapsedSec=' + ev.data.elapsedSec);
-          if (ev.data.url) metaParts.push('url=' + ev.data.url);
-          if (metaParts.length) lines.push('  جزئیات: ' + metaParts.join(' | '));
-          if (ev.data.error) lines.push('  خطا: ' + ev.data.error);
-          if (ev.data.raw) lines.push('  raw: ' + String(ev.data.raw).slice(0, 1500));
-          if (ev.data.text) lines.push('  text: ' + String(ev.data.text).slice(0, 800));
-        }
-      });
-    }
-    return lines.join('\n');
-  }
-
-  function download(kind) {
-    var p = stripSecrets(pack());
-    var blob, name;
-    if (kind === 'txt') {
-      blob = new Blob([toText(p)], { type: 'text/plain;charset=utf-8' });
-      name = 'hesabrasi-debug.txt';
-    } else {
-      blob = new Blob([JSON.stringify(p, null, 2)], { type: 'application/json;charset=utf-8' });
-      name = 'hesabrasi-debug.json';
-    }
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
-  }
-
-  function html() {
-    var p = pack();
-    var acc = (p.accounts || []).filter(function (x) { return x.active; })[0] || p.accounts[0];
-    var natureState = 'هنوز خروجی نیست';
-    if (acc && acc.nature.acceptedText) natureState = 'شرح ماهیت پذیرفته شد (' + acc.nature.acceptedText.length + ' نویسه)';
-    else if (acc && acc.nature.rejectedRaw) natureState = 'قالب ماهیت رد شد — متن خام ذخیره شده';
-    else if (acc && (acc.nature.error || acc.nature.detail)) natureState = acc.nature.detail || acc.nature.error;
-    var anaState = 'آنالیز هنوز اجرا نشده';
-    if (acc && acc.analysis.prepared) anaState = 'آنالیز آماده شد — ' + (acc.analysis.categories.length || 0) + ' دسته';
-    else if (acc && acc.analysis.error) anaState = acc.analysis.error;
-    return (
-      '<section class="audit-debug-box" dir="rtl">' +
-        '<div class="audit-debug-head"><b>خروجی بازبینی برای برنامه‌نویس</b>' +
-        '<small>همین خروجی را دانلود کنید و بفرستید تا باگ شرح ماهیت و دسته‌بندی دیده شود.</small></div>' +
-        '<p class="audit-debug-sum">' + esc(natureState) + '</p>' +
-        '<p class="audit-debug-sum">' + esc(anaState) + '</p>' +
-        '<div class="audit-debug-actions">' +
-          '<button type="button" id="auditDebugJson">دانلود JSON بازبینی</button>' +
-          '<button type="button" id="auditDebugTxt">دانلود متن بازبینی</button>' +
-        '</div>' +
-        '<p class="audit-debug-hint">کلید API داخل فایل نیست. هر دو فایل را بفرستید.</p>' +
-      '</section>'
-    );
-  }
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
-    });
-  }
-
-  function paint() {
-    var box = document.getElementById('auditDebugBox');
-    if (!box) return;
-    box.innerHTML = html();
-    var j = document.getElementById('auditDebugJson');
-    var x = document.getElementById('auditDebugTxt');
-    if (j) j.onclick = function () { download('json'); };
-    if (x) x.onclick = function () { download('txt'); };
-  }
-
   function hook() {
-    function wrap(name, okType, errType) {
-      try {
-        var fn = global[name];
-        if (typeof fn !== 'function') {
-          try { fn = eval(name); } catch (e0) { return; }
-        }
-        if (typeof fn !== 'function') return;
-        var orig = fn;
-        var wrapped = function () {
-          var args = arguments;
-          try {
-            var out = orig.apply(this, args);
-            if (okType) log(okType, { sample: String(args[0] || '').slice(0, 4000) });
-            return out;
-          } catch (e) {
-            log(errType || (name + '_error'), {
-              error: e && e.message ? e.message : String(e),
-              raw: String(args[0] == null ? '' : args[0]).slice(0, 20000)
-            });
-            throw e;
-          }
-        };
-        try { global[name] = wrapped; } catch (e1) {}
-        try { eval(name + ' = wrapped'); } catch (e2) {}
-      } catch (e) {}
-    }
-    wrap('adNatureText', null, 'nature_template_rejected');
-    wrap('reportJSON', null, 'analysis_json_invalid');
-    wrap('reportAggregate', null, 'analysis_aggregate_failed');
-    wrap('adClassifyGroups', null, 'analysis_classify_failed');
+    if (!global || typeof global.addEventListener !== 'function') return;
+    global.addEventListener('error', function (event) { log('window_error',{error:event&&event.message?String(event.message):'Window error'}); });
+    global.addEventListener('unhandledrejection', function (event) { var reason=event&&event.reason;log('unhandled_rejection',{error:reason&&reason.message?String(reason.message):String(reason||'Unhandled promise rejection')}); });
   }
-
-  var style = document.createElement('style');
-  style.textContent =
-    '.audit-debug-box{margin:12px 0 18px;padding:14px;border:1px dashed #2f6f4f;border-radius:12px;background:#e9f3ec;color:#1f2a24;text-align:right}' +
-    '.audit-debug-head b{display:block;font-size:15px;margin-bottom:4px}' +
-    '.audit-debug-head small,.audit-debug-hint,.audit-debug-sum{display:block;font-size:12px;line-height:1.7;color:#3d4a44}' +
-    '.audit-debug-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}' +
-    '.audit-debug-actions button{padding:8px 12px;border-radius:8px;border:1px solid #2f6f4f;background:#2f6f4f;color:#fff;font-family:Tahoma,sans-serif;cursor:pointer}';
-  document.head.appendChild(style);
-
-  if (global && typeof global.addEventListener === 'function') {
-    global.addEventListener('error', function (ev) {
-      try {
-        log('runtime_error', {
-          error: (ev && ev.message) ? String(ev.message) : 'Unknown script error',
-          text: ((ev && ev.filename ? String(ev.filename).split('/').pop() : 'inline') + ':' + (ev && ev.lineno || 0) + ':' + (ev && ev.colno || 0))
-        });
-      } catch (e) {}
-    });
-    global.addEventListener('unhandledrejection', function (ev) {
-      try {
-        var r = ev && ev.reason;
-        log('unhandled_rejection', {
-          error: r && r.message ? String(r.message) : String(r || 'Unhandled promise rejection')
-        });
-      } catch (e) {}
-    });
-  }
-
-  global.HesabrasiDebug = {
-    log: log,
-    pack: pack,
-    download: download,
-    paint: paint,
-    hook: hook,
-    getEvents: function () { return stripSecrets(events.slice()); },
-    clearEvents: function () { events.length = 0; paint(); }
-  };
+  global.HesabrasiDebug = {log:log,hook:hook,getEvents:function(){return safe(events.slice());},clearEvents:function(){events.length=0;}};
   hook();
 })(typeof window !== 'undefined' ? window : this);
-
-
 
 // راه‌اندازی اولیه — پس از آنکه همه‌ی متغیرها اعلان شدند
 // کاربر با فهرست ماژول‌ها روبه‌رو می‌شود، نه با یک مرحله‌ی خاص

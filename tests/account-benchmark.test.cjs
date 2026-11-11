@@ -5,6 +5,10 @@ const html=fs.readFileSync(path.join(__dirname,'..','audit-google-auto.html'),'u
 if(!html.includes('data-act="benchmark-capacity"')||!html.includes('Synthetic request-capacity probe'))throw Error('OpenRouter settings must retain synthetic capacity probes');
 if(html.includes('accountBenchmarkPanel')||html.includes('accountCompareSelectorHTML')||html.includes('window.HesabrasiAccountBenchmark'))throw Error('the worksheet model-comparison panel should be removed');
 if(html.includes('data-rerun="both"')||html.includes('اجرای مجدد کامل کاربرگ'))throw Error('the combined worksheet rerun action should be removed');
+if(html.includes('مقایسهٔ اکسل، شرح اسناد ارسالی و پاسخ — بدون AI')||html.includes('data-ai-trace')||html.includes('function adTraceCreate'))throw Error('Excel/request/response comparison feature should be removed');
+if(html.includes('natureEvidenceLab')||html.includes('natureEvidenceBuild')||html.includes('آزمایش محلی قرارداد شواهد'))throw Error('local evidence-contract experiment should be removed');
+if(html.includes('خروجی بازبینی برای برنامه‌نویس')||html.includes('auditDebugJson')||html.includes('auditDebugTxt'))throw Error('programmer review export should be removed');
+if(html.includes('anaQuickModelSelect')||html.includes('anaAddRow')||html.includes('anaResetRows'))throw Error('account-analysis active model and worksheet row controls should be removed');
 const errors=[];const vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
 const dom=new JSDOM(html,{runScripts:'dangerously',url:'https://example.test',pretendToBeVisual:true,virtualConsole:vc,beforeParse(w){w.TextEncoder=require('util').TextEncoder;w.TextDecoder=require('util').TextDecoder;w.scrollTo=()=>{};w.confirm=()=>true;w.alert=()=>{};w.fetch=async()=>{throw new Error('unexpected network')}}});
 const w=dom.window;
