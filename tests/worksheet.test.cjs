@@ -111,6 +111,9 @@ ok(SHEET_OUT[1].count===2&&SHEET_OUT[1].sel.flatMap(x=>x.rows).includes(ACCOUNT_
 globalTarget=document.querySelector('#sampleOutputSettings .samp-val');globalTarget.value='100';document.querySelector('#applyAllSamplesBtn').click();
 ok(SHEET_OUT[0].count===2&&SHEET_OUT[0].target==='100'&&!SHEET_OUT[0].sel.flatMap(x=>x.rows).includes(ACCOUNT_ROWS[2]),'global preview controls rebuild all worksheets while preserving detected transfer exclusions');
 ACCOUNT_LEVELS=oldLevels;ACCOUNT_ROWS=oldRows;WORKSHEET_ACCOUNTS=oldAccounts;SHEET_OUT=oldOut;SAMP_TARGET=oldTarget;SAMP_CFG=oldCfg;
+ok(typeof HesabrasiAccountBenchmark?.run==='function'&&HesabrasiAccountBenchmark.compare('فروش کالا از مشتریان','فروش کالا از مشتریان').f1===1&&HesabrasiAccountBenchmark.compare('','فروش کالا از مشتریان').f1===null,'account benchmark exposes sequential runner and optional local reference comparison');
+ok(typeof HesabrasiCapacityBenchmark?.run==='function','OpenRouter capacity probe API is available independently of an account');
+ok(document.getElementById('accountBenchmarkRun')&&document.getElementById('accountBenchmarkReference')&&document.getElementById('accountBenchmarkDownload'),'selected-account worksheet shows reference, run-all-models, and CSV controls');
 window.testResult='PASS';
 }catch(e){window.testResult=e.stack;}
 `;
