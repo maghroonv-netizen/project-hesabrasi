@@ -3,8 +3,18 @@ import { once } from 'node:events';
 import { createTookenProxyServer } from '../tooken-local-proxy.mjs';
 
 const calls = [];
+let upstreamStarted;
+let upstreamAborted;
 const fetchImpl = async (url, init) => {
   calls.push({ url, init });
+  if (init.body && JSON.parse(Buffer.from(init.body).toString()).model === 'cancel-test') {
+    upstreamStarted?.();
+    return new Promise((resolve, reject) => {
+      const abort = () => { upstreamAborted?.(); reject(init.signal.reason || new Error('aborted')); };
+      if (init.signal.aborted) abort();
+      else init.signal.addEventListener('abort', abort, { once: true });
+    });
+  }
   if (url.endsWith('/models')) {
     return new Response(JSON.stringify({ data: [{ id: 'gpt-6.1-sol' }] }), {
       status: 200,
@@ -49,11 +59,27 @@ try {
   assert.notEqual(calls[1].init.headers.Authorization, 'Bearer browser-secret');
   assert.deepEqual(JSON.parse(Buffer.from(calls[1].init.body).toString()), chatBody);
 
+  const upstreamReady = new Promise(resolve => { upstreamStarted = resolve; });
+  const cancellationObserved = new Promise(resolve => { upstreamAborted = resolve; });
+  const browserController = new AbortController();
+  const cancelledRequest = fetch(origin + '/api/tooken/chat/completions', {
+    method: 'POST', signal: browserController.signal,
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'cancel-test', messages: [] })
+  }).catch(error => error);
+  await upstreamReady;
+  browserController.abort();
+  const clientResult = await cancelledRequest;
+  assert.equal(clientResult.name, 'AbortError');
+  await cancellationObserved;
+  const cancelledUpstream = calls.at(-1);
+  assert.equal(cancelledUpstream.init.signal.aborted, true, 'browser disconnect must abort the Tooken upstream fetch');
+
   const hostile = await fetch(origin + '/api/tooken/models', {
     headers: { Origin: 'https://evil.example', 'Sec-Fetch-Site': 'cross-site' }
   });
   assert.equal(hostile.status, 403);
-  assert.equal(calls.length, 2, 'untrusted origins must not be forwarded upstream');
+  assert.equal(calls.length, 3, 'untrusted origins must not be forwarded upstream');
 
   const wrongRoute = await fetch(origin + '/api/other', { headers });
   assert.equal(wrongRoute.status, 404);
