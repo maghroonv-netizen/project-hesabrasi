@@ -92,26 +92,55 @@ export function createTookenProxyServer({
       const upstreamUrl = isModels
         ? 'https://tooken.club/v1/models'
         : 'https://tooken.club/v1/chat/completions';
-      const upstream = await fetchImpl(upstreamUrl, {
-        method: isModels ? 'GET' : 'POST',
-        headers: {
-          Authorization: `Bearer ${secret}`,
-          Accept: req.headers.accept || 'application/json',
-          ...(isChat ? { 'Content-Type': 'application/json' } : {})
-        },
-        ...(isChat ? { body } : {}),
-        signal: AbortSignal.timeout(120000)
-      });
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(new Error('Upstream request timed out')), 120000);
+      let clientGone = false;
+      const cancelUpstream = () => {
+        if (clientGone || res.writableEnded) return;
+        clientGone = true;
+        controller.abort(new Error('Browser client disconnected'));
+      };
+      req.once('aborted', cancelUpstream);
+      res.once('close', cancelUpstream);
+      try {
+        const upstream = await fetchImpl(upstreamUrl, {
+          method: isModels ? 'GET' : 'POST',
+          headers: {
+            Authorization: `Bearer ${secret}`,
+            Accept: req.headers.accept || 'application/json',
+            ...(isChat ? { 'Content-Type': 'application/json' } : {})
+          },
+          ...(isChat ? { body } : {}),
+          signal: controller.signal
+        });
 
-      res.statusCode = upstream.status;
-      res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
-      res.setHeader('Cache-Control', 'no-store');
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      if (!upstream.body) return res.end();
-      for await (const chunk of upstream.body) {
-        if (!res.write(chunk)) await new Promise(resolveDrain => res.once('drain', resolveDrain));
+        if (clientGone || res.destroyed) {
+          await upstream.body?.cancel().catch(() => {});
+          return;
+        }
+        res.statusCode = upstream.status;
+        res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (!upstream.body) return res.end();
+        for await (const chunk of upstream.body) {
+          if (clientGone || res.destroyed) {
+            await upstream.body.cancel().catch(() => {});
+            return;
+          }
+          if (!res.write(chunk)) await new Promise((resolveDrain, reject) => {
+            const onDrain = () => { cleanup(); resolveDrain(); };
+            const onClose = () => { cleanup(); reject(new Error('Browser client disconnected')); };
+            const cleanup = () => { res.off('drain', onDrain); res.off('close', onClose); };
+            res.once('drain', onDrain);res.once('close', onClose);
+          });
+        }
+        if (!clientGone && !res.destroyed) res.end();
+      } finally {
+        clearTimeout(deadline);
+        req.off('aborted', cancelUpstream);
+        res.off('close', cancelUpstream);
       }
-      res.end();
     } catch (error) {
       if (res.destroyed) return;
       const status = Number(error && error.statusCode) || 502;
