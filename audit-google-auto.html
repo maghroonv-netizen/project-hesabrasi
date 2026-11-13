@@ -2173,10 +2173,7 @@ function entryUpload(){
       </div>
       <p class="hint">فایل فقط در همین مرورگر خوانده می‌شود و به هیچ سروری ارسال نمی‌گردد.</p>
     </div>
-    <div class="card entry-sr-note">
-      <span>⏳ برای <b>اقلام سنواتی و راکد</b> که فایل اسناد چند سال را جداگانه می‌گیرد، لازم نیست اینجا فایلی بارگذاری کنید:</span>
-      <button type="button" class="btn" data-open="sr">ورود به ماژول اقلام سنواتی و راکد</button>
-    </div>`;
+`;
 }
 
 function entryCols(){
@@ -4124,12 +4121,8 @@ function anaSentences(A){
     }else{
       odd.forEach(o=>s.push(o));
     }
-    const old = anaOldItems(A);
-    s.push('هـ) اقلام سنواتی — ' + (old.length
-      ? `${fa(old.length)} سند در محدوده‌ی سه ماه پایانی سال ثبت شده و در فهرست بالا نیامده‌اند؛ تعیین سنواتی‌بودن آن‌ها نیازمند داده‌ی سال بعد است.`
-      : 'سندی در سه ماه پایانی دوره ثبت نشده است.'));
-    s.push('و) ارتباط با ادعاهای حسابرسی — ادعاهای مرتبط با این حساب: وجود، کامل بودن، ارزشیابی، طبقه‌بندی و ارائه و افشا.');
-    s.push('ز) اهمیت و ریسک — ' + (ANA.materiality!=null
+    s.push('هـ) ارتباط با ادعاهای حسابرسی — ادعاهای مرتبط با این حساب: وجود، کامل بودن، ارزشیابی، طبقه‌بندی و ارائه و افشا.');
+    s.push('و) اهمیت و ریسک — ' + (ANA.materiality!=null
       ? `اهمیتِ اعلام‌شده از سوی کاربر ${absF(ANA.materiality)} ریال است.`
       : 'اطلاعات مربوط به سطح اهمیت در اختیار قرار نگرفته است؛ بنابراین هیچ عددی برای اهمیت تعیین نشد و مقایسه‌ای انجام نگرفت.'));
     push('آنالیز', s.join(' '));
@@ -5615,7 +5608,15 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  };
  handleFile=function(file){park();state.source=null;state.confirmed=false;state.signature='';state.lastOpeningNumbers=null;state.mappingError=false;ANA.aiBy={};return baseFile(file);};
  // ماژول «اقلام سنواتی و راکد» فایل‌ها و تأیید افتتاحیهٔ مستقل خود را دارد و از این دروازه عبور می‌کند.
- gotoModule=function(mid,step){if(mid!=='home'&&mid!=='sr'&&!ready()){openOpening();return;}return baseModule(mid,step);};
+ gotoModule=function(mid,step){
+  if(mid==='sr'&&(!tracked()||!ready())){
+    if(tracked()&&!ready()) openOpening();
+    else window.alert('ابتدا فایل سال جاری را در صفحهٔ اصلی بارگذاری کنید و ستون‌ها و وضعیت افتتاحیه را تأیید کنید.');
+    return;
+  }
+  if(mid!=='home'&&mid!=='sr'&&!ready()){openOpening();return;}
+  return baseModule(mid,step);
+};
  gotoStep=function(n){if(CUR_MODULE!=='sr'&&tracked()&&(String(n)==='3'||!ready())){openOpening();return;}return baseStep(n);};
  goBackOne=function(){
   if(CUR_MODULE==='home'&&tracked()&&ENTRY.phase==='ready'){openOpening();return;}
@@ -8346,9 +8347,11 @@ function build(input){
       const acc=accounts.get(account); acc.files.add(f.id);
       if(r.kolT) acc.kolT=String(r.kolT).trim(); if(r.moeinT) acc.moeinT=String(r.moeinT).trim();
       (person?acc.personKeys:acc.blankKeys).add(f.id+'#'+key);
-      if(!keys.has(key)) keys.set(key,{key,account,kol,moein,person,title:'',titles:new Map(),levels:{}});
+      if(!keys.has(key)) keys.set(key,{key,account,kol,moein,person,title:'',titles:new Map(),levels:{},detailCodes:[],detailTitle:''});
       const km=keys.get(key);
-      const tt=KEY_LEVELS.filter(([c])=>f.keyFields.includes(c)&&normCode(r[c])).map(([c,t])=>String(r[t]??'').trim()||normCode(r[c]));
+      const detailEntries=KEY_LEVELS.filter(([c])=>f.keyFields.includes(c)&&normCode(r[c])).map(([c,t])=>({code:normCode(r[c]),title:String(r[t]??'').trim()}));
+      const tt=detailEntries.map(x=>x.title||x.code);
+      if(detailEntries.length){ km.detailCodes=detailEntries.map(x=>x.code); km.detailTitle=tt.join(' / '); }
       const title=[acc.moeinT||String(r.moeinT??'').trim(),...tt].filter(Boolean).join(' / ');
       if(title) km.titles.set(f.id,title);
       const rowNo=normCode(r.row);
@@ -8379,7 +8382,7 @@ function build(input){
   });
   files.forEach(f=>{
     if(!f.keyFields.length) exceptions.push({code:'NO_KEY_LEVEL',severity:'warn',fileId:f.id,detail:'هیچ ستون تفصیلی برای کلید انتخاب نشده؛ همهٔ محاسبات در سطح معین و با هشدار اختلاط اشخاص است'});
-    if(!f.hasOpening&&f===files[0]) exceptions.push({code:'FIRST_YEAR_NO_OPENING',severity:'warn',fileId:f.id,detail:'اولین فایل سند افتتاحیه ندارد؛ مانده‌های قبل از آن صفر فرض نمی‌شوند و کل زنجیره ناقص است'});
+    if(!f.hasOpening&&f===files[0]) exceptions.push({code:'FIRST_YEAR_NO_OPENING',severity:'warn',fileId:f.id,detail:'اولین فایل زنجیره سند افتتاحیه/مانده اول دوره ندارد؛ محاسبه از صفر آغاز می‌شود و مانده‌های قبل از شروع زنجیره قابل ردیابی نیستند؛ اقلام سنواتی و راکد ممکن است کمتر از واقع باشند'});
     if(f.hasOpening&&!f.openingDocs.size) exceptions.push({code:'OPENING_NOT_SET',severity:'warn',fileId:f.id,detail:'سند افتتاحیه برای این فایل مشخص نشده است'});
   });
   for(let i=0;i<files.length;i++) for(let j=i+1;j<files.length;j++){
@@ -12177,17 +12180,18 @@ el('routerForget').onclick=()=>{
 'use strict';
 if(typeof SRE==='undefined') return;
 const U=SRE.UNKNOWN;
-const SR={files:[],auditId:null,seq:0,mapped:false,model:null,result:null,roles:new Map(),tagOverrides:new Map(),
+const SR={files:[],auditId:null,seq:0,mapped:false,model:null,result:null,priorModel:null,priorResult:null,nextModel:null,nextResult:null,priorWorkpaper:null,roles:new Map(),tagOverrides:new Map(),
   linkSug:[],linkOk:new Set(),codingSug:[],codingOk:new Set(),
-  settings:{thresholds:[6,12,24],cutoffMethod:'months',inclusive:true},
-  view:{tab:'san',T:0,filter:'',limit:200,key:null,accFilter:'',tagFilter:''},busy:false};
+  settings:{thresholds:[12],cutoffMethod:'months',inclusive:true},
+  view:{tab:'work',T:0,filter:'',limit:200,key:null,accFilter:'',tagFilter:''},busy:false};
 window.SR_STATE=SR;
 
 /* ---------------------------------------------------------------- ثبت ماژول */
 MODULES.push({id:'sr',name:'اقلام سنواتی و راکد',icon:'⏳',desc:'مانده‌های سنواتی و راکد با حداقل و حداکثر، از روی اسناد چند سال.'});
 MODULE_STEPS.sr=[
-  {n:'s1',title:'فایل‌های سال‌ها'},{n:'s2',title:'ستون‌ها و سال مالی'},{n:'s3',title:'افتتاحیه و اختتامیه'},
-  {n:'s4',title:'حساب‌ها'},{n:'s5',title:'تنظیمات و بازبینی'},{n:'s6',title:'گزارش‌ها'}];
+  {n:'s1',title:'سال‌ها'},{n:'s2',title:'ستون‌ها و دوره‌ها'},
+  {n:'s3',title:'افتتاحیه و اختتامیه'},{n:'s5',title:'آستانهٔ رکود'},
+  {n:'s6',title:'کاربرگ نهایی'}];
 
 /* ---------------------------------------------------------------- کمکی‌ها */
 const FA_D='۰۱۲۳۴۵۶۷۸۹';
@@ -12212,21 +12216,23 @@ const UNC_LABEL={UNALLOCATED_DEC:'کاهش‌های بدون شاهد تخصیص
   BOUNCE_UNLINKED:'برگشت چک بدون اتصال',OPENING_MISMATCH:'اختلاف افتتاحیه با سال قبل',PRE_PERIOD:'قبل از دورهٔ اطلاعاتی',YEAR_GAP:'شکاف سال',
   MIXED_PERSONS:'اختلاط اشخاص (نبود تفصیلی)',COMPOSITE_DOC:'سند مرکب مبهم',REBOUND:'احتمال پیش‌پرداخت/مصرف پیش از ایجاد'};
 const EXC_LABEL={INVALID_DATE:'تاریخ نامعتبر',DATE_OUT_OF_YEAR:'تاریخ خارج از سال مالی فایل',MISSING_CODE:'کد حساب خالی',INVALID_AMOUNT:'مبلغ نامعتبر',
-  NEGATIVE_AMOUNT:'مبلغ منفی (به ستون مقابل منتقل شد)',MIXED_TAFSILI:'تفصیلی ناهمگن در معین',NO_KEY_LEVEL:'کلید بدون تفصیلی',FIRST_YEAR_NO_OPENING:'اولین سال بدون افتتاحیه',
+  NEGATIVE_AMOUNT:'مبلغ منفی (به ستون مقابل منتقل شد)',MIXED_TAFSILI:'تفصیلی ناهمگن در معین',NO_KEY_LEVEL:'کلید بدون تفصیلی',FIRST_YEAR_NO_OPENING:'اولین سال بدون افتتاحیه / مانده ابتدای دوره',
   OPENING_NOT_SET:'سند افتتاحیه مشخص نشده',YEAR_OVERLAP:'هم‌پوشانی سال‌ها',CODE_TITLE_CHANGED:'تغییر عنوان با کد یکسان',NEXT_NOT_CONTIGUOUS:'سال بعد پیوسته نیست',
   FILE_IGNORED:'فایل استفاده‌نشده',LINK_INVALID:'اتصال نامعتبر',CONTRA_BALANCE:'مانده خلاف ماهیت',OPENING_MISMATCH:'افتتاحیه و اختتامیه نامنطبق',
   YEAR_GAP:'سال مفقود (مانده غیرصفر)',NO_TAFSILI:'حساب فاقد تفصیلی',CLOSING_MISMATCH:'سند اختتامیه نامنطبق'};
 const SEV_LABEL={error:'خطا',warn:'هشدار',info:'اطلاع'};
 
 function invalidate(level){            // level: 'model' (ساختار داده تغییر کرد) | 'result' (فقط تنظیمات)
-  if(level==='model') SR.model=null;
-  SR.result=null;
+  if(level==='model'){ SR.model=null; SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null; }
+  SR.result=null; SR.priorResult=null; SR.nextResult=null;
 }
 function srStepReady(n){
-  if(n==='s1') return true;
-  if(n==='s2') return SR.files.length>0&&SR.files.every(f=>f.headers)&&!!SR.auditId;
+  const main=SR.files.find(f=>f.isMain), prior=SR.files.find(f=>f.periodRole==='prior'), history=SR.files.find(f=>f.periodRole==='history');
+  const priorHistoryReady=true; // فایل ۱۴۰۲ اختیاری است؛ افتتاحیهٔ ۱۴۰۳ می‌تواند مبنای مستقل باشد.
+  if(n==='s1') return !!main&&main.status==='ok'&&!!prior&&prior.status==='ok';
+  if(n==='s2') return !!main&&!!prior&&SR.files.filter(f=>f.status==='ok').length===SR.files.length;
   if(n==='s3') return SR.mapped;
-  if(n==='s4'||n==='s5') return !!SR.model;
+  if(n==='s5') return !!SR.model;
   if(n==='s6') return !!SR.result;
   return false;
 }
@@ -12235,7 +12241,18 @@ function srRender(){
   const m={s1:renderFiles,s2:renderMapping,s3:renderOC,s4:renderAccounts,s5:renderSettings,s6:renderReports}[CUR_STEP];
   if(m) m();
 }
-window.srEnter=function(){ srRender(); };
+window.srEnter=function(){
+  const rows=(typeof FULL_ROWS!=='undefined'&&Array.isArray(FULL_ROWS))?FULL_ROWS:[];
+  if(rows.length){
+    const existing=SR.files.find(f=>f.isMain);
+    if(!existing||existing.mainRowsRef!==rows){
+      SR.files=[]; SR.auditId=null; SR.mapped=false; SR.model=null; SR.result=null; SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null; SR.priorWorkpaper=null;
+      SR.roles.clear(); SR.tagOverrides.clear(); SR.linkOk.clear(); SR.codingOk.clear(); SR.view.filter='';
+      addMainFile();
+    }
+  }
+  srRender();
+};
 function go(n){ CUR_STEP=n; srRender(); paint(); }
 function nav(back,next,nextLabel,disabled){
   return `<div class="sr-nav">${back?`<button type="button" class="btn ghost" data-go="${back}">→ مرحلهٔ قبل</button>`:'<span></span>'}
@@ -12302,135 +12319,252 @@ function guessYear(f){
   f.start=lo; f.end=hi<=oneYear?oneYear:hi;
   f.label=fa(SRE.dayToJalali(f.end).jy);
 }
-async function addFiles(list){
-  const host=$('srS1');
-  for(const file of list){
-    const f={id:'f'+(++SR.seq),name:file.name,status:'reading',hasOpening:true,openingDocs:new Set(),closingDocs:new Set()};
-    SR.files.push(f); renderFiles();
-    try{
-      const wb=await auditReadWorkbookFile(file);
-      f.sheetNames=wb.SheetNames.slice();
-      if(wb._rawBytes){ f.rawBytes=wb._rawBytes; f.wb=null; }
-      else f.wb=wb;
-      let best=f.sheetNames[0];
-      if(f.sheetNames.length>1){ let bs=-1; f.sheetNames.forEach(n=>{ const s=sheetScore(wb,n).score; if(s>bs){ bs=s; best=n; } }); }
-      loadSheetInto(f,best);
-      f.status='ok';
-    }catch(err){ f.status='error'; f.error=auditWorkbookMessage?auditWorkbookMessage(err):String(err&&err.message||err); }
-    if(!SR.auditId&&f.status==='ok') SR.auditId=f.id;
-    SR.mapped=false; invalidate('model');
-    if(host&&CUR_STEP==='s1') renderFiles();
+async function addFiles(list,periodRole){
+  if(!['history','prior','next'].includes(periodRole)){ alert('نوع فایل سال مشخص نیست.'); return; }
+  if(!list||!list.length) return;
+  if(list.length>1){ alert('برای هر جایگاه فقط یک فایل سالانه انتخاب کنید.'); return; }
+  if(SR.files.some(f=>f.periodRole===periodRole&&!f.isMain)){
+    alert('برای این سال قبلاً فایل انتخاب شده است؛ ابتدا فایل موجود را حذف کنید.'); return;
   }
-}
-function addMainFile(){
-  if(!FULL_ROWS.length) return;
-  const keys=Object.keys(FULL_ROWS[0]||{});
-  const f={id:'f'+(++SR.seq),name:'فایل اصلیِ بارگذاری‌شده'+(fname&&fname.textContent?' ('+fname.textContent+')':''),status:'ok',hasOpening:true,openingDocs:new Set(),closingDocs:new Set(),sheetNames:[]};
-  f.headers=keys.map(norm); f.data=FULL_ROWS.map(r=>keys.map(k=>r[k]??'')); f.srcRows=FULL_ROWS.map((r,i)=>i+2);
-  f.mapping=guessMapping(f.headers); f.keyFields=['taf','taf1','taf2'].filter(k=>f.mapping[k]>=0); guessYear(f);
-  SR.files.push(f); if(!SR.auditId) SR.auditId=f.id; SR.mapped=false; invalidate('model'); renderFiles();
+  const file=list[0], host=$('srS1');
+  const f={id:'f'+(++SR.seq),name:file.name,status:'reading',periodRole,hasOpening:false,openingDocs:new Set(),closingDocs:new Set()};
+  SR.files.push(f); renderFiles();
+  try{
+    const wb=await auditReadWorkbookFile(file);
+    f.sheetNames=wb.SheetNames.slice();
+    if(wb._rawBytes){ f.rawBytes=wb._rawBytes; f.wb=null; } else f.wb=wb;
+    let best=f.sheetNames[0];
+    if(f.sheetNames.length>1){ let bs=-1; f.sheetNames.forEach(n=>{ const score=sheetScore(wb,n).score; if(score>bs){ bs=score; best=n; } }); }
+    loadSheetInto(f,best); f.status='ok';
+  }catch(err){ f.status='error'; f.error=auditWorkbookMessage?auditWorkbookMessage(err):String(err&&err.message||err); }
+  SR.mapped=false; invalidate('model');
+  if(host&&CUR_STEP==='s1') renderFiles();
 }
 
-/* ------------------------------------------------------- مرحلهٔ ۱: فایل‌ها */
+function priorWpNumber(v,label){
+  if(v===null||v===undefined||String(v).trim()==='') return 0n;
+  const r=SRE.parseAmount(v);
+  if(!r.ok||r.value<0n) throw new Error('مقدار ستون «'+label+'» عدد صحیح نامنفی نیست. فایل کاربرگ قبلی باید مبلغ عددی داشته باشد؛ بازه یا متن وضعیت پذیرفته نمی‌شود.');
+  return r.value;
+}
+function rawSheetRows(sheet){
+  const dense=Array.isArray(sheet)?sheet:(Array.isArray(sheet&&sheet['!data'])?sheet['!data']:null);
+  if(dense) return dense.map(rc=>!rc?[]:Array.from({length:rc.length},(_,c)=>cellVal(rc[c])));
+  return XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:'',blankrows:true});
+}
+function headerWithYearContext(rows,headerRow){
+  const width=Math.max(0,...rows.slice(0,headerRow+1).map(r=>r?r.length:0));
+  const yearOnly=v=>{
+    const t=SRE.latinDigits(String(v??'')).replace(/\s+/g,' ').trim();
+    const m=t.match(/^(?:سال(?:\s*مالی)?\s*)?(13\d{2}|14\d{2})(?:\s*سال)?$/);
+    return m?m[1]:'';
+  };
+  const out=[];
+  for(let c=0;c<width;c++){
+    const direct=String((rows[headerRow]||[])[c]??'').trim();
+    let context='';
+    for(let r=headerRow-1;r>=Math.max(0,headerRow-2)&&!context;r--){
+      const row=rows[r]||[];
+      for(let j=c;j>=0;j--){
+        context=yearOnly(row[j]);
+        if(context) break;
+      }
+    }
+    out[c]=SRE.latinDigits([context,direct].filter(Boolean).join(' ').replace(/\s+/g,' ').trim());
+  }
+  return out;
+}
+async function addPriorWorkpaper(file){
+  try{
+    const wb=await auditReadWorkbookFile(file);
+    const names=wb.SheetNames||[]; let best=null, bestScore=-1;
+    const temp={rawBytes:wb._rawBytes||null,wb:wb._rawBytes?null:wb};
+    for(const name of names){
+      const rows=rawSheetRows(sheetFromWb(temp,name));
+      const maxScan=Math.min(rows.length,50);
+      for(let hr=0;hr<maxScan;hr++){
+        const h=headerWithYearContext(rows,hr);
+        const san=h.findIndex(x=>/سنواتی/.test(x));
+        const stale=h.findIndex(x=>/راکد/.test(x));
+        const sub=h.findIndex(x=>/(?:ساب|حساب\s*معین|معین)/.test(x));
+        const detail=h.findIndex(x=>/تفصیلی/.test(x));
+        const score=(san>=0?4:0)+(stale>=0?4:0)+(san>=0&&stale>=0&&san!==stale?2:0)+(sub>=0?2:0)+(detail>=0?2:0);
+        if(score>bestScore){bestScore=score;best={name,rows,headerRow:hr,h,san,stale,sub,detail};}
+      }
+    }
+    if(!best||bestScore<12) throw new Error('در هیچ‌یک از برگه‌ها، یک ردیف عنوان شامل ساب/حساب معین، تفصیلی، سنواتی و راکد پیدا نشد.');
+    const nextHeader=(best.rows[best.headerRow+1]||[]).map(v=>SRE.latinDigits(String(v??'')).trim());
+    const childSan=nextHeader.findIndex(x=>/سنواتی/.test(x)),childStale=nextHeader.findIndex(x=>/راکد/.test(x));
+    if(childSan>=0&&childStale>=0&&childSan!==childStale){
+      // سرستون گروهیِ جدید دو سطر دارد؛ مقادیر «سنواتی/راکد» در زیرسرستون‌ها قرار دارند.
+      best.san=childSan; best.stale=childStale; best.dataStartRow=best.headerRow+2;
+    }
+    const chooseAmountColumn=(kind,base)=>{
+      if(best.dataStartRow===best.headerRow+2) return kind==='san'?best.san:best.stale;
+      const candidates=best.h.map((h,i)=>({h,i})).filter(x=>kind==='san'?/سنواتی/.test(x.h):/راکد/.test(x.h));
+      const exact=candidates.filter(x=>/\b1403\b/.test(x.h));
+      if(exact.length===1) return exact[0].i;
+      if(exact.length>1) throw new Error('بیش از یک ستون '+(kind==='san'?'سنواتی':'راکد')+' مربوط به سال ۱۴۰۳ پیدا شد؛ فایل را به یک برگه/ستون یکتا محدود کنید.');
+      if(candidates.length===1) return candidates[0].i;
+      throw new Error('ستون '+(kind==='san'?'سنواتی':'راکد')+' سال ۱۴۰۳ مشخص نیست. عنوان ستون باید سال ۱۴۰۳ را مشخص کند.');
+    };
+    best.san=chooseAmountColumn('san',best.san); best.stale=chooseAmountColumn('stale',best.stale);
+    const keyI=best.h.findIndex(x=>/کلید\s*تطبیق|group\s*key/i.test(x));
+    const subCodeI=best.h.findIndex(x=>/کد\s*(?:حساب\s*)?معین/.test(x));
+    const subTitleI=best.h.findIndex(x=>/عنوان\s*(?:حساب\s*)?معین|معین\s*عنوان/.test(x));
+    const detailCodeI=best.h.findIndex(x=>/کد\s*تفصیلی/.test(x));
+    const detailTitleI=best.h.findIndex(x=>/عنوان\s*تفصیلی|تفصیلی\s*عنوان/.test(x));
+    const joinCodeTitle=(row,code,title,fallback)=>{
+      const c=String(code>=0?row[code]??'':'').trim(),t=String(title>=0?row[title]??'':'').trim();
+      return [c,t&&t!==c?t:''].filter(Boolean).join(' — ')||String(fallback??'').trim();
+    };
+    const rows=[];
+    for(let ri=(best.dataStartRow||best.headerRow+1);ri<best.rows.length;ri++){
+      const a=best.rows[ri]||[];
+      const sub=joinCodeTitle(a,subCodeI,subTitleI,a[best.sub]), detail=joinCodeTitle(a,detailCodeI,detailTitleI,a[best.detail]);
+      if(!sub&&!detail) continue;
+      const san=priorWpNumber(a[best.san],'سنواتی ۱۴۰۳');
+      const stale=priorWpNumber(a[best.stale],'راکد ۱۴۰۳');
+      rows.push({sub,detail,san,stale,groupKey:keyI>=0?String(a[keyI]??'').trim():'',sourceRow:ri+1});
+    }
+    if(!rows.length) throw new Error('پس از ردیف عنوان، ردیف حسابداری قابل استفاده‌ای پیدا نشد.');
+    SR.priorWorkpaper={name:file.name,sheet:best.name,rows,headerRow:best.headerRow+1};
+    SR.mapped=false; invalidate('model');
+    renderFiles();
+  }catch(err){ alert('خواندن کاربرگ سال قبل ناموفق بود: '+(err.message||String(err))); }
+}
+function addMainFile(){
+  if(typeof FULL_ROWS==='undefined'||!FULL_ROWS.length) return false;
+  const keys=Object.keys(FULL_ROWS[0]||{});
+  const f={id:'f'+(++SR.seq),name:'فایل سال جاریِ بارگذاری‌شده در صفحهٔ اصلی'+(fname&&fname.textContent?' ('+fname.textContent+')':''),
+    status:'ok',periodRole:'audit',isMain:true,mainRowsRef:FULL_ROWS,hasOpening:false,openingDocs:new Set(),closingDocs:new Set(),sheetNames:[]};
+  f.headers=keys.map(norm); f.data=FULL_ROWS.map(r=>keys.map(k=>r[k]??'')); f.srcRows=FULL_ROWS.map((r,i)=>i+2);
+  f.mapping=guessMapping(f.headers); f.keyFields=['taf','taf1','taf2'].filter(k=>f.mapping[k]>=0); guessYear(f);
+  SR.files.unshift(f); SR.auditId=f.id; SR.mapped=false; invalidate('model');
+  renderFiles(); return true;
+}
+
+/* ------------------------------------------------------- مرحلهٔ ۱: سال‌ها */
 function renderFiles(){
   const host=$('srS1'); if(!host) return;
-  const list=SR.files.map(f=>`
+  const main=SR.files.find(f=>f.isMain), history=SR.files.find(f=>f.periodRole==='history'), prior=SR.files.find(f=>f.periodRole==='prior'), next=SR.files.find(f=>f.periodRole==='next');
+  const wp=SR.priorWorkpaper, needHistory=false;
+  const fileCard=(f,label)=>!f?`<div class="sr-year-empty"><b>${label}</b><span>هنوز بارگذاری نشده</span></div>`:`
     <div class="sr-file ${f.status}">
-      <div class="sr-file-h"><b>${e_(f.name)}</b>
-        <button type="button" class="btn ghost sr-x" data-del="${f.id}" title="حذف این فایل">✕ حذف</button></div>
-      ${f.status==='reading'?'<div class="hint">در حال خواندن…</div>':''}
+      <div class="sr-file-h"><b>${label}: ${e_(f.name)}</b>${!f.isMain?`<button type="button" class="btn ghost sr-x" data-del="${f.id}">حذف</button>`:'<span class="sr-tag">از فایل اصلی برنامه</span>'}</div>
+      ${f.status==='reading'?'<div class="hint">در حال خواندن فایل…</div>':''}
       ${f.status==='error'?`<div class="err">${e_(f.error)}</div>`:''}
-      ${f.status==='ok'?`<div class="sr-file-b">
-        ${f.sheetNames&&f.sheetNames.length>1?`<label>برگه: <select data-sheet="${f.id}">${f.sheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${e_(n)}</option>`).join('')}</select></label>`:''}
-        <span>${fa(f.data.length.toLocaleString())} ردیف</span>
-        ${f.minDay!=null?`<span>از ${fmtD(f.minDay)} تا ${fmtD(f.maxDay)}</span>`:''}
-        <label class="sr-audit"><input type="radio" name="srAudit" value="${f.id}" ${SR.auditId===f.id?'checked':''}> این فایل «سال مورد رسیدگی» است</label>
-      </div>`:''}
-    </div>`).join('');
+      ${f.status==='ok'?`<div class="sr-file-b">${f.sheetNames&&f.sheetNames.length>1?`<label>برگه: <select data-sheet="${f.id}">${f.sheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${e_(n)}</option>`).join('')}</select></label>`:''}
+        <span>${fa(f.data.length.toLocaleString())} ردیف</span><span>${f.minDay!=null?`از ${fmtD(f.minDay)} تا ${fmtD(f.maxDay)}`:'تاریخ قابل تشخیص نیست'}</span>
+        ${f.label?`<span>سال پیشنهادی: ${e_(f.label)}</span>`:''}</div>`:''}
+    </div>`;
+  const wpCard=!wp?`<div class="sr-year-empty"><b>کاربرگ اقلام راکد و سنواتی سال ۱۴۰۳</b><span>ارائه نشده</span></div>`:`<div class="sr-file"><div class="sr-file-h"><b>کاربرگ قبلی: ${e_(wp.name)}</b><button type="button" class="btn ghost sr-x" id="srDelWp">حذف</button></div><div class="sr-file-b"><span>برگه: ${e_(wp.sheet)}</span><span>${fa(wp.rows.length)} ردیف مبلغ‌دار/حسابی</span><span class="sr-ok">مبالغ عددی دریافت شد</span></div></div>`;
+  const ready=!!main&&main.status==='ok'&&!!prior&&prior.status==='ok';
   host.innerHTML=`
-    <h1>اقلام سنواتی و راکد — فایل‌های سال‌ها</h1>
-    <p class="sub">فایل اکسل اسناد حسابداری <b>هر سال جداگانه</b> بارگذاری کنید: سال مورد رسیدگی، سال‌های قبل (برای پیدا کردن منشأ مانده‌ها) و در صورت وجود سال بعد (فقط برای پیگیری). فایل‌ها فقط در همین مرورگر خوانده می‌شوند.</p>
-    <div class="card">
-      <div class="drop" id="srDrop"><p class="big">فایل‌ها را اینجا رها کنید</p><p class="sub2">می‌توانید چند فایل را با هم انتخاب کنید</p>
-        <button type="button" class="btn primary" id="srPick">انتخاب فایل‌ها</button>
-        <input type="file" id="srFile" accept=".xlsx,.xls,.csv" multiple hidden></div>
-      ${typeof FULL_ROWS!=='undefined'&&FULL_ROWS.length&&!SR.files.some(f=>f.name.startsWith('فایل اصلی'))?`<p class="hint">فایلی که در صفحهٔ اول بارگذاری کرده‌اید را هم می‌توانید به‌عنوان یکی از سال‌ها اضافه کنید: <button type="button" class="btn ghost" id="srMain">افزودن فایل اصلی</button><br>اگر تاریخ‌ها در اکسل به شکل «تاریخ میلادی» قالب‌بندی شده‌اند، بهتر است همان فایل را مستقیم از دکمهٔ بالا بارگذاری کنید تا تاریخ دقیق خوانده شود.</p>`:''}
+    <h1>اقلام سنواتی و راکد — انتخاب فایل‌های سالانه</h1>
+    <p class="sub">سال جاری از فایل اصلی برنامه دریافت می‌شود. اکسل اسناد ۱۴۰۳ برای تحلیل سال ۱۴۰۴ لازم است. برای محاسبه ستون‌های سال ۱۴۰۳، در صورت نبود کاربرگ قبلی یا اسناد ۱۴۰۲، برنامه می‌تواند از مانده‌های افتتاحیهٔ ۱۴۰۳ و گردش همان سال استفاده کند؛ قدمت دقیق مانده‌های افتتاحیه فقط در صورت وجود شواهد کافی قابل تعیین است.</p>
+    <div class="card"><h2>سال جاری — ۱۴۰۴</h2>${main?fileCard(main,'سال جاری'):'<div class="err">فایل سال جاری از برنامه دریافت نشد. از صفحهٔ اصلی فایل را بارگذاری و ستون‌ها را تأیید کنید.</div>'}</div>
+    <div class="sr-two">
+      <div class="card"><h2>اکسل اسناد سال قبل — ۱۴۰۳ <span class="sr-req">(الزامی)</span></h2>${fileCard(prior,'سال قبل')}
+        ${!prior?'<input type="file" id="srPriorFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn primary" id="srPriorPick">بارگذاری اکسل اسناد ۱۴۰۳</button>':''}</div>
+      <div class="card"><h2>کاربرگ قبلی سال ۱۴۰۳ <span class="hint">(جایگزین اکسل ۱۴۰۲)</span></h2>${wpCard}
+        ${!wp?'<input type="file" id="srPrevWpFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn" id="srPrevWpPick">بارگذاری کاربرگ سنواتی و راکد ۱۴۰۳</button>':''}</div>
+      <div class="card"><h2>اکسل اسناد سال ۱۴۰۲ <span class="hint">(اختیاری؛ برای تشخیص دقیق‌تر قدمت)</span></h2>${fileCard(history,'سال ۱۴۰۲')}
+        ${!history?'<input type="file" id="srHistoryFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn" id="srHistoryPick">بارگذاری اکسل اسناد ۱۴۰۲</button>':''}</div>
+      <div class="card"><h2>اکسل اسناد سال بعد — ۱۴۰۵ <span class="hint">(برای پیگیری)</span></h2>${fileCard(next,'سال بعد')}
+        ${!next?'<input type="file" id="srNextFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn" id="srNextPick">بارگذاری اکسل اسناد ۱۴۰۵</button>':''}</div>
     </div>
-    ${list?`<div class="card"><h2>فایل‌های بارگذاری‌شده</h2>${list}</div>`:''}
-    ${nav(null,'s2','ادامه: ستون‌ها و سال مالی ←',!srStepReady('s2'))}`;
-  const inp=$('srFile');
-  $('srPick').onclick=()=>inp.click();
-  inp.onchange=e=>{ const l=[...e.target.files]; e.target.value=''; if(l.length) addFiles(l); };
-  const d=$('srDrop');
-  ['dragenter','dragover'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add('over');}));
-  ['dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove('over');}));
-  d.addEventListener('drop',e=>{ const l=[...e.dataTransfer.files]; if(l.length) addFiles(l); });
-  if($('srMain')) $('srMain').onclick=addMainFile;
-  host.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ SR.files=SR.files.filter(f=>f.id!==b.dataset.del); if(SR.auditId===b.dataset.del) SR.auditId=(SR.files.find(f=>f.status==='ok')||{}).id||null; SR.mapped=false; invalidate('model'); renderFiles(); paint(); });
-  host.querySelectorAll('[data-sheet]').forEach(s=>s.onchange=()=>{ const f=SR.files.find(x=>x.id===s.dataset.sheet); try{ loadSheetInto(f,s.value); }catch(err){ f.status='error'; f.error=err.message; } SR.mapped=false; invalidate('model'); renderFiles(); });
-  host.querySelectorAll('input[name=srAudit]').forEach(r=>r.onchange=()=>{ SR.auditId=r.value; invalidate('model'); renderFiles(); paint(); });
+    <p class="hint">اولویت اطلاعات سال ۱۴۰۳: کاربرگ قبلی، سپس زنجیرهٔ اسناد ۱۴۰۲ و ۱۴۰۳، و در نبود هر دو، تحلیل مستقل اسناد ۱۴۰۳ با اتکا به افتتاحیه. در روش افتتاحیه، منشأ مانده قبل از سال ۱۴۰۳ مشخص است اما سن دقیق آن معلوم نیست؛ بنابراین راکد بودن فقط با شواهد کافی گزارش می‌شود. فایل ۱۴۰۵ برای محاسبهٔ مانده خالص پایان سال بعد است و وضعیت تاریخی ۱۴۰۴ را تغییر نمی‌دهد.</p>
+    ${nav(null,'s2','ادامه: بررسی ستون‌ها ←',!ready)}`;
+  if($('srPriorPick')) $('srPriorPick').onclick=()=>$('srPriorFile').click();
+  if($('srHistoryPick')) $('srHistoryPick').onclick=()=>$('srHistoryFile').click();
+  if($('srNextPick')) $('srNextPick').onclick=()=>$('srNextFile').click();
+  if($('srPrevWpPick')) $('srPrevWpPick').onclick=()=>$('srPrevWpFile').click();
+  if($('srPriorFile')) $('srPriorFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) addFiles([f],'prior'); };
+  if($('srHistoryFile')) $('srHistoryFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) addFiles([f],'history'); };
+  if($('srNextFile')) $('srNextFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) addFiles([f],'next'); };
+  if($('srPrevWpFile')) $('srPrevWpFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) addPriorWorkpaper(f); };
+  if($('srDelWp')) $('srDelWp').onclick=()=>{ SR.priorWorkpaper=null; SR.mapped=false; invalidate('model'); renderFiles(); paint(); };
+  host.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ SR.files=SR.files.filter(f=>f.id!==b.dataset.del); SR.mapped=false; invalidate('model'); renderFiles(); paint(); });
+  host.querySelectorAll('[data-sheet]').forEach(sel=>sel.onchange=()=>{ const f=SR.files.find(x=>x.id===sel.dataset.sheet); try{ loadSheetInto(f,sel.value); f.status='ok'; }catch(err){ f.status='error'; f.error=err.message; } SR.mapped=false; invalidate('model'); renderFiles(); });
   bindNav(host,n=>go(n));
 }
 
-/* ------------------------------------------- مرحلهٔ ۲: ستون‌ها و سال مالی */
+/* ------------------------------------------- مرحلهٔ ۲: ستون‌ها و دوره‌ها */
+/* ------------------------------------------- مرحلهٔ ۲: ستون‌ها و دوره‌ها */
+
 function renderMapping(){
   const host=$('srS2'); if(!host) return;
-  const files=SR.files.filter(f=>f.status==='ok');
+  const files=SR.files.filter(f=>f.status==='ok').sort((a,b)=>a.start-b.start);
+  const main=SR.files.find(f=>f.isMain), mainFields=main?main.keyFields.slice():[];
   host.innerHTML=`
-    <h1>ستون‌ها، کلید طرف حساب و سال مالی</h1>
-    <p class="sub">برای هر فایل، ستون‌ها را بررسی کنید (برنامه حدس زده است). ستون‌های «تفصیلی» که تیک بخورند، کلید طرف حساب را می‌سازند؛ اگر هیچ‌کدام تیک نخورد، محاسبه در سطح معین و با هشدار «اختلاط اشخاص» انجام می‌شود. تاریخ شروع و پایان سال مالی را تأیید کنید (سال مالی می‌تواند غیرتقویمی باشد).</p>
+    <h1>بررسی ستون‌ها و دوره‌های مالی</h1>
+    <p class="sub">ستون‌های سال جاری از نگاشت صفحهٔ اول برنامه گرفته شده‌اند. برای سال قبل و سال بعد، ستون‌های متناظر را کنترل کنید. سطح تفصیلیِ انتخاب‌شده در فایل اصلی، مبنای تطبیق همهٔ سال‌هاست.</p>
     ${files.map(f=>`
     <div class="card sr-map" data-file="${f.id}">
-      <h2>${e_(f.name)} ${SR.auditId===f.id?'<span class="sr-tag">سال رسیدگی</span>':''}</h2>
+      <h2>${e_(f.name)} ${f.isMain?'<span class="sr-tag">سال جاری · نگاشت اصلی</span>':''}</h2>
       <div class="sr-grid3">
         <label>عنوان سال<input data-k="label" value="${e_(f.label||'')}"></label>
         <label>شروع سال مالی<input data-k="start" dir="ltr" value="${f.start!=null?SRE.formatDay(f.start):''}" placeholder="1404/01/01"></label>
         <label>پایان سال مالی<input data-k="end" dir="ltr" value="${f.end!=null?SRE.formatDay(f.end):''}" placeholder="1404/12/29"></label>
       </div>
-      ${f.minDay!=null?`<p class="hint">اولین تاریخ در فایل: ${fmtD(f.minDay)} — آخرین تاریخ: ${fmtD(f.maxDay)}</p>`:''}
-      <div class="sr-maprows">${Object.keys(FIELD_LABEL).map(k=>`
-        <label class="sr-maprow"><span>${FIELD_LABEL[k]}${REQUIRED.includes(k)?' <b class="sr-req">*</b>':''}</span>
-          <select data-map="${k}"><option value="-1">— ندارد —</option>${f.headers.map((h,i)=>`<option value="${i}" ${f.mapping[k]===i?'selected':''}>${e_(h||('ستون '+(i+1)))}</option>`).join('')}</select>
-          ${['taf','taf1','taf2'].includes(k)?`<span class="sr-keychk"><input type="checkbox" data-keyf="${k}" ${f.keyFields.includes(k)?'checked':''} ${f.mapping[k]<0?'disabled':''}> جزء کلید طرف حساب</span>`:''}
-        </label>`).join('')}</div>
+      ${f.minDay!=null?`<p class="hint">اولین تاریخ سند: ${fmtD(f.minDay)} — آخرین تاریخ سند: ${fmtD(f.maxDay)}</p>`:''}
+      ${f.isMain?`<div class="sr-okbar">نگاشت ستون‌های سال جاری از مرحلهٔ اصلی برنامه دریافت شده است؛ ${fa(Object.keys(f.mapping).filter(k=>f.mapping[k]>=0).length)} فیلد شناسایی‌شده.</div>
+        <p class="hint">سطح تفصیلی مبنا: ${mainFields.length?mainFields.map(k=>FIELD_LABEL[k]).join('، '):'در فایل اصلی انتخاب نشده؛ تطبیق تهاتر اشخاص در سطح تفصیلی ممکن نیست.'}</p>`:
+        `<div class="sr-maprows">${Object.keys(FIELD_LABEL).map(k=>`
+          <label class="sr-maprow"><span>${FIELD_LABEL[k]}${REQUIRED.includes(k)?' <b class="sr-req">*</b>':''}</span>
+            <select data-map="${k}"><option value="-1">— ندارد —</option>${f.headers.map((h,i)=>`<option value="${i}" ${f.mapping[k]===i?'selected':''}>${e_(h||('ستون '+(i+1)))}</option>`).join('')}</select>
+            ${['taf','taf1','taf2'].includes(k)&&mainFields.includes(k)?'<span class="sr-keychk">این ستون در فایل جاری جزو کلید تفصیلی است و باید در این فایل هم متناظر شود.</span>':''}
+          </label>`).join('')}</div>`}
       <div class="sr-msg" data-msg></div>
     </div>`).join('')}
     ${nav('s1','s3','تأیید و ادامه ←')}`;
   host.querySelectorAll('.sr-map').forEach(card=>{
     const f=SR.files.find(x=>x.id===card.dataset.file);
-    card.querySelectorAll('[data-map]').forEach(s=>s.onchange=()=>{
-      f.mapping[s.dataset.map]=Number(s.value);
-      if(s.dataset.map==='date') guessYear(f);
-      if(['taf','taf1','taf2'].includes(s.dataset.map)){ if(Number(s.value)>=0&&!f.keyFields.includes(s.dataset.map)) f.keyFields.push(s.dataset.map); if(Number(s.value)<0) f.keyFields=f.keyFields.filter(k=>k!==s.dataset.map); }
+    if(!f.isMain) card.querySelectorAll('[data-map]').forEach(sel=>sel.onchange=()=>{
+      f.mapping[sel.dataset.map]=Number(sel.value);
+      if(sel.dataset.map==='date') guessYear(f);
+      f.keyFields=mainFields.filter(k=>f.mapping[k]>=0);
       SR.mapped=false; invalidate('model'); renderMapping(); paint();
     });
-    card.querySelectorAll('[data-keyf]').forEach(c=>c.onchange=()=>{ const k=c.dataset.keyf; f.keyFields=c.checked?[...new Set([...f.keyFields,k])]:f.keyFields.filter(x=>x!==k); SR.mapped=false; invalidate('model'); });
-    card.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{
-      const k=i.dataset.k;
-      if(k==='label') f.label=i.value.trim();
-      else { const p=SRE.parseDate(i.value); if(p.ok){ f[k]=p.day; i.classList.remove('sr-bad'); } else { f[k]=null; i.classList.add('sr-bad'); } }
+    card.querySelectorAll('[data-k]').forEach(input=>input.onchange=()=>{
+      const k=input.dataset.k;
+      if(k==='label') f.label=input.value.trim();
+      else { const p=SRE.parseDate(input.value); if(p.ok){ f[k]=p.day; input.classList.remove('sr-bad'); } else { f[k]=null; input.classList.add('sr-bad'); } }
       SR.mapped=false; invalidate('model'); paint();
     });
   });
   bindNav(host,()=>{
     let okAll=true;
+    const mainFieldsNow=(SR.files.find(f=>f.isMain)||{}).keyFields||[];
+    if(!SR.files.some(f=>f.periodRole==='prior'&&f.status==='ok')){ alert('بارگذاری فایل اسناد سال ۱۴۰۳ الزامی است.'); return; }
+    if(SR.files.some(f=>f.status!=='ok')){ alert('ابتدا خطای خواندن فایل‌های سالانه را برطرف کنید.'); return; }
     host.querySelectorAll('.sr-map').forEach(card=>{
       const f=SR.files.find(x=>x.id===card.dataset.file), msg=card.querySelector('[data-msg]'), errs=[];
       REQUIRED.forEach(k=>{ if(!(f.mapping[k]>=0)) errs.push('ستون «'+FIELD_LABEL[k]+'» انتخاب نشده است'); });
       if(f.start==null||f.end==null) errs.push('تاریخ شروع یا پایان سال مالی معتبر نیست');
       else if(f.end<f.start) errs.push('پایان سال مالی قبل از شروع آن است');
+      if(!f.isMain){
+        mainFieldsNow.forEach(k=>{ if(f.mapping[k]<0) errs.push('ستون تفصیلی متناظر با «'+FIELD_LABEL[k]+'» در این فایل پیدا نشده است'); });
+        f.keyFields=mainFieldsNow.filter(k=>f.mapping[k]>=0);
+      }
       const used={}; Object.entries(f.mapping).forEach(([k,i])=>{ if(i>=0&&['debit','credit','date','doc','kol','moein'].includes(k)){ if(used[i]) errs.push('یک ستون برای «'+FIELD_LABEL[used[i]]+'» و «'+FIELD_LABEL[k]+'» انتخاب شده'); used[i]=k; } });
       msg.innerHTML=errs.length?`<div class="err">${errs.map(e_).join('<br>')}</div>`:'';
       if(errs.length) okAll=false;
     });
+    const audit=SR.files.find(f=>f.isMain), history=SR.files.find(f=>f.periodRole==='history'), prior=SR.files.find(f=>f.periodRole==='prior'), next=SR.files.find(f=>f.periodRole==='next');
+    if(history&&prior&&history.end>=prior.start){ okAll=false; alert('پایان سال ۱۴۰۲ باید قبل از شروع سال ۱۴۰۳ باشد.'); }
+    if(audit&&prior&&prior.end>=audit.start){ okAll=false; alert('پایان سال قبل باید قبل از شروع سال جاری باشد.'); }
+    if(audit&&next&&next.start<=audit.end){ okAll=false; alert('شروع سال بعد باید بعد از پایان سال جاری باشد.'); }
     const fs=SR.files.filter(f=>f.status==='ok'&&f.start!=null).sort((a,b)=>a.start-b.start);
     for(let i=1;i<fs.length;i++) if(fs[i].start<=fs[i-1].end){ okAll=false; alert('بازهٔ سال مالی «'+fs[i].label+'» با «'+fs[i-1].label+'» هم‌پوشانی دارد.'); break; }
     if(!okAll) return;
-    SR.files.forEach(f=>{ if(f.status!=='ok') return; f.canon=canonRows(f); f.oc=SRE.suggestOpeningClosing(f.canon,f.start,f.end);
-      if(!f.ocTouched){ f.openingDocs=new Set(f.oc.opening.filter(x=>x.strong).map(x=>x.doc)); f.closingDocs=new Set(f.oc.closing.map(x=>x.doc)); f.hasOpening=f.oc.opening.length>0||f.start!==Math.min(...fs.map(x=>x.start)); } });
+    SR.files.forEach(f=>{ f.canon=canonRows(f); f.oc=SRE.suggestOpeningClosing(f.canon,f.start,f.end);
+      if(!f.ocTouched){ f.openingDocs=new Set(f.oc.opening.filter(x=>x.strong).map(x=>x.doc)); f.closingDocs=new Set(f.oc.closing.map(x=>x.doc)); f.hasOpening=f.oc.opening.length>0; } });
     SR.mapped=true; invalidate('model'); go('s3');
   });
 }
+
 function canonRows(f){
   const keys=Object.keys(FIELD_LABEL).filter(k=>f.mapping[k]>=0);
   return f.data.map(r=>{ const o={}; keys.forEach(k=>o[k]=r[f.mapping[k]]); return o; });
@@ -12445,6 +12579,7 @@ function renderOC(){
   host.innerHTML=`
     <h1>سند افتتاحیه و اختتامیهٔ هر سال</h1>
     <p class="sub">افتتاحیهٔ اولین سال، مانده‌هایی با «قدمت نامشخص» می‌سازد. افتتاحیهٔ سال‌های بعد با ماندهٔ پایان سال قبل تطبیق داده می‌شود. سند اختتامیه از ماندهٔ پایان کنار گذاشته می‌شود. پیشنهادهای برنامه را تأیید یا اصلاح کنید.</p>
+    ${(()=>{const first=files[0]; return first&&(!first.hasOpening||!first.openingDocs.size)?`<div class="card"><div class="err"><b>هشدار پوشش اطلاعاتی ${e_(first.label||'سال نخست زنجیره')}:</b> در اولین سال اطلاعاتی، سند افتتاحیه/مانده اول دوره باید در فایل وجود داشته و در همین مرحله انتخاب شود. اگر نه سال قبل‌تر بارگذاری شده و نه افتتاحیه معتبر ثبت شده باشد، محاسبه از صفر آغاز می‌شود و بخشی از اقلام سنواتی و راکد ممکن است قابل شناسایی نباشد. کاربرگ قبلی ۱۴۰۳ فقط ارقام همان کاربرگ را تأمین می‌کند و جزئیات منشأ لایه‌ها را جایگزین نمی‌کند.</div></div>`:'';})()}
     ${files.map(f=>`
     <div class="card" data-file="${f.id}">
       <h2>${e_(f.label||f.name)} <small class="hint">${fmtD(f.start)} تا ${fmtD(f.end)}</small></h2>
@@ -12458,7 +12593,7 @@ function renderOC(){
       ${f.oc.tempClosing.length?`<p class="hint">سندهای «بستن حساب‌های موقت» پیدا شد (${f.oc.tempClosing.map(x=>fa(x.doc)).join('، ')})؛ این‌ها اختتامیه نیستند و روی حساب‌های اشخاص اثری ندارند.</p>`:''}
       <label>شمارهٔ سندهای اختتامیهٔ دیگر (با ویرگول جدا کنید)<input data-manual="close" data-file="${f.id}" value="${e_([...f.closingDocs].filter(d=>!f.oc.closing.some(x=>x.doc===d)).join('، '))}"></label>
     </div>`).join('')}
-    ${nav('s2','s4','تأیید و ادامه ←')}`;
+    ${nav('s2','s5','تأیید و ادامه ←')}`;
   host.querySelectorAll('[data-oc]').forEach(c=>c.onchange=()=>{ const f=SR.files.find(x=>x.id===c.dataset.file); const set=c.dataset.oc==='open'?f.openingDocs:f.closingDocs; c.checked?set.add(c.value):set.delete(c.value); f.ocTouched=true; invalidate('model'); paint(); });
   host.querySelectorAll('[data-hasopen]').forEach(c=>c.onchange=()=>{ const f=SR.files.find(x=>x.id===c.dataset.hasopen); f.hasOpening=c.checked; f.ocTouched=true; invalidate('model'); paint(); });
   host.querySelectorAll('[data-manual]').forEach(i=>i.onchange=()=>{
@@ -12467,14 +12602,25 @@ function renderOC(){
     SRE.latinDigits(i.value).split(/[,،\s]+/).map(s=>s.trim()).filter(Boolean).forEach(d=>set.add(SRE.normCode(d)));
     f.ocTouched=true; invalidate('model'); paint();
   });
-  bindNav(host,()=>{ busy(host,'در حال ساخت رویدادها از اسناد',()=>{ buildModel(); go('s4'); }); });
+  bindNav(host,()=>{
+    const prior=SR.files.find(f=>f.periodRole==='prior'), history=SR.files.find(f=>f.periodRole==='history');
+    if(!SR.priorWorkpaper&&!history&&prior&&(!prior.hasOpening||!prior.openingDocs.size)){
+      alert('برای محاسبهٔ مستقل اقلام سال ۱۴۰۳، سند افتتاحیه/مانده ابتدای دورهٔ ۱۴۰۳ باید در مرحلهٔ حاضر انتخاب شده باشد. اگر افتتاحیه در فایل وجود دارد، آن را از جدول یا از طریق شماره سندهای دستی مشخص کنید.');
+      return;
+    }
+    busy(host,'در حال آماده‌سازی اطلاعات حساب‌ها',()=>{ buildModel(); go('s5'); });
+  });
 }
 function buildModel(){
   const files=SR.files.filter(f=>f.status==='ok').map(f=>({id:f.id,label:f.label||f.name,name:f.name,start:f.start,end:f.end,rows:f.canon,srcRows:f.srcRows,
     keyFields:f.keyFields,openingDocs:[...f.openingDocs],closingDocs:[...f.closingDocs],hasOpening:f.hasOpening}));
   SR.model=SRE.build({files,auditFileId:SR.auditId});
   const sug=SRE.suggestRoles(SR.model);
-  sug.forEach((v,k)=>{ if(!SR.roles.has(k)) SR.roles.set(k,v); });
+  sug.forEach((v,k)=>{
+    const old=SR.roles.get(k);
+    if(!old) SR.roles.set(k,{...v,confirmed:v.role!=='OTHER'});
+    else if(!old.confirmed&&v.role!=='OTHER'){ old.role=v.role; old.nature=v.nature; old.confirmed=true; }
+  });
   SR.codingSug=SRE.suggestCoding(SR.model);
   SR.codingOk=new Set([...SR.codingOk].filter(id=>SR.codingSug.some(s=>s.id===id)));
   SR.result=null;
@@ -12485,20 +12631,31 @@ function renderAccounts(){
   const host=$('srS4'); if(!host) return;
   const accs=[...SR.model.accounts.values()].sort((a,b)=>(a.kol+'|'+a.moein).localeCompare(b.kol+'|'+b.moein,'fa',{numeric:true}));
   const q=SRE.normText(SR.view.accFilter);
-  const shown=accs.filter(a=>!q||SRE.normText(a.kol+' '+a.moein+' '+a.kolT+' '+a.moeinT).includes(q));
+  const groups=new Map();
+  accs.forEach(a=>{const key=String(a.kol||'');if(!groups.has(key))groups.set(key,{kol:a.kol||'—',title:a.kolT||'—',accounts:[]});const g=groups.get(key);if(a.kolT)g.title=a.kolT;g.accounts.push(a);});
+  const visibleGroups=[...groups.values()].map(g=>({...g,shown:g.accounts.filter(a=>!q||SRE.normText(a.kol+' '+a.moein+' '+a.kolT+' '+a.moeinT).includes(q))})).filter(g=>g.shown.length);
   const pending=[...SR.roles.values()].filter(r=>!r.confirmed).length;
+  const selectedCount=accs.filter(a=>SR.roles.get(a.id)?.selected).length;
+  const allSelected=accs.length>0&&selectedCount===accs.length;
   host.innerHTML=`
-    <h1>برچسب حساب‌ها و انتخاب حساب‌های مورد رسیدگی</h1>
-    <p class="sub">برنامه از روی عنوان حساب‌ها پیشنهاد داده است. فقط برچسب‌های <b>تأییدشده</b> در تشخیص «گردش مؤثر» (دریافت/پرداخت با بانک، صندوق یا چک) به کار می‌روند. ستون «بررسی شود» تعیین می‌کند کدام حساب‌ها در گزارش بیایند.</p>
+    <h1>انتخاب حساب‌ها و تعیین نوع حساب</h1>
+    <p class="sub">انتخاب فقط در دو سطح <b>کل</b> و <b>معین</b> انجام می‌شود. با تیک کنار هر حساب کل، تمام حساب‌های معین زیرمجموعه آن یکجا انتخاب یا لغو می‌شوند؛ برای انتخاب همه حساب‌ها نیز از تیک سرستون استفاده کنید. انتخاب حساب‌ها مستقل از انتخاب تفصیلی است و خروجی همچنان به تفکیک تفصیلی‌های ثبت‌شده نمایش داده می‌شود.</p>
     <div class="card">
-      <div class="sr-row"><input class="sr-search" id="srAccQ" placeholder="جست‌وجوی کد یا عنوان حساب" value="${e_(SR.view.accFilter)}">
-        <button type="button" class="btn" id="srAccAll">تأیید همهٔ پیشنهادها${pending?' ('+fa(pending)+')':''}</button></div>
-      <div class="scrollx sr-tall"><table class="sr-t"><thead><tr><th>بررسی شود</th><th>کد کل/معین</th><th>عنوان</th><th>نوع حساب</th><th>ماهیت</th><th>وضعیت</th></tr></thead><tbody>
-      ${shown.map(a=>{ const r=SR.roles.get(a.id)||{role:'OTHER',nature:'',confirmed:false,selected:false}; return `<tr data-acc="${e_(a.id)}">
-        <td><input type="checkbox" data-sel ${r.selected?'checked':''}></td><td>${fa(e_(a.kol))} / ${fa(e_(a.moein))}</td><td>${e_(a.kolT)} — ${e_(a.moeinT)}</td>
-        <td><select data-role>${Object.keys(ROLE_LABEL).map(k=>`<option value="${k}" ${r.role===k?'selected':''}>${ROLE_LABEL[k]}</option>`).join('')}</select></td>
-        <td><select data-nat><option value="">نامشخص</option><option value="D" ${r.nature==='D'?'selected':''}>بدهکار</option><option value="C" ${r.nature==='C'?'selected':''}>بستانکار</option></select></td>
-        <td>${r.confirmed?'<span class="sr-ok">تأییدشده</span>':'<span class="sr-pend">پیشنهادی</span>'}</td></tr>`; }).join('')}
+      <div class="sr-row"><input class="sr-search" id="srAccQ" placeholder="جست‌وجوی کد یا عنوان کل و معین" value="${e_(SR.view.accFilter)}">
+        <span class="sr-chip">${fa(selectedCount)} از ${fa(accs.length)} حساب معین انتخاب شده</span>
+        <button type="button" class="btn" id="srAccConfirmAll">تأیید همهٔ پیشنهادهای نوع حساب${pending?' ('+fa(pending)+')':''}</button></div>
+      <div class="scrollx sr-tall"><table class="sr-t sr-account-tree"><thead><tr>
+        <th><label class="sr-select-all"><input type="checkbox" id="srAccAll" ${allSelected?'checked':''}> انتخاب همه</label></th><th>سطح / کد حساب</th><th>عنوان حساب</th><th>نوع حساب</th><th>ماهیت</th><th>وضعیت</th>
+      </tr></thead><tbody>
+      ${visibleGroups.map((g,gi)=>{
+        const ids=g.accounts.map(a=>a.id), selected=ids.filter(id=>SR.roles.get(id)?.selected).length, parentChecked=selected===ids.length, parentMixed=selected>0&&selected<ids.length;
+        return `<tr class="sr-kol-row"><td><input type="checkbox" data-kol-select="${gi}" ${parentChecked?'checked':''} aria-label="انتخاب همه حساب‌های معین این حساب کل"></td><td><b>کل ${fa(e_(g.kol))}</b></td><td colspan="4"><b>${e_(g.title||'—')}</b><small class="sr-tree-count">${fa(ids.length)} حساب معین</small></td></tr>
+          ${g.shown.map(a=>{const r=SR.roles.get(a.id)||{role:'OTHER',nature:'',confirmed:false,selected:false};return `<tr class="sr-moein-row" data-acc="${e_(a.id)}" data-parent-group="${gi}">
+            <td><input type="checkbox" data-sel ${r.selected?'checked':''} aria-label="انتخاب حساب معین"></td><td class="sr-moein-code">معین ${fa(e_(a.moein))}</td><td>${e_(a.moeinT||'—')}</td>
+            <td><select data-role>${Object.keys(ROLE_LABEL).map(k=>`<option value="${k}" ${r.role===k?'selected':''}>${ROLE_LABEL[k]}</option>`).join('')}</select></td>
+            <td><select data-nat><option value="">نامشخص</option><option value="D" ${r.nature==='D'?'selected':''}>بدهکار</option><option value="C" ${r.nature==='C'?'selected':''}>بستانکار</option></select></td>
+            <td>${r.confirmed?'<span class="sr-ok">تأییدشده</span>':'<span class="sr-pend">پیشنهادی</span>'}</td></tr>`;}).join('')}`;
+      }).join('')}
       </tbody></table></div>
     </div>
     ${SR.codingSug.length?`<div class="card"><h2>تطبیق کدینگ بین سال‌ها</h2>
@@ -12509,10 +12666,16 @@ function renderAccounts(){
       </tbody></table></div></div>`:''}
     ${nav('s3','s5','ادامه: تنظیمات ←')}`;
   const q1=$('srAccQ'); q1.oninput=()=>{ SR.view.accFilter=q1.value; clearTimeout(q1._t); q1._t=setTimeout(()=>{ renderAccounts(); const n=$('srAccQ'); n.focus(); n.setSelectionRange(n.value.length,n.value.length); },250); };
-  $('srAccAll').onclick=()=>{ SR.roles.forEach(r=>r.confirmed=true); invalidate('result'); renderAccounts(); };
+  const allBox=$('srAccAll'); if(allBox){allBox.indeterminate=selectedCount>0&&selectedCount<accs.length;allBox.onchange=()=>{ SR.roles.forEach(r=>r.selected=allBox.checked); invalidate('result'); renderAccounts(); };}
+  $('srAccConfirmAll').onclick=()=>{ SR.roles.forEach(r=>r.confirmed=true); invalidate('result'); renderAccounts(); };
+  host.querySelectorAll('[data-kol-select]').forEach(input=>{
+    const g=visibleGroups[Number(input.dataset.kolSelect)];
+    if(g){const count=g.accounts.filter(a=>SR.roles.get(a.id)?.selected).length;input.indeterminate=count>0&&count<g.accounts.length;}
+    input.onchange=()=>{if(!g)return;g.accounts.forEach(a=>{const r=SR.roles.get(a.id)||{role:'OTHER',nature:'',confirmed:false,selected:false};r.selected=input.checked;SR.roles.set(a.id,r);});invalidate('result');renderAccounts();};
+  });
   host.querySelectorAll('tr[data-acc]').forEach(tr=>{
     const id=tr.dataset.acc, r=SR.roles.get(id)||{role:'OTHER',nature:'',confirmed:false,selected:false}; SR.roles.set(id,r);
-    tr.querySelector('[data-sel]').onchange=e=>{ r.selected=e.target.checked; invalidate('result'); };
+    tr.querySelector('[data-sel]').onchange=e=>{ r.selected=e.target.checked; invalidate('result'); renderAccounts(); };
     tr.querySelector('[data-role]').onchange=e=>{ r.role=e.target.value; r.confirmed=true; invalidate('result'); renderAccounts(); };
     tr.querySelector('[data-nat]').onchange=e=>{ r.nature=e.target.value; r.confirmed=true; invalidate('result'); renderAccounts(); };
   });
@@ -12527,62 +12690,71 @@ function currentTags(){
 }
 function renderSettings(){
   const host=$('srS5'); if(!host) return;
-  const st=SR.settings, {auto,tagOf}=currentTags();
-  const selected=new Set([...SR.roles.entries()].filter(([,r])=>r.selected).map(([k])=>k));
-  SR.linkSug=SRE.suggestLinks(SR.model,tagOf).filter(l=>{ const e=SR.model.byId.get(l.laterEid); return e&&selected.has(e.account); });
-  const tagged=SR.model.events.filter(e=>selected.has(e.account)&&(auto.has(e.eid)||SR.tagOverrides.has(e.eid)));
-  const q=SRE.normText(SR.view.tagFilter);
-  const tShown=tagged.filter(e=>!q||SRE.normText(e.descRow+' '+e.descDoc+' '+e.doc+' '+e.key).includes(q)).slice(0,300);
-  const title=k=>(SR.model.keys.get(k)||{}).title||k;
+  const st=SR.settings, audit=SR.model.files.find(f=>f.id===SR.auditId);
+  const T=st.thresholds[0]||12, cut=SRE.cutoffDay(audit.end,T,'months');
   host.innerHTML=`
-    <h1>تنظیمات و بازبینی رویدادها</h1>
-    <div class="card"><h2>آستانه‌های رکود و تاریخ مرز</h2>
-      <div class="sr-row">${[6,12,24,36].map(T=>`<label class="sr-chk"><input type="checkbox" data-th="${T}" ${st.thresholds.includes(T)?'checked':''}> ${fa(T)} ماه</label>`).join('')}
-        <label>آستانهٔ دلخواه (ماه)<input type="number" min="1" max="120" id="srThCustom" style="width:90px"></label></div>
-      <div class="sr-row"><label class="sr-chk"><input type="radio" name="srCm" value="months" ${st.cutoffMethod==='months'?'checked':''}> شمارش ماه تقویمی (پیش‌فرض)</label>
-        <label class="sr-chk"><input type="radio" name="srCm" value="days" ${st.cutoffMethod==='days'?'checked':''}> تعداد روز ثابت (۶ ماه = ۱۸۰ روز، ۱۲ ماه = ۳۶۵ روز)</label></div>
-      <div class="sr-row"><label class="sr-chk"><input type="radio" name="srInc" value="1" ${st.inclusive?'checked':''}> ثبت‌شده دقیقاً در روز مرز «قدیمی» حساب شود (پیش‌فرض)</label>
-        <label class="sr-chk"><input type="radio" name="srInc" value="0" ${!st.inclusive?'checked':''}> فقط قبل از روز مرز قدیمی است</label></div>
-      <p class="hint">مثال: پایان سال ${fmtD(SR.model.files.find(f=>f.id===SR.auditId).end)} ← مرز ۶ ماهه ${fmtD(SRE.cutoffDay(SR.model.files.find(f=>f.id===SR.auditId).end,6,st.cutoffMethod))}</p>
+    <h1>تنظیم مدت تشخیص اقلام راکد</h1>
+    <div class="card">
+      <h2>آستانهٔ رکود</h2>
+      <p>مانده‌ای که منشأ آن از این مدت قبل‌تر باشد، در ستون اقلام راکد محاسبه می‌شود. این معیار فقط سن مانده را می‌سنجد؛ گردش جدید، قدمت باقی‌ماندهٔ مانده را خودکار از بین نمی‌برد.</p>
+      <label>قدمت مورد بررسی
+        <select id="srThreshold" style="display:block;min-width:180px;padding:9px;margin-top:6px">
+          ${[6,12,18,24,36].map(n=>`<option value="${n}" ${T===n?'selected':''}>${fa(n)} ماه</option>`).join('')}
+        </select>
+      </label>
+      <p class="hint">پایان سال جاری: ${fmtD(audit.end)} — تاریخ مرز ${fa(T)} ماهه: ${fmtD(cut)}. روش محاسبه بر اساس ماه تقویمی شمسی است.</p>
     </div>
-    <div class="card"><h2>اتصال برگشت چک و برگشت سند (${fa(SR.linkSug.length)})</h2>
-      <p class="hint">اتصال تأییدشده باعث می‌شود رویداد اصلی و برگشت آن هر دو از محاسبهٔ لایه‌ها حذف شوند و محاسبه از ابتدا تکرار شود. بدون تأیید، برگشت چک «افزایش مشکوک» با قدمت نامشخص در نظر گرفته می‌شود.</p>
-      ${SR.linkSug.length?`<div class="scrollx"><table class="sr-t"><thead><tr><th>تأیید</th><th>نوع</th><th>حساب</th><th>رویداد اصلی</th><th>برگشت</th><th>مبلغ</th><th>قوت</th><th>مبنا</th></tr></thead><tbody>
-      ${SR.linkSug.map(l=>{ const a=SR.model.byId.get(l.origEid), b=SR.model.byId.get(l.laterEid); return `<tr><td><input type="checkbox" data-link="${e_(l.id)}" ${SR.linkOk.has(l.id)?'checked':''}></td>
-        <td>${l.kind==='CHECK'?'برگشت چک':'برگشت سند'}</td><td>${e_(title(l.key))}</td><td>سند ${fa(e_(a.doc))} — ${fmtD(a.day)}<br><small>${e_(a.descRow||a.descDoc)}</small></td>
-        <td>سند ${fa(e_(b.doc))} — ${fmtD(b.day)}<br><small>${e_(b.descRow||b.descDoc)}</small></td><td>${fmtB(l.amount)}</td><td>${l.strength==='strong'?'قوی':'ضعیف'}</td><td class="hint">${e_(l.reason)}</td></tr>`; }).join('')}
-      </tbody></table></div>`:'<p class="hint">پیشنهادی وجود ندارد.</p>'}
+    <div class="card">
+      <h2>روش تهیهٔ کاربرگ</h2>
+      <p>مانده‌ها ابتدا به تفکیک معین و تفصیلی محاسبه می‌شوند. در حساب‌های اشخاص، اگر یک تفصیلی در حساب‌های دریافتنی و پرداختنی ماندهٔ مخالف داشته باشد، مبلغ کمتر به‌عنوان «تهاتر تحلیلی» کسر می‌شود و ماندهٔ خالص نشان داده می‌شود.</p>
+      <p class="hint">تهاتر این ماژول برای تحلیل مانده است؛ به‌تنهایی مجوز ثبت سند تهاتر یا ارائهٔ خالص در صورت‌های مالی نیست. اگر تشخیص نوع حساب از عنوان آن قطعی نباشد، تهاتر خودکار انجام نمی‌شود.</p>
+      <p class="hint">پیگیری سال بعد جدا از ماندهٔ پایان سال جاری انجام می‌شود و اعداد سال جاری را تغییر نمی‌دهد. اگر فایل سال بعد بارگذاری نشده باشد، ستون پیگیری خالی می‌ماند.</p>
     </div>
-    <div class="card"><h2>رویدادهای برچسب‌خورده (${fa(tagged.length)})</h2>
-      <p class="hint">برنامه این برچسب‌ها را از روی شرح و ساختار سند پیشنهاد داده است و قابل اصلاح است. برچسب «انتقال» و «برگشت چک» فقط حداکثر را محتاطانه بزرگ‌تر می‌کند و حداقل را تغییر نمی‌دهد. اصلاحیه، برگشت و انتقال «گردش مؤثر» حساب نمی‌شوند.</p>
-      <input class="sr-search" id="srTagQ" placeholder="جست‌وجو در شرح، شمارهٔ سند یا کلید" value="${e_(SR.view.tagFilter)}">
-      <div class="scrollx sr-tall"><table class="sr-t"><thead><tr><th>تاریخ</th><th>سند</th><th>حساب</th><th>بدهکار</th><th>بستانکار</th><th>شرح</th><th>برچسب</th><th>مبنای پیشنهاد</th></tr></thead><tbody>
-      ${tShown.map(e=>`<tr><td>${fmtD(e.day)}</td><td>${fa(e_(e.doc))}</td><td>${e_(title(e.key))}</td><td>${e.side==='D'?fmtB(e.amount):''}</td><td>${e.side==='C'?fmtB(e.amount):''}</td>
-        <td class="sr-desc">${e_(e.descRow||e.descDoc)}</td><td><select data-tag="${e_(e.eid)}">${SRE.TAGS.map(t=>`<option value="${t}" ${tagOf(e)===t?'selected':''}>${TAG_LABEL[t]}</option>`).join('')}</select></td>
-        <td class="hint">${SR.tagOverrides.has(e.eid)?'اصلاح دستی':e_((auto.get(e.eid)||{}).why||'')}</td></tr>`).join('')}
-      </tbody></table></div>${tagged.length>tShown.length?`<p class="hint">${fa(tShown.length)} مورد از ${fa(tagged.length)} نمایش داده شده؛ برای یافتن بقیه جست‌وجو کنید.</p>`:''}
-    </div>
-    ${nav('s4','s6','اجرای محاسبات ←')}`;
-  host.querySelectorAll('[data-th]').forEach(c=>c.onchange=()=>{ const T=Number(c.dataset.th); st.thresholds=c.checked?[...new Set([...st.thresholds,T])].sort((a,b)=>a-b):st.thresholds.filter(x=>x!==T); invalidate('result'); });
-  $('srThCustom').onchange=e=>{ const T=Math.round(Number(SRE.latinDigits(e.target.value))); if(T>0&&T<=120){ st.thresholds=[...new Set([...st.thresholds,T])].sort((a,b)=>a-b); invalidate('result'); renderSettings(); } };
-  host.querySelectorAll('input[name=srCm]').forEach(r=>r.onchange=()=>{ st.cutoffMethod=r.value; invalidate('result'); renderSettings(); });
-  host.querySelectorAll('input[name=srInc]').forEach(r=>r.onchange=()=>{ st.inclusive=r.value==='1'; invalidate('result'); });
-  host.querySelectorAll('[data-link]').forEach(c=>c.onchange=()=>{ c.checked?SR.linkOk.add(c.dataset.link):SR.linkOk.delete(c.dataset.link); invalidate('result'); });
-  host.querySelectorAll('[data-tag]').forEach(s=>s.onchange=()=>{ SR.tagOverrides.set(s.dataset.tag,s.value); invalidate('result'); });
-  const tq=$('srTagQ'); tq.oninput=()=>{ SR.view.tagFilter=tq.value; clearTimeout(tq._t); tq._t=setTimeout(()=>{ renderSettings(); const n=$('srTagQ'); n.focus(); n.setSelectionRange(n.value.length,n.value.length); },300); };
-  bindNav(host,()=>{ if(!st.thresholds.length){ alert('حداقل یک آستانهٔ رکود انتخاب کنید.'); return; } busy(host,'در حال محاسبهٔ لایه‌ها و کران‌ها',()=>{ runAnalysis(); go('s6'); }); });
-}
-function runAnalysis(){
-  const accounts=new Set([...SR.roles.entries()].filter(([,r])=>r.selected).map(([k])=>k));
-  const links=SR.linkSug.filter(l=>SR.linkOk.has(l.id)).map(l=>({origEid:l.origEid,laterEid:l.laterEid}));
-  const aliases=SR.codingSug.filter(s=>SR.codingOk.has(s.id)).map(s=>({fromKey:s.fromKey,toKey:s.toKey,toFileId:s.toFileId}));
-  SR.result=SRE.analyze(SR.model,{roles:SR.roles,tagOverrides:SR.tagOverrides,confirmedTags:new Set(SR.tagOverrides.keys()),links,aliases,accounts,
-    thresholds:SR.settings.thresholds.slice(),cutoffMethod:SR.settings.cutoffMethod,inclusive:SR.settings.inclusive});
-  SR.view.limit=200; SR.view.key=null; SR.view.T=0;
+    ${nav('s3','s6','محاسبه و ساخت کاربرگ ←')}`;
+  $('srThreshold').onchange=e=>{ st.thresholds=[Number(e.target.value)]; st.cutoffMethod='months'; st.inclusive=true; invalidate('result'); renderSettings(); };
+  bindNav(host,()=>{ if(!st.thresholds.length) st.thresholds=[12]; busy(host,'در حال محاسبهٔ مانده‌ها، تهاتر و قدمت اقلام',()=>{ runAnalysis(); go('s6'); }); });
 }
 
+function srSourceFiles(){
+  return SR.files.filter(f=>f.status==='ok').map(f=>({id:f.id,label:f.label||f.name,name:f.name,start:f.start,end:f.end,rows:f.canon,srcRows:f.srcRows,
+    keyFields:f.keyFields,openingDocs:[...f.openingDocs],closingDocs:[...f.closingDocs],hasOpening:f.hasOpening}));
+}
+function srSettingsFor(model){
+  const links=SR.linkSug.filter(l=>SR.linkOk.has(l.id)).map(l=>({origEid:l.origEid,laterEid:l.laterEid}));
+  const aliases=SR.codingSug.filter(s=>SR.codingOk.has(s.id)).map(s=>({fromKey:s.fromKey,toKey:s.toKey,toFileId:s.toFileId}));
+  const outOfScope=/(دارایی\s*(?:های)?\s*ثابت|موجودی\s*(?:کالا|مواد|محصول|قطعات)|مواد\s*اولیه|کالای\s*در\s*جریان(?:\s*ساخت)?|محصول\s*در\s*جریان(?:\s*ساخت)?|حساب\s*(?:های|ها)?\s*موقت|خلاصه\s*سود\s*و\s*زیان)/;
+  const eligible=[...model.accounts.values()].filter(a=>!outOfScope.test(SRE.normText((a.kolT||'')+' '+(a.moeinT||''))));
+  // فقط حساب‌های معین تیک‌خورده در سطح انتخاب کل/معین وارد تحلیل و خروجی می‌شوند.
+  const selected=eligible.filter(a=>(SR.roles.get(a.id)||{}).selected===true);
+  return {roles:SR.roles,tagOverrides:SR.tagOverrides,confirmedTags:new Set(SR.tagOverrides.keys()),links,aliases,accounts:new Set(selected.map(a=>a.id)),
+    thresholds:SR.settings.thresholds.slice(),cutoffMethod:SR.settings.cutoffMethod,inclusive:SR.settings.inclusive};
+}
+function runAnalysis(){
+  const source=srSourceFiles(), options=srSettingsFor(SR.model);
+  const excluded=[...SR.model.accounts.values()].filter(a=>!options.accounts.has(a.id));
+  SR.excludedAccounts=excluded.map(a=>({id:a.id,kolT:a.kolT,moeinT:a.moeinT}));
+  SR.result=SRE.analyze(SR.model,options);
+  const prior=SR.files.find(f=>f.periodRole==='prior'), history=SR.files.find(f=>f.periodRole==='history'), next=SR.files.find(f=>f.periodRole==='next');
+  SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null;
+  // در نبود کاربرگ قبلی: اگر اسناد ۱۴۰۲ موجود باشد، زنجیرهٔ دو ساله ساخته می‌شود؛
+  // در غیر این صورت، ۱۴۰۳ به‌تنهایی و با اتکا به سند افتتاحیهٔ خودش تحلیل می‌شود.
+  if(!SR.priorWorkpaper&&prior){
+    const priorFiles=history?source:source.filter(f=>f.id===prior.id);
+    SR.priorModel=SRE.build({files:priorFiles,auditFileId:prior.id});
+    const priorSettings=srSettingsFor(SR.priorModel);
+    if(!history){ priorSettings.links=[]; priorSettings.aliases=[]; }
+    SR.priorResult=SRE.analyze(SR.priorModel,priorSettings);
+  }
+  // پیگیری ۱۴۰۵ از کل اسناد زنجیره تا پایان سال بعد محاسبه می‌شود؛ خروجی کاربرگ، ماندهٔ خالص کل حساب است، نه صرفاً لایهٔ قدیمی باقی‌مانده.
+  if(next){
+    SR.nextModel=SRE.build({files:source,auditFileId:next.id});
+    SR.nextResult=SRE.analyze(SR.nextModel,srSettingsFor(SR.nextModel));
+  }
+  SR.view.limit=200; SR.view.key=null; SR.view.T=0;
+}
 /* ------------------------------------------------------ مرحلهٔ ۶: گزارش‌ها */
-const TABS=[['san','اقلام سنواتی'],['stale','اقلام راکد'],['exc','استثناها'],['next','پیگیری سال بعد'],['detail','نمای ریز حساب'],['help','راهنمای خواندن گزارش']];
+/* ------------------------------------------------------ مرحلهٔ ۶: گزارش‌ها */
+const TABS=[['work','کاربرگ اقلام سنواتی و راکد'],['exc','استثناها'],['help','روش محاسبه']];
 function keysShown(){
   const R=SR.result, q=SRE.normText(SR.view.filter);
   return R.keys.filter(k=>k.endSide&&(!q||SRE.normText(k.title+' '+k.key).includes(q))).sort((a,b)=>(b.end>a.end?1:(b.end<a.end?-1:0)));
@@ -12598,94 +12770,228 @@ function chips(k){
 function headerHtml(){
   const R=SR.result, cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
   return `<div class="sr-head"><div><b>${e_(cfg.company||'')}</b></div>
-    <div>سال مورد رسیدگی: <b>${e_(R.audit.label)}</b> (${fmtD(R.audit.start)} تا ${fmtD(R.audit.end)}) — سال‌های زنجیره: ${R.chain.map(c=>e_(c.label)).join('، ')}${R.next?' — سال بعد: '+e_(R.next.label):''}</div>
-    <div class="hint">روش تاریخ مرز: ${R.settings.cutoffMethod==='months'?'ماه تقویمی شمسی':'تعداد روز ثابت'}؛ ثبت در روز مرز ${R.settings.inclusive?'قدیمی محسوب می‌شود':'قدیمی محسوب نمی‌شود'}. اثرانگشت محاسبات سال رسیدگی: <span dir="ltr">${e_(R.snapshotDigest)}</span></div></div>`;
+    <div>سال رسیدگی: <b>${e_(R.audit.label)}</b> (${fmtD(R.audit.start)} تا ${fmtD(R.audit.end)}) — سال قبل: ${e_((R.chain.length>1?R.chain[R.chain.length-2].label:'—'))}${R.next?' — سال بعد: '+e_(R.next.label):' — فایل سال بعد ارائه نشده است'}</div>
+    <div class="hint">سطح گزارش: معین و تفصیلی | آستانهٔ رکود: ${fa(R.settings.thresholds[0]||12)} ماه | ارقام بر مبنای ریال</div></div>`;
 }
+
 function renderReports(){
   const host=$('srS6'); if(!host) return;
   const R=SR.result;
-  if(!R){ host.innerHTML='<div class="card"><div class="err">تنظیمات تغییر کرده است؛ برای دیدن گزارش، دوباره «اجرای محاسبات» را بزنید.</div></div>'+nav('s5',null); bindNav(host,()=>{}); return; }
+  if(!R){ host.innerHTML='<div class="card"><div class="err">تنظیمات تغییر کرده است؛ کاربرگ را دوباره محاسبه کنید.</div></div>'+nav('s5',null); bindNav(host,()=>{}); return; }
   const tab=SR.view.tab;
   host.innerHTML=`
-    <h1>گزارش اقلام سنواتی و راکد</h1>
-    ${R.checks.length?`<div class="card"><div class="err"><b>کنترل صحت محاسبات در ${fa(R.checks.length)} مورد ناموفق بود.</b> اعداد کلیدهای علامت‌خورده قابل اتکا نیست. ${R.checks.slice(0,5).map(c=>e_((c.key||'')+' — '+c.detail)).join('<br>')}</div></div>`:'<p class="sr-okbar">✓ همهٔ کنترل‌های صحت برقرار است: جمع لایه‌ها با ماندهٔ دفتر (مبلغ و سمت) برابر است، حداقل ≤ حداکثر ≤ مانده، و فایل سال بعد اثری بر سال رسیدگی ندارد.</p>'}
-    <div class="sr-tabs">${TABS.map(([id,l])=>`<button type="button" class="${tab===id?'on':''}" data-tab="${id}">${l}</button>`).join('')}</div>
-    <div class="sr-tools"><input class="sr-search" id="srQ" placeholder="جست‌وجوی حساب یا طرف حساب" value="${e_(SR.view.filter)}">
-      <button type="button" class="btn" id="srPrint">🖨 چاپ این بخش</button><button type="button" class="btn" id="srXlsx">⬇ خروجی اکسل (همهٔ بخش‌ها)</button></div>
-    <div id="srReport" class="card">${headerHtml()}${tabHtml(tab)}</div>
+    <h1>کاربرگ اقلام سنواتی و راکد</h1>
+    ${R.checks.length?`<div class="card"><div class="err"><b>کنترل صحت محاسبات در ${fa(R.checks.length)} مورد ناموفق بود.</b> مبالغ کلیدهای دارای کنترل ناموفق نیازمند بررسی‌اند. ${R.checks.slice(0,5).map(c=>e_((c.key||'')+' — '+c.detail)).join('<br>')}</div></div>`:'<p class="sr-okbar">کنترل جمع لایه‌ها با ماندهٔ دفتر و استقلال محاسبهٔ سال بعد برقرار است.</p>'}
+    <div class="sr-tabs">${TABS.map(([id,label])=>`<button type="button" class="${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('')}</div>
+    <div class="sr-tools"><input class="sr-search" id="srQ" placeholder="جست‌وجوی کد یا عنوان معین و تفصیلی" value="${e_(SR.view.filter)}">
+      <button type="button" class="btn" id="srPrint">چاپ کاربرگ</button><button type="button" class="btn" id="srXlsx">خروجی اکسل</button></div>
+    <div id="srReport" class="${tab==='work'?'sr-report-shell':'card'}">${tab==='work'?'':headerHtml()}${tabHtml(tab)}</div>
     ${nav('s5',null)}`;
-  host.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ SR.view.tab=b.dataset.tab; SR.view.limit=200; renderReports(); });
-  const q=$('srQ'); q.oninput=()=>{ SR.view.filter=q.value; clearTimeout(q._t); q._t=setTimeout(()=>{ SR.view.limit=200; const r=$('srReport'); r.innerHTML=headerHtml()+tabHtml(SR.view.tab); bindReport(); },250); };
+  host.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ SR.view.tab=b.dataset.tab; renderReports(); });
+  const q=$('srQ'); q.oninput=()=>{ SR.view.filter=q.value; clearTimeout(q._t); q._t=setTimeout(()=>{ const r=$('srReport'); r.innerHTML=(SR.view.tab==='work'?'':headerHtml())+tabHtml(SR.view.tab); bindReport(); },180); };
   $('srPrint').onclick=printReport; $('srXlsx').onclick=exportXlsx;
   bindReport(); bindNav(host,()=>{});
 }
+
 function bindReport(){
   const r=$('srReport'); if(!r) return;
-  r.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{ SR.view.limit+=200; r.innerHTML=headerHtml()+tabHtml(SR.view.tab); bindReport(); });
+  r.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{ SR.view.limit+=200; r.innerHTML=(SR.view.tab==='work'?'':headerHtml())+tabHtml(SR.view.tab); bindReport(); });
   r.querySelectorAll('[data-key]').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); SR.view.key=a.dataset.key; SR.view.tab='detail'; renderReports(); });
-  r.querySelectorAll('[data-T]').forEach(b=>b.onclick=()=>{ SR.view.T=Number(b.dataset.T); r.innerHTML=headerHtml()+tabHtml(SR.view.tab); bindReport(); });
+  r.querySelectorAll('[data-T]').forEach(b=>b.onclick=()=>{ SR.view.T=Number(b.dataset.T); r.innerHTML=(SR.view.tab==='work'?'':headerHtml())+tabHtml(SR.view.tab); bindReport(); });
   const ks=r.querySelector('#srKeySel'); if(ks) ks.onchange=()=>{ SR.view.key=ks.value; r.innerHTML=headerHtml()+tabHtml('detail'); bindReport(); };
   r.querySelectorAll('[data-dtag]').forEach(s=>s.onchange=()=>{ SR.tagOverrides.set(s.dataset.dtag,s.value); const n=r.querySelector('#srRerun'); if(n) n.hidden=false; });
   const rr=r.querySelector('#srRerun'); if(rr) rr.onclick=()=>{ const k=SR.view.key; busy($('srS6'),'در حال محاسبهٔ دوباره',()=>{ runAnalysis(); SR.view.key=k; SR.view.tab='detail'; renderReports(); }); };
 }
 function totalsRow(R,cols){ return ['D','C'].filter(s=>R.totals[s].count).map(s=>{ const t=R.totals[s]; return cols(t,s); }).join(''); }
+function workpaperRowsFor(R,model,applySearch=true){
+  if(!R||!model) return [];
+  const T=R.settings.thresholds[0]||12;
+  const auditIndex=R.chain.findIndex(x=>x.id===R.audit.id), priorId=auditIndex>0?R.chain[auditIndex-1].id:null;
+  const bins=new Map();
+  const prevFor=k=>{ if(!priorId) return null; const x=(k.byYearEnd||[]).find(v=>v.fileId===priorId); return x?x.ledger:0n; };
+  for(const k of R.keys){
+    const priorBalance=prevFor(k);
+    if(!k.endSide&&(priorBalance===null||priorBalance===0n)) continue;
+    const parts=String(k.key).split('|'), detailCodes=parts.slice(2), hasDetail=detailCodes.some(Boolean);
+    const role=SR.roles.get(k.account), person=!!(role&&role.confirmed&&role.role==='PERSON'&&hasDetail);
+    const groupKey=person?'P|'+detailCodes.join('|'):'K|'+k.key;
+    if(!bins.has(groupKey)) bins.set(groupKey,{members:[],person,detailCodes:detailCodes.filter(Boolean)});
+    bins.get(groupKey).members.push(k);
+  }
+  const sum=(arr,fn)=>arr.reduce((a,x)=>a+fn(x),0n);
+  const minBig=(a,b)=>a<b?a:b, maxBig=(a,b)=>a>b?a:b;
+  const accLabel=k=>{
+    const a=model.accounts.get(k.account)||{};
+    const sub=[a.moein,a.moeinT].filter(Boolean).join(' — ')||k.account;
+    const parent=[a.kol,a.kolT].filter(Boolean).join(' — ');
+    return sub+(parent?' | کل '+parent:'');
+  };
+  const detailLabel=(members,codes)=>{
+    const metas=members.map(k=>model.keys.get(k.key)).filter(Boolean);
+    const title=(metas.find(x=>x.detailTitle)||{}).detailTitle||'';
+    const code=[...new Set(codes.filter(Boolean))].join(' / ');
+    if(!code&&!title) return {plain:'تفصیلی ثبت نشده',html:'تفصیلی ثبت نشده',code:'',title:'تفصیلی ثبت نشده'};
+    const plain=[code,title&&title!==code?title:''].filter(Boolean).join(' — ');
+    return {plain,html:e_(plain),code,title:title||'—'};
+  };
+  const uniquePairs=(values,codeKey,titleKey)=>{
+    const seen=new Set(),out=[];
+    values.forEach(v=>{const code=String(v[codeKey]||'').trim(),title=String(v[titleKey]||'').trim();const key=code+'|'+title;if((code||title)&&!seen.has(key)){seen.add(key);out.push({code,title});}});
+    out.sort((a,b)=>a.code.localeCompare(b.code,'fa',{numeric:true})||a.title.localeCompare(b.title,'fa',{numeric:true}));
+    return {codes:out.map(x=>x.code||'—'),titles:out.map(x=>x.title||'—')};
+  };
+  const rows=[];
+  for(const [groupKey,group] of bins){
+    const ms=group.members, d=sum(ms.filter(k=>k.endSide==='D'),k=>k.end), c=sum(ms.filter(k=>k.endSide==='C'),k=>k.end);
+    const offset=minBig(d,c), signed=d-c, netSide=signed>0n?'D':(signed<0n?'C':null), netAbs=signed<0n?-signed:signed;
+    const prevVals=ms.map(prevFor), priorSigned=prevVals.some(x=>x===null)?null:sum(prevVals,x=>x);
+    const cutIndex=Math.max(0,R.cuts.findIndex(x=>x.T===T));
+    const aged=getter=>{
+      if(!netSide||netAbs===0n) return {min:0n,max:0n};
+      const same=ms.filter(k=>k.endSide===netSide&&getter(k));
+      const lo=sum(same,k=>getter(k).min), hi=sum(same,k=>getter(k).max);
+      const lower=minBig(netAbs,maxBig(0n,lo-offset));
+      const upper=minBig(netAbs,hi);
+      return {min:minBig(lower,upper),max:upper};
+    };
+    const san=aged(k=>k.sanavati), stale=aged(k=>k.stale&&k.stale[cutIndex]);
+    const subs=[...new Set(ms.map(accLabel))].sort((a,b)=>a.localeCompare(b,'fa',{numeric:true}));
+    const detail=detailLabel(ms,group.detailCodes);
+    const accountMeta=[...new Map(ms.map(k=>[k.account,model.accounts.get(k.account)||{id:k.account,kol:k.kol,moein:k.moein}])).values()];
+    const kol=uniquePairs(accountMeta,'kol','kolT'),moein=uniquePairs(accountMeta,'moein','moeinT');
+    const consumedPre=ms.reduce((total,k)=>total+(k.log?.MIN||[]).filter(x=>x.origin==='PRE_PERIOD'&&x.eid&&model.byId.get(x.eid)?.fileId===R.audit.id).reduce((a,x)=>a+x.amount,0n),0n);
+    rows.push({groupKey,subPlain:subs.join(' ؛ '),subHtml:subs.map(e_).join('<br>'),detailPlain:detail.plain,detailHtml:detail.html,
+      kolCode:kol.codes.join(' ؛ '),kolTitle:kol.titles.join(' ؛ '),moeinCode:moein.codes.join(' ؛ '),moeinTitle:moein.titles.join(' ؛ '),detailCode:detail.code,detailTitle:detail.title,
+      priorSigned,offset,netSigned:signed,grossDebit:d,grossCredit:c,san,stale,consumedPre,memberCount:ms.length,isPersonGroup:group.person,sortSub:subs.join(' '),sortDetail:detail.plain});
+  }
+  const q=applySearch?SRE.normText(SR.view.filter):'';
+  return rows.filter(r=>!q||SRE.normText(r.subPlain+' '+r.detailPlain).includes(q))
+    .sort((a,b)=>a.sortSub.localeCompare(b.sortSub,'fa',{numeric:true})||a.sortDetail.localeCompare(b.sortDetail,'fa',{numeric:true}));
+}
+function workpaperRows(applySearch=true){ return workpaperRowsFor(SR.result,SR.model,applySearch); }
+function srNormMatch(v){ return SRE.normText(String(v??'').replace(/[؛;|]/g,' ')).replace(/\s+/g,' ').trim(); }
+function importedPriorFor(row,used){
+  const list=SR.priorWorkpaper?.rows||[]; if(!list.length) return null;
+  if(row.groupKey){ const exact=list.filter(x=>!used.has(x)&&x.groupKey&&x.groupKey===row.groupKey); if(exact.length){ exact.forEach(x=>used.add(x)); return {san:exact.reduce((a,x)=>a+x.san,0n),stale:exact.reduce((a,x)=>a+x.stale,0n),matched:exact}; } }
+  const rawD=srNormMatch(row.detailPlain), d=/^(?:تفصیلی ثبت نشده|تفصیلی ندارد|—|-)$/.test(rawD)?'':rawD;
+  const subs=new Set(String(row.subPlain||'').split('؛').map(srNormMatch).filter(Boolean));
+  const candidates=list.filter(x=>{
+    if(used.has(x)) return false;
+    const rawOldD=srNormMatch(x.detail), oldD=/^(?:تفصیلی ثبت نشده|تفصیلی ندارد|—|-)$/.test(rawOldD)?'':rawOldD;
+    const detailMatch=d===oldD;
+    const oldSubs=String(x.sub||'').split('؛').map(srNormMatch).filter(Boolean);
+    const subMatch=oldSubs.some(t=>[...subs].some(s=>s===t||s.startsWith(t+' | کل ')||s.startsWith(t+' | کل')));
+    return detailMatch&&subMatch;
+  });
+  if(!candidates.length) return null;
+  candidates.forEach(x=>used.add(x));
+  return {san:candidates.reduce((a,x)=>a+x.san,0n),stale:candidates.reduce((a,x)=>a+x.stale,0n),matched:candidates};
+}
+function finalWorkpaperRows(){
+  const cur=workpaperRowsFor(SR.result,SR.model,false), prev=SR.priorResult?workpaperRowsFor(SR.priorResult,SR.priorModel,false):[], next=SR.nextResult?workpaperRowsFor(SR.nextResult,SR.nextModel,false):[];
+  const pm=new Map(prev.map(x=>[x.groupKey,x])), nm=new Map(next.map(x=>[x.groupKey,x])), cm=new Map(cur.map(x=>[x.groupKey,x]));
+  const keys=new Set([...pm.keys(),...nm.keys(),...cm.keys()]);
+  const usedImport=new Set(), rows=[];
+  for(const key of keys){
+    const c=cm.get(key)||null, p=pm.get(key)||null, n=nm.get(key)||null;
+    const base=c||p||n;
+    rows.push({groupKey:key,subPlain:base.subPlain,detailPlain:base.detailPlain,
+      kolCode:base.kolCode,kolTitle:base.kolTitle,moeinCode:base.moeinCode,moeinTitle:base.moeinTitle,detailCode:base.detailCode,detailTitle:base.detailTitle,
+      san1403:p?p.san.min:0n,stale1403:p?p.stale.min:0n,
+      san1404:c?c.san.min:0n,stale1404:c?c.stale.min:0n,
+      san1403Range:p?p.san:null,stale1403Range:p?p.stale:null,san1404Range:c?c.san:null,stale1404Range:c?c.stale:null,
+      // مانده‌های ۱۴۰۳ و ۱۴۰۴ خالص‌اند؛ تهاتر ۱۴۰۴ جداگانه و به‌صورت مبلغ مثبت نشان داده می‌شود.
+      balance1403:p?p.netSigned:(c?c.priorSigned:null),balance1404:c?c.netSigned:0n,offset1404:c?c.offset:0n,
+      // پیگیری ۱۴۰۵، ماندهٔ خالص کل حساب در فایل سال بعد است و طبقه‌بندی تاریخی ۱۴۰۴ را تغییر نمی‌دهد.
+      nextBalance:SR.nextResult?(n?n.netSigned:0n):null,sortSub:base.sortSub,sortDetail:base.sortDetail});
+  }
+  if(SR.priorWorkpaper){
+    rows.forEach(r=>{ const found=importedPriorFor(r,usedImport); if(found){ r.san1403=found.san; r.stale1403=found.stale; r.importedPrior=true; } });
+    for(const x of SR.priorWorkpaper.rows){
+      if(usedImport.has(x)) continue;
+      rows.push({groupKey:x.groupKey||'WP|'+srNormMatch(x.sub)+'|'+srNormMatch(x.detail),subPlain:x.sub,detailPlain:x.detail,
+        kolCode:'',kolTitle:'',moeinCode:'',moeinTitle:x.sub,detailCode:'',detailTitle:x.detail,
+        san1403:x.san,stale1403:x.stale,san1404:0n,stale1404:0n,san1403Range:null,stale1403Range:null,san1404Range:null,stale1404Range:null,
+        balance1403:null,balance1404:0n,offset1404:0n,nextBalance:SR.nextResult?0n:null,sortSub:x.sub,sortDetail:x.detail,unmatchedPrior:true});
+      usedImport.add(x);
+    }
+  }
+  rows.sort((a,b)=>a.sortSub.localeCompare(b.sortSub,'fa',{numeric:true})||a.sortDetail.localeCompare(b.sortDetail,'fa',{numeric:true}));
+  return rows;
+}
+function signedText(x){
+  if(x===null||x===undefined) return '—';
+  if(x===0n) return '۰';
+  return fmtB(x<0n?-x:x)+' '+(x<0n?'بستانکار':'بدهکار');
+}
+function signedBalanceText(x){
+  if(x===null||x===undefined) return '—';
+  if(x===0n) return '۰';
+  return x<0n?'('+fmtB(-x)+')':fmtB(x);
+}
+function rangeText(r){
+  if(!r) return '—';
+  return r.min===r.max?fmtB(r.min):fmtB(r.min)+' تا '+fmtB(r.max);
+}
 function tabHtml(tab){
   const R=SR.result;
-  if(tab==='san'){
-    const ks=keysShown(), part=ks.slice(0,SR.view.limit);
-    return `<h2>اقلام سنواتی — بخشی از ماندهٔ پایان سال که منشأ آن قبل از ${fmtD(R.audit.start)} است</h2>
-    <p class="hint">چون مشخص نیست هر دریافت/پرداخت بابت کدام بدهی بوده، مبلغ سنواتی به‌صورت <b>حداقل</b> و <b>حداکثر</b> نمایش داده می‌شود. «حداکثر بدون فرض» یعنی اگر بعضی کاهش‌ها پیش‌پرداختِ فاکتورهای بعدی بوده باشند، مبلغ سنواتی تا این حد می‌تواند برسد.</p>
-    <div class="scrollx"><table class="sr-t sr-rep"><thead><tr><th>حساب / طرف حساب</th><th>ماندهٔ پایان</th><th>سمت</th><th>سنواتی حداقل</th><th>سنواتی حداکثر</th><th>قدمت نامشخص</th><th>عرض بازه</th><th>حداکثر بدون فرض</th><th>تفکیک سال منشأ (حداقل–حداکثر، تجمعی)</th><th>هشدارها و منابع عدم‌قطعیت</th></tr></thead><tbody>
-    ${part.map(k=>`<tr><td><a href="#" data-key="${e_(k.key)}">${e_(k.title)}</a><br><small dir="ltr">${e_(k.key)}</small></td><td>${fmtB(k.end)}</td><td>${side(k.endSide)}</td>
-      <td><b>${fmtB(k.sanavati.min)}</b></td><td><b>${fmtB(k.sanavati.max)}</b></td><td>${k.unknown.max>0n?fmtB(k.unknown.min)+' تا '+fmtB(k.unknown.max):'—'}</td><td>${pct(k.width)}</td>
-      <td>${k.sanavati.risk>0n?fmtB(k.sanavati.modelFreeMax):'—'}</td>
-      <td class="sr-small">${k.byOrigin.map(o=>`پیش از ${e_(o.label)}: ${fmtB(o.min)}–${fmtB(o.max)}`).join('<br>')}</td><td>${chips(k)}</td></tr>`).join('')}
-    </tbody><tfoot>${totalsRow(R,(t,s)=>`<tr><th>جمع ${fa(t.count)} حساب ${side(s)}</th><th>${fmtB(t.end)}</th><th>${side(s)}</th><th>${fmtB(t.sanMin)}</th><th>${fmtB(t.sanMax)}</th><th>${fmtB(t.unkMax)}</th><th colspan="4"></th></tr>`)}</tfoot></table></div>
-    ${ks.length>part.length?`<button type="button" class="btn" data-more>نمایش ${fa(Math.min(200,ks.length-part.length))} ردیف بعدی (از ${fa(ks.length)})</button>`:''}
-    ${R.zeroKeys?`<p class="hint">${fa(R.zeroKeys)} کلید ماندهٔ صفر دارند و در جدول نیامده‌اند.</p>`:''}`;
-  }
-  if(tab==='stale'){
-    const i=Math.min(SR.view.T,R.cuts.length-1), c=R.cuts[i], ks=keysShown(), part=ks.slice(0,SR.view.limit);
-    return `<h2>اقلام راکد — مانده با قدمت بیش از ${fa(c.T)} ماه (تاریخ مرز ${fmtD(c.cut)})</h2>
-    <div class="sr-tabs small">${R.cuts.map((x,j)=>`<button type="button" class="${j===i?'on':''}" data-T="${j}">${fa(x.T)} ماه</button>`).join('')}</div>
-    <p class="hint">مبلغ قدمت‌دار و وضعیت فعالیت حساب <b>دو شاخص مستقل</b>‌اند: گردش اخیر، قدمت ماندهٔ باقی‌مانده را از بین نمی‌برد. وضعیت فعالیت در بازهٔ ${fmtD(c.windowFrom)} تا ${fmtD(R.audit.end)} سنجیده شده است. برچسب نهایی «راکد قطعی» صادر نمی‌شود؛ تصمیم با حسابرس است.${R.anyCashConfirmed?'':' <b>هیچ حساب بانک/صندوقی تأیید نشده؛ وضعیت فعالیت نامشخص است.</b>'}</p>
-    <div class="scrollx"><table class="sr-t sr-rep"><thead><tr><th>حساب / طرف حساب</th><th>ماندهٔ پایان</th><th>سمت</th><th>قدیمی‌تر از مرز — حداقل</th><th>حداکثر</th><th>حداکثر بدون فرض</th><th>وضعیت فعالیت</th><th>آخرین گردش مؤثر قطعی</th><th>آخرین گردش محتمل</th><th>آخرین افزایش</th><th>هشدارها</th></tr></thead><tbody>
-    ${part.map(k=>{ const s=k.stale[i], a=k.activity[i]; return `<tr><td><a href="#" data-key="${e_(k.key)}">${e_(k.title)}</a></td><td>${fmtB(k.end)}</td><td>${side(k.endSide)}</td>
-      <td><b>${fmtB(s.min)}</b></td><td><b>${fmtB(s.max)}</b></td><td>${s.risk>0n?fmtB(s.modelFreeMax):'—'}</td>
-      <td><span class="sr-act ${a.status}">${ACT_LABEL[a.status]}</span></td><td>${a.lastFull?fmtD(a.lastFull.day)+' — '+fmtB(a.lastFull.amount):'—'}</td>
-      <td>${a.lastPossible?fmtD(a.lastPossible.day)+' — '+fmtB(a.lastPossible.amount)+'<br><small>'+e_(ACT_LABEL[a.lastPossible.status])+'</small>':'—'}</td><td>${fmtD(k.lastIncrease)}</td><td>${chips(k)}</td></tr>`; }).join('')}
-    </tbody><tfoot>${totalsRow(R,(t,s)=>`<tr><th>جمع ${fa(t.count)} حساب ${side(s)}</th><th>${fmtB(t.end)}</th><th>${side(s)}</th><th>${fmtB(t.stale[i].min)}</th><th>${fmtB(t.stale[i].max)}</th><th colspan="6"></th></tr>`)}</tfoot></table></div>
-    ${ks.length>part.length?`<button type="button" class="btn" data-more>نمایش ردیف‌های بعدی (از ${fa(ks.length)})</button>`:''}`;
+  if(tab==='work'){
+    const rows=finalWorkpaperRows(), cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
+    let today=''; try{ today=new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()); }catch{ today=new Date().toLocaleDateString('fa-IR'); }
+    const cell=v=>e_(String(v??'').split(' ؛ ').filter(Boolean).join('\n')||'—').replace(/\n/g,'<br>');
+    const amount=(v,blank=false)=>v===null||v===undefined?(blank?'':'—'):fmtB(v);
+    const balance=(v,blank=false)=>v===null||v===undefined?(blank?'':'—'):signedBalanceText(v);
+    const uncertainty=rows.reduce((n,r)=>n+['san1404Range','stale1404Range'].filter(k=>r[k]&&r[k].min!==r[k].max).length,0);
+    const auditYear=SR.result?.audit?.label||'۱۴۰۴';
+    const priorYear=SR.result?.chain?.length>1?SR.result.chain[SR.result.chain.length-2].label:'۱۴۰۳';
+    return `<section class="sheet v2 audit-template ana-page sr-paper" dir="rtl">
+      <div class="sr-screen-head">
+        <div class="sr-refbox" aria-label="محل درج عطف کارت‌برگ"></div>
+        <div class="sr-head-company"><div>شرکت مورد رسیدگی : <b>${e_(cfg.company||'—')}</b></div><div>موضوع : <b>کاربرگ اقلام سنواتی و راکد</b></div><div>دوره مالی : <b>${e_(auditYear)}</b></div></div>
+        <div class="sr-head-prep"><div>تاریخ تهیه : ${e_(cfg.date||today)}</div><div>تهیه کننده : ${e_(cfg.prep||'—')}</div><div>بررسی کننده : ${e_(cfg.rev||'—')}</div></div>
+      </div>
+      <div class="sr-report-title"><b>کاربرگ اقلام سنواتی و راکد</b><span>مبالغ به ریال</span></div>
+      <div class="sr-report-sub">مانده‌های سال ${e_(priorYear)} و ${e_(auditYear)}، مبلغ تهاتر، پیگیری سال بعد و طبقه‌بندی اقلام تا پایان سال جاری</div>
+      <div class="box sr-rows-box">
+        <table class="sr-paper-table">
+          <colgroup>
+            <col style="width:6%"><col style="width:10%"><col style="width:7%"><col style="width:10%"><col style="width:8%"><col style="width:11%">
+            <col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:8.5%"><col style="width:8.5%">
+          </colgroup>
+          <thead>
+            <tr class="sr-print-meta"><th colspan="12"><div class="sr-meta-grid">
+              <div class="sr-refbox" aria-label="محل درج عطف کارت‌برگ"></div>
+              <div class="sr-head-company"><div>شرکت مورد رسیدگی : <b>${e_(cfg.company||'—')}</b></div><div>موضوع : <b>کاربرگ اقلام سنواتی و راکد</b></div><div>دوره مالی : <b>${e_(auditYear)}</b></div></div>
+              <div class="sr-head-prep"><div>تاریخ تهیه : ${e_(cfg.date||today)}</div><div>تهیه کننده : ${e_(cfg.prep||'—')}</div><div>بررسی کننده : ${e_(cfg.rev||'—')}</div></div>
+            </div></th></tr>
+            <tr class="sr-print-title"><th colspan="12"><span>کاربرگ اقلام سنواتی و راکد</span><span>مبالغ به ریال</span></th></tr>
+            <tr class="sr-group-head">
+              <th rowspan="2">کد کل</th><th rowspan="2">عنوان کل</th><th rowspan="2">کد معین</th><th rowspan="2">عنوان معین</th><th rowspan="2">کد تفصیلی</th><th rowspan="2">عنوان تفصیلی</th>
+              <th rowspan="2">مانده پایان ${e_(priorYear)}</th><th rowspan="2">مانده پایان ${e_(auditYear)}</th><th rowspan="2">تهاتر ${e_(auditYear)}</th><th rowspan="2">پیگیری سال مالی بعد</th>
+              <th colspan="2">اقلام راکد و سنواتی تا پایان ${e_(auditYear)}</th>
+            </tr>
+            <tr class="sr-sub-head"><th>سنواتی</th><th>راکد</th></tr>
+          </thead>
+          <tbody>${rows.map(r=>`<tr>
+            <td class="sr-code">${cell(r.kolCode)}</td><td>${cell(r.kolTitle)}</td><td class="sr-code">${cell(r.moeinCode)}</td><td>${cell(r.moeinTitle)}</td><td class="sr-code">${cell(r.detailCode)}</td><td>${cell(r.detailTitle)}</td>
+            <td class="num">${balance(r.balance1403)}</td><td class="num">${balance(r.balance1404)}</td><td class="num">${amount(r.offset1404)}</td><td class="num">${balance(r.nextBalance,true)}</td><td class="num">${amount(r.san1404)}</td><td class="num">${amount(r.stale1404)}</td>
+          </tr>`).join('')||'<tr><td colspan="12">ردیفی برای نمایش وجود ندارد.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="box compact-note"><div class="bar">یادداشت محاسبات :</div><div class="body">مانده‌های پایان سال ۱۴۰۳ و ۱۴۰۴ به‌صورت خالص نمایش داده شده‌اند؛ مانده بستانکار داخل پرانتز است. مبلغ ستون «تهاتر» مثبت و جدا از مانده خالص نشان داده می‌شود. پیگیری سال مالی بعد، مانده خالص حساب در فایل سال بعد است و در صورت نبود فایل سال بعد خالی می‌ماند. ستون‌های «سنواتی» و «راکد» وضعیت مستقل اقلام تا پایان سال جاری را نشان می‌دهند و ممکن است هم‌پوشانی داشته باشند؛ بنابراین با یکدیگر جمع نمی‌شوند.${uncertainty?` دامنه عدم‌قطعیت در ${fa(uncertainty)} شاخص در شیت «استثناها» درج شده است.`:''}</div></div>
+    </section>`;
   }
   if(tab==='exc'){
-    const q=SRE.normText(SR.view.filter), title=k=>k?((SR.model.keys.get(k)||{}).title||k):'';
-    const fl=id=>{ const f=SR.model.files.find(x=>x.id===id); return f?f.label:''; };
+    const q=SRE.normText(SR.view.filter), title=k=>(SR.model.keys.get(k)||{}).title||k;
     const list=R.exceptions.filter(x=>!q||SRE.normText((EXC_LABEL[x.code]||x.code)+' '+(x.key||'')+' '+title(x.key)+' '+(x.detail||'')).includes(q));
-    const counts={}; R.exceptions.forEach(x=>counts[x.code]=(counts[x.code]||0)+1);
-    const part=list.slice(0,SR.view.limit);
-    return `<h2>گزارش استثناها (${fa(R.exceptions.length)})</h2>
-    <div class="sr-row">${Object.entries(counts).map(([c,n])=>`<span class="sr-chip">${EXC_LABEL[c]||c}: ${fa(n)}</span>`).join(' ')}</div>
-    <div class="scrollx"><table class="sr-t"><thead><tr><th>نوع</th><th>شدت</th><th>سال</th><th>حساب</th><th>سند / سطر اکسل</th><th>مبلغ</th><th>توضیح</th></tr></thead><tbody>
-    ${part.map(x=>`<tr><td>${EXC_LABEL[x.code]||x.code}</td><td><span class="sr-sev ${x.severity}">${SEV_LABEL[x.severity]||''}</span></td><td>${e_(fl(x.fileId))}</td>
-      <td>${x.key?`<a href="#" data-key="${e_(x.key)}">${e_(title(x.key))}</a>`:e_(x.account||'')}</td><td>${x.doc?'سند '+fa(e_(x.doc)):''}${x.srcRow?' / سطر '+fa(x.srcRow):''}</td><td>${x.amount!=null?fmtB(x.amount):''}</td><td class="sr-desc">${e_(fa(x.detail||''))}</td></tr>`).join('')}
-    </tbody></table></div>${list.length>part.length?`<button type="button" class="btn" data-more>نمایش ردیف‌های بعدی (از ${fa(list.length)})</button>`:''}`;
+    return `<h2>موارد نیازمند بررسی (${fa(list.length)})</h2><div class="scrollx"><table class="sr-t"><thead><tr><th>مورد</th><th>سال</th><th>حساب / تفصیلی</th><th>مبلغ</th><th>توضیح</th></tr></thead><tbody>
+      ${list.slice(0,1000).map(x=>{const f=SR.model.files.find(y=>y.id===x.fileId);return `<tr><td>${EXC_LABEL[x.code]||x.code}</td><td>${e_(f?f.label:'')}</td><td>${e_(x.key?title(x.key):(x.account||''))}</td><td>${x.amount!=null?fmtB(x.amount):'—'}</td><td>${e_(fa(x.detail||''))}</td></tr>`;}).join('')||'<tr><td colspan="5">موردی ثبت نشده است.</td></tr>'}
+    </tbody></table></div>`;
   }
-  if(tab==='next'){
-    if(!R.next) return '<h2>پیگیری سال بعد</h2><p class="hint">فایل سال بعد بارگذاری نشده است.</p>';
-    const ks=keysShown().filter(k=>k.next), part=ks.slice(0,SR.view.limit);
-    return `<h2>پیگیری ماندهٔ پایان سال در سال ${e_(R.next.label)} (تا ${fmtD(R.next.lastDay)})</h2>
-    <p class="hint">این بخش روی نسخه‌ای جدا از محاسبات سال رسیدگی انجام شده و هیچ اثری بر گزارش سال رسیدگی ندارد. افزایش و کاهش ناخالص جدا آمده‌اند تا خالص‌شدن آن‌ها چیزی را پنهان نکند.</p>
-    <div class="scrollx"><table class="sr-t sr-rep"><thead><tr><th>حساب / طرف حساب</th><th>ماندهٔ پایان سال رسیدگی</th><th>افزایش ناخالص سال بعد</th><th>کاهش ناخالص سال بعد</th><th>تسویه‌شده از ماندهٔ قبلی (حداقل–حداکثر)</th><th>باقی‌مانده از ماندهٔ قبلی</th><th>اختلاف افتتاحیه</th><th>اسناد مرتبط با سنوات قبل</th></tr></thead><tbody>
-    ${part.map(k=>{ const n=k.next; return `<tr><td><a href="#" data-key="${e_(k.key)}">${e_(k.title)}</a></td><td>${fmtB(k.end)} ${side(k.endSide)}</td><td>${fmtB(n.inc)}</td><td>${fmtB(n.dec)}</td>
-      <td>${n.settled?fmtB(n.settled.min)+' تا '+fmtB(n.settled.max):'—'}</td><td>${n.remaining?fmtB(n.remaining.min)+' تا '+fmtB(n.remaining.max):'—'}</td>
-      <td>${n.openingDiff&&n.openingDiff!==0n?'<span class="sr-chip warn">'+fmtB(n.openingDiff<0n?-n.openingDiff:n.openingDiff)+'</span>':'—'}</td>
-      <td class="sr-small">${n.priorAdj.map(p=>'سند '+fa(e_(p.doc))+' — '+fmtB(p.amount)+' — '+e_(p.desc)).join('<br>')||'—'}</td></tr>`; }).join('')}
-    </tbody></table></div>${ks.length>part.length?`<button type="button" class="btn" data-more>نمایش ردیف‌های بعدی</button>`:''}`;
-  }
-  if(tab==='detail') return detailHtml();
   if(tab==='help') return helpHtml();
   return '';
 }
+
 function layerTable(L){
   if(!L.length) return '<p class="hint">لایه‌ای باقی نمانده است.</p>';
   const ORIG={KNOWN:'مشخص',PRE_PERIOD:'قبل از دورهٔ اطلاعاتی',GAP:'پس از شکاف سال',SUSPECT:'مشکوک (اختلاف افتتاحیه/برگشت چک)',TRANSFER:'انتقالی با منشأ نامشخص'};
@@ -12717,21 +13023,45 @@ function detailHtml(){
     </tbody></table></div>`;
 }
 function helpHtml(){
-  return `<h2>راهنمای خواندن گزارش</h2><div class="sr-help">
-  <p><b>اقلام سنواتی:</b> بخشی از ماندهٔ پایان سال که منشأ آن قبل از شروع سال رسیدگی است. مانده‌ای که از افتتاحیهٔ اولین سالِ موجود آمده، سنواتی است ولی قدمت دقیقش «نامشخص» است.</p>
-  <p><b>حداقل و حداکثر:</b> در اسناد معمولاً مشخص نیست هر دریافت یا پرداخت بابت کدام بدهی بوده است. «حداقل» یعنی اگر همهٔ دریافت‌ها اول بابت قدیمی‌ترین بدهی‌ها بوده باشند؛ «حداکثر» یعنی اگر اول بابت جدیدترین‌ها بوده باشند. مبلغ واقعی بین این دو است، به شرط این‌که پیش‌پرداخت، انتقال یا اصلاحیهٔ پنهانی در کار نباشد.</p>
-  <p><b>حداکثر بدون فرض:</b> اگر برخی کاهش‌ها پیش‌پرداختِ فاکتورهای بعدی بوده باشند، مبلغ قدیمی می‌تواند تا این عدد برسد. حداقل در این حالت هم معتبر می‌ماند.</p>
-  <p><b>اقلام راکد:</b> بخشی از مانده که قدیمی‌تر از آستانه (مثلاً ۶ ماه) است. <b>وضعیت فعالیت</b> جدا نمایش داده می‌شود: «قطعی» فقط وقتی است که در سندی ساده، کاهش حساب در مقابل بانک یا صندوقِ تأییدشده ثبت شده باشد؛ دریافت چکِ وصول‌نشده و سند مرکب «محتمل» است؛ اصلاحیه، برگشت و انتقال گردش مؤثر نیستند.</p>
-  <p><b>پرداخت جزئی</b> قدمت باقی‌ماندهٔ بدهی را جوان نمی‌کند. <b>گردش اخیر حساب</b> قدمت ماندهٔ قدیمی را از بین نمی‌برد.</p>
-  <p><b>نبود تفصیلی:</b> اگر طرف حساب مشخص نباشد، محاسبه در سطح معین انجام می‌شود و قدمت به شخص مشخصی قابل انتساب نیست.</p>
-  <p><b>سال بعد:</b> فقط برای پیگیری سرنوشت مانده است و هیچ عددی از گزارش سال رسیدگی را تغییر نمی‌دهد.</p>
-  <p><b>هوش مصنوعی:</b> در این ماژول هیچ عددی با هوش مصنوعی تولید نمی‌شود؛ همهٔ ارقام با محاسبهٔ قطعی برنامه به دست آمده‌اند.</p></div>`;
+  return `<h2>روش محاسبهٔ کاربرگ</h2><div class="sr-help">
+    <p><b>ستون‌های مانده:</b> ستون‌های پایان ۱۴۰۳ و ۱۴۰۴، مانده خالص حساب در پایان هر سال را نشان می‌دهند؛ مانده بستانکار داخل پرانتز درج می‌شود. ستون «تهاتر ۱۴۰۴» مبلغ تهاتر تحلیلی دریافتنی و پرداختنی را به‌صورت مثبت و جداگانه نشان می‌دهد؛ مانده خالص ۱۴۰۴ پس از کسر تهاتر محاسبه شده است.</p>
+    <p><b>سنواتی و راکد:</b> دو زیرستون انتهایی، مبلغ قابل پشتیبانی اقلام سنواتی و مبلغ اقلام راکد را تا پایان سال جاری نشان می‌دهند. این دو شاخص مستقل‌اند و می‌توانند هم‌پوشانی داشته باشند؛ بنابراین با یکدیگر جمع نمی‌شوند. آستانه رکود صرفاً سیاست تحلیلی قابل تنظیم است و تعریف ثابت استاندارد حسابرسی نیست.</p>
+    <p><b>ماندن یا خروج از وضعیت راکد:</b> کاهش یا افزایش مانده کل حساب به‌تنهایی قدمت لایه قدیمی را از بین نمی‌برد. اگر بخشی از مانده قدیمی باقی مانده باشد، همان بخش می‌تواند راکد/سنواتی باقی بماند؛ فقط مبلغی که با سند و شواهد به همان لایه تخصیص یابد از آن کسر می‌شود. در نبود تخصیص قابل اتکا، حداقل قابل پشتیبانی در کاربرگ و اختلاف آن تا حداکثر در استثناها ثبت می‌شود.</p>
+    <p><b>منبع ارقام ۱۴۰۳:</b> در صورت ارائه کاربرگ سال ۱۴۰۳ حسابرس قبلی، ارقام عددی همان کاربرگ استفاده می‌شود و فایل اسناد ۱۴۰۲ لازم نیست. اگر کاربرگ قبلی وجود نداشته باشد، برنامه با فایل‌های ۱۴۰۲ و ۱۴۰۳ و با پیگیری ۱۴۰۴، ارقام ۱۴۰۳ را محاسبه می‌کند.</p>
+    <p><b>محدودیت بازسازی:</b> کاربرگ قبلی فقط ارقام سنواتی و راکد ۱۴۰۳ را برای ستون‌های همان سال تأمین می‌کند؛ برای ردیابی منشأ این اقلام در محاسبه ۱۴۰۴، فایل ۱۴۰۳ باید مانده اول دوره/سند افتتاحیه قابل شناسایی داشته باشد. اگر نه فایل ۱۴۰۲ موجود باشد و نه افتتاحیه معتبر ۱۴۰۳، قدمت قبل از ۱۴۰۳ از داده‌های موجود قابل بازسازی نیست.</p>
+    <p><b>پیگیری سال مالی بعد:</b> مانده خالص حساب در فایل سال مالی بعد و تا تاریخ استخراج آن نشان داده می‌شود؛ مانده بستانکار داخل پرانتز است. این ستون محاسبات و طبقه‌بندی سنواتی/راکد سال جاری را تغییر نمی‌دهد و در نبود فایل سال بعد خالی می‌ماند.</p>
+    <p><b>تهاتر تحلیلی:</b> دریافتنی و پرداختنی فقط برای تفصیلی یکسان و حساب‌های تأییدشده اشخاص، در محاسبه مانده خالص گروه می‌شوند. این تهاتر به‌تنهایی حق قانونی تهاتر یا مجازبودن ارائه خالص در صورت‌های مالی را اثبات نمی‌کند.</p>
+    <p><b>محدودیت استانداردی:</b> استاندارد حسابرسی، آستانه عمومی و ثابتی برای نامیدن همه حساب‌ها به‌عنوان «راکد» تعیین نمی‌کند. آستانه باید با ماهیت حساب، چرخه عملیاتی، قراردادها و شواهد تسویه سنجیده شود. برای دریافتنی‌ها، وجود مانده قدیمی به‌تنهایی جایگزین ارزیابی کاهش ارزش/وصول‌پذیری نیست.</p>
+    <p><b>دامنه:</b> دارایی‌های ثابت، موجودی‌ها و حساب‌های موقتِ قابل تشخیص از عنوان حساب در این نسخه وارد کاربرگ نمی‌شوند. مبالغ با کد و بر پایه ارقام فایل محاسبه می‌شوند و هوش مصنوعی در محاسبات عددی دخالت ندارد.</p>
+  </div>`;
 }
+
 function printReport(){
   const src=$('srReport'); if(!src) return;
   if(typeof window.__activePrintRestore==='function') window.__activePrintRestore();
   const ph=$('printHost'); let done=false; const old=document.title;
-  const rule=document.createElement('style'); rule.textContent='@page{size:A4 landscape;margin:8mm}';
+  const rule=document.createElement('style'); rule.dataset.srLandscapePrint='true';
+  rule.textContent=`@page srAgedLandscape{size:A4 landscape;margin:7mm}
+    @media print{
+      html,body{width:100%!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important}
+      body.printing #printHost{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;overflow:visible!important}
+      .sr-print{width:100%!important;margin:0!important;padding:0!important;direction:rtl!important;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:7.3pt!important}
+      .sr-print .sr-report-shell{overflow:visible!important;padding:0!important}
+      .sr-print .sr-paper{page:srAgedLandscape!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;box-shadow:none!important;border:0!important}
+      .sr-print .sr-screen-head,.sr-print .sr-report-title,.sr-print .sr-report-sub{display:none!important}
+      .sr-print .sr-paper-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;page-break-inside:auto!important;break-inside:auto!important}
+      .sr-print .sr-paper-table thead{display:table-header-group!important}
+      .sr-print .sr-paper-table thead tr.sr-print-meta,.sr-print .sr-paper-table thead tr.sr-print-title{display:table-row!important}
+      .sr-print .sr-paper-table tbody{display:table-row-group!important}
+      .sr-print .sr-paper-table tr{break-inside:avoid!important;page-break-inside:avoid!important}
+      .sr-print .sr-paper-table th,.sr-print .sr-paper-table td{font-size:7pt!important;padding:1.1mm .8mm!important;line-height:1.3!important;overflow-wrap:anywhere!important}
+      .sr-print .sr-paper-table td.num{font-size:6.8pt!important;white-space:nowrap!important;direction:ltr!important}
+      .sr-print .sr-meta-grid{display:grid!important;grid-template-columns:24mm 1.6fr 1fr!important;gap:3mm!important;align-items:center!important;min-height:16mm!important}
+      .sr-print .sr-refbox{width:21mm!important;height:11mm!important}
+      .sr-print .sr-paper-table .sr-print-meta th{padding:1.5mm!important}
+      .sr-print .sr-paper-table .sr-print-title th{padding:1.5mm 2mm!important}
+      .sr-print .compact-note{break-inside:avoid!important;page-break-inside:avoid!important;margin-top:2mm!important}
+    }`;
   const restore=()=>{ if(done) return; done=true; if(window.__activePrintRestore===restore) window.__activePrintRestore=null; document.title=old; document.body.classList.remove('printing'); ph.innerHTML=''; rule.remove(); };
   ph.innerHTML=`<div class="sr-print" dir="rtl">${src.innerHTML}</div>`;
   ph.querySelectorAll('select').forEach(s=>{ const t=s.options[s.selectedIndex]?s.options[s.selectedIndex].text:''; s.replaceWith(document.createTextNode(t)); });
@@ -12741,31 +13071,52 @@ function printReport(){
   window.print();
 }
 function exportXlsx(){
-  const R=SR.result, ks=R.keys.filter(k=>k.endSide).sort((a,b)=>(b.end>a.end?1:-1));
-  const N=x=>{ if(x===null||x===undefined) return ''; const n=Number(x); return Number.isSafeInteger(n)?n:String(x); };
-  const D=d=>d===U?'نامشخص':(d==null?'':SRE.formatDay(d));
-  const wb=XLSX.utils.book_new();
-  const san=[['حساب','کلید','مانده پایان','سمت','سنواتی حداقل','سنواتی حداکثر','قدمت نامشخص حداقل','قدمت نامشخص حداکثر','حداکثر بدون فرض',...R.chain.map(c=>'پیش از '+c.label+' (حداقل-حداکثر)'),'منابع عدم‌قطعیت']];
-  ks.forEach(k=>san.push([k.title,k.key,N(k.end),side(k.endSide),N(k.sanavati.min),N(k.sanavati.max),N(k.unknown.min),N(k.unknown.max),N(k.sanavati.modelFreeMax),
-    ...k.byOrigin.map(o=>o.min.toString()+' - '+o.max.toString()),k.uncertainty.map(u=>(UNC_LABEL[u.code]||u.code)+': '+u.amount.toString()).join(' | ')]));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(san),'سنواتی');
-  R.cuts.forEach((c,i)=>{
-    const rows=[['حساب','کلید','مانده پایان','سمت','تاریخ مرز','قدیمی‌تر از مرز حداقل','حداکثر','حداکثر بدون فرض','وضعیت فعالیت','آخرین گردش قطعی','آخرین گردش محتمل','آخرین افزایش']];
-    ks.forEach(k=>{ const s=k.stale[i], a=k.activity[i]; rows.push([k.title,k.key,N(k.end),side(k.endSide),D(c.cut),N(s.min),N(s.max),N(s.modelFreeMax),ACT_LABEL[a.status],a.lastFull?D(a.lastFull.day):'',a.lastPossible?D(a.lastPossible.day):'',D(k.lastIncrease)]); });
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'راکد '+c.T+' ماه');
+  const R=SR.result, rows=finalWorkpaperRows(), wb=XLSX.utils.book_new();
+  const xval=x=>{
+    if(x===null||x===undefined) return '';
+    if(typeof x==='bigint') return x<=9007199254740991n&&x>=-9007199254740991n?Number(x):x.toString();
+    return x;
+  };
+  const cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
+  let today=''; try{ today=new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()); }catch{ today=new Date().toLocaleDateString('fa-IR'); }
+  const topHeaders=['کد کل','عنوان کل','کد معین','عنوان معین','کد تفصیلی','عنوان تفصیلی','مانده پایان ۱۴۰۳','مانده پایان ۱۴۰۴','تهاتر ۱۴۰۴','پیگیری سال مالی بعد','اقلام راکد و سنواتی تا پایان ۱۴۰۴','','کلید تطبیق'];
+  const subHeaders=['','','','','','','','','','','سنواتی','راکد',''];
+  const data=[
+    ['شرکت مورد رسیدگی',cfg.company||'—'],
+    ['موضوع','کاربرگ اقلام سنواتی و راکد'],
+    ['دوره مالی','۱۴۰۴'],
+    ['تاریخ تهیه',cfg.date||today,'تهیه کننده',cfg.prep||'—','بررسی کننده',cfg.rev||'—'],
+    [],topHeaders,subHeaders,
+    ...rows.map(r=>[r.kolCode,r.kolTitle,r.moeinCode,r.moeinTitle,r.detailCode,r.detailTitle,xval(r.balance1403),xval(r.balance1404),xval(r.offset1404),xval(r.nextBalance),xval(r.san1404),xval(r.stale1404),r.groupKey])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  // مانده‌های منفی (بستانکار) در خروجی اکسل نیز داخل پرانتز نمایش داده شوند.
+  for(let ri=7;ri<7+rows.length;ri++) for(let ci=6;ci<=11;ci++){const cell=ws[XLSX.utils.encode_cell({r:ri,c:ci})];if(cell&&cell.t==='n')cell.z='#,##0;(#,##0);0';}
+  ws['!cols']=[{wch:12},{wch:24},{wch:12},{wch:24},{wch:16},{wch:24},{wch:18},{wch:18},{wch:16},{wch:18},{wch:17},{wch:17},{wch:2,hidden:true}];
+  ws['!rows']=[{hpt:24},{hpt:22},{hpt:22},{hpt:22},{hpt:8},{hpt:32},{hpt:24},...rows.map(()=>({hpt:22}))];
+  ws['!merges']=[{s:{r:0,c:1},e:{r:0,c:12}},{s:{r:1,c:1},e:{r:1,c:12}},{s:{r:2,c:1},e:{r:2,c:12}},{s:{r:5,c:10},e:{r:5,c:11}}];
+  ws['!freeze']={xSplit:6,ySplit:7,topLeftCell:'G8',activePane:'bottomRight',state:'frozen'};
+  ws['!autofilter']={ref:`A7:M${Math.max(7,7+rows.length)}`};
+  ws['!pageSetup']={orientation:'landscape',paperSize:9,fitToWidth:1,fitToHeight:0};
+  ws['!margins']={left:0.25,right:0.25,top:0.35,bottom:0.35,header:0.15,footer:0.15};
+  XLSX.utils.book_append_sheet(wb,ws,'کاربرگ');
+  const ex=[['مورد','شدت','سال','حساب / تفصیلی','مبلغ','توضیح']];
+  const allResults=[R,SR.priorResult,SR.nextResult].filter(Boolean);
+  allResults.forEach(res=>res.exceptions.forEach(x=>{ const f=(SR.model.files||[]).find(y=>y.id===x.fileId); ex.push([EXC_LABEL[x.code]||x.code,SEV_LABEL[x.severity]||'',f?f.label:'',x.key||x.account||'',xval(x.amount),x.detail||'']); }));
+  rows.forEach(r=>{
+    for(const [field,label,year] of [['san1404Range','سنواتی تا پایان ۱۴۰۴','۱۴۰۴'],['stale1404Range','راکد تا پایان ۱۴۰۴','۱۴۰۴']]){
+      const v=r[field]; if(v&&v.min!==v.max) ex.push(['دامنه عدم‌قطعیت','هشدار',year,r.subPlain+' | '+r.detailPlain,xval(v.max-v.min),'حداقل قابل پشتیبانی '+v.min.toString()+'؛ حداکثر ممکن '+v.max.toString()]);
+    }
+    if(r.unmatchedPrior) ex.push(['تطبیق‌نیافتن کاربرگ قبلی','هشدار','۱۴۰۳',r.subPlain+' | '+r.detailPlain,'','برای جلوگیری از انتساب اشتباه، ردیف قبلی با حساب جاری تطبیق داده نشد.']);
   });
-  const ex=[['نوع','شدت','سال','کلید','سند','سطر اکسل','مبلغ','توضیح']];
-  R.exceptions.forEach(x=>{ const f=SR.model.files.find(y=>y.id===x.fileId); ex.push([EXC_LABEL[x.code]||x.code,SEV_LABEL[x.severity]||'',f?f.label:'',x.key||x.account||'',x.doc||'',x.srcRow||'',N(x.amount),x.detail||'']); });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ex),'استثناها');
-  if(R.next){
-    const nx=[['حساب','کلید','مانده پایان سال رسیدگی','افزایش ناخالص','کاهش ناخالص','تسویه حداقل','تسویه حداکثر','باقی‌مانده حداقل','باقی‌مانده حداکثر']];
-    ks.forEach(k=>{ const n=k.next; if(n&&n.settled) nx.push([k.title,k.key,N(k.end),N(n.inc),N(n.dec),N(n.settled.min),N(n.settled.max),N(n.remaining.min),N(n.remaining.max)]); });
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(nx),'سال بعد');
-  }
+  if(SR.priorWorkpaper) SR.priorWorkpaper.rows.forEach(x=>{});
+  const exws=XLSX.utils.aoa_to_sheet(ex); exws['!cols']=[{wch:30},{wch:12},{wch:12},{wch:42},{wch:20},{wch:72}]; exws['!freeze']={xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
+  XLSX.utils.book_append_sheet(wb,exws,'استثناها');
   wb.Workbook={Views:[{RTL:true}]};
-  XLSX.writeFile(wb,'اقلام-سنواتی-و-راکد-'+R.audit.label+'.xlsx');
+  XLSX.writeFile(wb,'کاربرگ-اقلام-سنواتی-و-راکد-۱۴۰۴.xlsx');
 }
 
+/* ------------------------------------------------------------- سبک‌ها */
 /* ------------------------------------------------------------- سبک‌ها */
 const css=document.createElement('style');
 css.textContent=`
@@ -12812,10 +13163,65 @@ css.textContent=`
 .sr-help p{margin:0 0 10px}
 .sr-busy{font-weight:600;color:var(--accent)}
 .sr-print{font-family:Tahoma,sans-serif;font-size:8.5pt}
-.sr-print table{width:100%;border-collapse:collapse}.sr-print th,.sr-print td{border:1px solid #999;padding:2px 4px;font-size:7.5pt}
+.sr-year-empty{border:1px dashed var(--line);border-radius:10px;padding:14px;display:flex;justify-content:space-between;gap:10px;color:var(--muted)}
+ .audit-template.sheet.sr-paper{box-sizing:border-box;width:297mm;min-height:210mm;height:auto;margin:8px auto;background:#fff;color:#000;padding:6mm 8mm 6mm 15mm;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif;font-size:12px;font-weight:bold;direction:rtl;position:relative;box-shadow:0 8px 28px #14282814;max-width:none}
+.sr-paper .side{left:2mm;top:27mm;bottom:18mm;height:auto;width:7mm;background:#e2efda;font-size:10px}
+.sr-paper .head{grid-template-columns:24mm minmax(0,1.6fr) minmax(0,1fr);gap:10px;align-items:center;padding:6px 8px}
+.sr-paper .refbox{font-size:12px;line-height:1.6}
+.sr-paper .hl div{font-size:11.5px;padding:3px 0;line-height:1.45}
+.sr-paper .sr-rows-box{padding:0;overflow:visible;break-inside:auto}
+.sr-paper .sr-paper-table{width:100%;border-collapse:collapse;table-layout:fixed;direction:rtl;font-size:11px;page-break-inside:auto}
+.sr-paper .sr-paper-table th,.sr-paper .sr-paper-table td{border:1px solid #7f7f7f;padding:4px 5px;vertical-align:middle;overflow-wrap:anywhere;line-height:1.45}
+.sr-paper .sr-paper-table thead{display:table-header-group}
+.sr-paper .sr-paper-table tbody tr{break-inside:avoid;page-break-inside:avoid}
+.sr-paper .sr-paper-table thead th{background:#fff2cc;color:#000;text-align:center;font-size:11px;font-weight:bold}
+.sr-paper .sr-paper-table td.num{direction:ltr;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:10.5px}
+.sr-paper .sr-paper-table tbody tr:nth-child(even){background:#f7f7f7}
+.sr-paper .compact-note .body{font-size:10.5px;line-height:1.6}
+.sr-print{font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif;font-size:8.5pt}
+.sr-print .audit-template.sheet.sr-paper{width:100%;min-height:0;height:auto;margin:0;box-shadow:none;padding:0 0 0 8mm}
+.sr-print .sr-paper .sr-paper-table th,.sr-print .sr-paper .sr-paper-table td{font-size:7.3pt;padding:1.2mm}
+.sr-print table{border-collapse:collapse}
 .sr-print a{color:inherit;text-decoration:none}
-.entry-sr-note{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-`;
+@media(max-width:700px){.sr-paper{width:297mm;max-width:none;margin:0}.sr-report-shell{overflow:auto}}
+/* کارت‌برگ نهایی: تفکیک کد/عنوان و پیش‌نمایش افقی */
+.sr-report-shell{overflow-x:auto;max-width:100%;padding:4px 0 12px}
+.sr-paper .sr-screen-head{display:grid;grid-template-columns:24mm minmax(0,1.6fr) minmax(0,1fr);gap:10px;align-items:center;padding:7px 9px;border:1px solid #7f7f7f;background:#fff;margin-bottom:4px;direction:rtl}
+.sr-paper .sr-refbox{box-sizing:border-box;width:23mm;height:13mm;border:1.5px solid #333;background:#fff;justify-self:center}
+.sr-paper .sr-head-company,.sr-paper .sr-head-prep{font-size:11px;line-height:1.7;text-align:right}
+.sr-paper .sr-head-prep{border-right:1px dashed #777;padding-right:10px}
+.sr-paper .sr-report-title{display:flex;justify-content:space-between;align-items:center;border:1px solid #7f7f7f;padding:5px 9px;font-size:12px;background:#fff}
+.sr-paper .sr-report-sub{font-size:10px;padding:4px 2px;text-align:right}
+.sr-paper .sr-rows-box{padding:0;overflow:visible;break-inside:auto}
+.sr-paper .sr-paper-table{width:100%;border-collapse:collapse;table-layout:fixed;direction:rtl;font-size:10px;page-break-inside:auto}
+.sr-paper .sr-paper-table th,.sr-paper .sr-paper-table td{border:1px solid #555;padding:4px 3px;vertical-align:middle;text-align:center;line-height:1.4;overflow-wrap:anywhere}
+.sr-paper .sr-paper-table thead{display:table-header-group}
+.sr-paper .sr-paper-table thead tr.sr-print-meta,.sr-paper .sr-paper-table thead tr.sr-print-title{display:none}
+.sr-paper .sr-paper-table thead th{background:#fff2cc;font-weight:bold}
+.sr-paper .sr-paper-table thead tr.sr-sub-head th{background:#fff2cc}
+.sr-paper .sr-paper-table td{background:#fff}
+.sr-paper .sr-paper-table tbody tr:nth-child(even) td{background:#f7f7f7}
+.sr-paper .sr-paper-table tbody tr{break-inside:avoid;page-break-inside:avoid}
+.sr-paper .sr-paper-table td.num{direction:ltr;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:9.5px}
+.sr-paper .sr-paper-table td.sr-code{direction:ltr;unicode-bidi:plaintext;font-size:9px}
+.sr-paper .sr-meta-grid{display:grid;grid-template-columns:24mm minmax(0,1.6fr) minmax(0,1fr);gap:3mm;align-items:center;direction:rtl;text-align:right}
+.sr-paper .sr-meta-grid .sr-refbox{width:23mm;height:13mm}
+.sr-paper .sr-print-title th{display:table-cell;text-align:right}.sr-paper .sr-print-title th span:last-child{float:left;font-weight:normal}
+.sr-account-tree .sr-kol-row td{background:#edf2f7!important;font-weight:bold;border-top:2px solid #64748b}
+.sr-account-tree .sr-moein-row td:first-child,.sr-account-tree .sr-moein-row .sr-moein-code{padding-right:22px}
+.sr-account-tree .sr-moein-code{white-space:nowrap;color:#334155}
+.sr-tree-count{display:inline-block;margin-right:10px;color:#64748b;font-weight:normal;font-size:11px}
+.sr-select-all{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.sr-account-tree input[type=checkbox]{width:16px;height:16px;vertical-align:middle}
+@media print{
+  @page srAgedLandscape{size:A4 landscape;margin:7mm}
+  .sr-paper{page:srAgedLandscape}
+  body.printing .audit-template.sheet.sr-paper{width:100%;min-width:0;min-height:0;height:auto;margin:0;padding:0;box-shadow:none}
+  .sr-print .sr-paper-table{break-inside:auto}
+  .sr-print .sr-paper-table thead{display:table-header-group!important}
+  .sr-print .sr-paper-table tbody{display:table-row-group!important}
+  .sr-print .sr-paper-table tr{break-inside:avoid;page-break-inside:avoid}
+}`;
 document.head.appendChild(css);
 })();
 /* <<<SR-UI-END>>> */
