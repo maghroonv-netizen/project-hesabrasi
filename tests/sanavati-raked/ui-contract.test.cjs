@@ -120,10 +120,35 @@ assert.match(html, /sr-head-prep \.v\{[^}]*overflow-wrap:normal/,
   'preparer values remain intact and wrap at spaces rather than within Persian words');
 assert.doesNotMatch(html, /sr-meta-grid \.sr-head-prep>div\{[^}]*overflow-wrap:anywhere/,
   'Persian preparation-field text is not allowed to break letter-by-letter');
+assert.match(workpaperMarkup, /class="sr-workpaper-subtotal"/,
+  'the aged workpaper inserts a subtotal for every represented kol group');
 assert.match(workpaperMarkup, /class="sr-workpaper-total"/,
-  'the aged workpaper includes a totals row');
+  'the aged workpaper includes a grand-total row');
+assert.match(workpaperMarkup, /subtotalGroups\.map\(group=>/,
+  'kol subtotals are emitted even when a group has only one detail row');
 assert.match(workpaperMarkup, /columnTotals\.amount1403[\s\S]*columnTotals\.finalAmount/,
-  'the totals row aggregates all five numeric columns');
+  'the grand total aggregates all five numeric columns');
+assert.match(exportCode, /subtotalGroups\.flatMap\(group=>/,
+  'the XLSX workpaper also inserts kol-level subtotals');
+const subtotalHelpersStart = html.indexOf('function workpaperSubtotalGroups(');
+const subtotalHelpersEnd = html.indexOf('\nfunction signedText(', subtotalHelpersStart);
+const subtotalSandbox = {};
+vm.createContext(subtotalSandbox);
+vm.runInContext(html.slice(subtotalHelpersStart, subtotalHelpersEnd), subtotalSandbox);
+const groupedRows = subtotalSandbox.workpaperSubtotalGroups([
+  {kolCode:'100',kolTitle:'دریافتنی',amount1403:2n,amount1404:3n,followUp:2n,offset1404:1n,finalAmount:1n},
+  {kolCode:'100',kolTitle:'دریافتنی',amount1403:4n,amount1404:5n,followUp:4n,offset1404:2n,finalAmount:2n},
+  {kolCode:'200',kolTitle:'پرداختنی',amount1403:7n,amount1404:8n,followUp:7n,offset1404:0n,finalAmount:7n}
+]);
+assert.equal(groupedRows.length,2);
+assert.equal(groupedRows[0].rows.length,2);
+const firstKolTotals = subtotalSandbox.workpaperColumnTotals(groupedRows[0].rows);
+assert.equal(firstKolTotals.amount1403,6n);
+assert.equal(firstKolTotals.amount1404,8n);
+assert.equal(firstKolTotals.followUp,6n);
+assert.equal(firstKolTotals.offset1404,3n);
+assert.equal(firstKolTotals.finalAmount,3n);
+assert.equal(groupedRows[1].rows.length,1,'single-item kol groups still receive their own subtotal');
 assert.match(exportCode, /\['جمع کل کاربرگ'[\s\S]*xval\(columnTotals\.finalAmount\)/,
   'the XLSX worksheet also includes totals for all numeric columns');
 assert.match(html, /sr-paper-table\{border:1\.2px solid #475569/,
