@@ -12204,7 +12204,7 @@ const U=SRE.UNKNOWN;
 const SR={files:[],auditId:null,seq:0,mapped:false,model:null,result:null,priorModel:null,priorResult:null,nextModel:null,nextResult:null,priorWorkpaper:null,roles:new Map(),tagOverrides:new Map(),
   linkSug:[],linkOk:new Set(),codingSug:[],codingOk:new Set(),
   settings:{thresholds:[12],cutoffMethod:'months',inclusive:true},
-  view:{tab:'work',T:0,filter:'',limit:200,key:null,accFilter:'',tagFilter:'',tbFilter:'',tbSelection:new Set()},busy:false};
+  view:{tab:'work',T:0,filter:'',limit:200,key:null,accFilter:'',tagFilter:'',tbFilter:'',tbSelection:new Set(),accountSelection:null,selectionConfirmed:false},busy:false};
 window.SR_STATE=SR;
 
 /* ---------------------------------------------------------------- ثبت ماژول */
@@ -12269,7 +12269,7 @@ window.srEnter=function(){
     const existing=SR.files.find(f=>f.isMain);
     if(!existing||existing.mainRowsRef!==rows){
       SR.files=[]; SR.auditId=null; SR.mapped=false; SR.model=null; SR.result=null; SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null; SR.priorWorkpaper=null;
-      SR.roles.clear(); SR.tagOverrides.clear(); SR.linkOk.clear(); SR.codingOk.clear(); SR.view.filter=''; SR.view.tbFilter=''; SR.view.tbSelection=new Set(); SR.view.accountSelection=null;
+      SR.roles.clear(); SR.tagOverrides.clear(); SR.linkOk.clear(); SR.codingOk.clear(); SR.view.filter=''; SR.view.tbFilter=''; SR.view.tbSelection=new Set(); SR.view.accountSelection=null; SR.view.selectionConfirmed=false;
       addMainFile();
     }
   }
@@ -12283,22 +12283,36 @@ function srCurrentYearLabel(){
 }
 function srTrialBalanceData(){
   const rows=Array.isArray(ACCOUNT_ROWS)?ACCOUNT_ROWS:[];
+  const detailLevels=[
+    {code:'کد حساب تفصیلی',title:'عنوان حساب تفصیلی',label:'تفصیلی'},
+    {code:'کد تفصیلی یک',title:'عنوان تفصیلی یک',label:'تفصیلی ۱'},
+    {code:'کد تفصیلی دو',title:'عنوان تفصیلی دو',label:'تفصیلی ۲'}
+  ].filter(x=>rows.some(r=>SRE.normCode(r[x.code])||String(r[x.title]??'').trim()));
   const byKol=new Map();
   rows.forEach(r=>{
     const kol=SRE.normCode(r['کد حساب کل']), moein=SRE.normCode(r['کد حساب معین']);
     if(!kol||!moein) return;
     if(!byKol.has(kol)) byKol.set(kol,{kol,kolT:String(r['عنوان حساب کل']||kol).trim(),accounts:new Map()});
     const g=byKol.get(kol), id=kol+'|'+moein;
-    if(!g.accounts.has(id)) g.accounts.set(id,{id,kol,moein,moeinT:String(r['عنوان حساب معین']||moein).trim(),openingDebit:0,openingCredit:0,debit:0,credit:0});
+    if(!g.accounts.has(id)) g.accounts.set(id,{id,kol,kolT:g.kolT,moein,moeinT:String(r['عنوان حساب معین']||moein).trim(),openingDebit:0,openingCredit:0,debit:0,credit:0,details:new Map()});
     const a=g.accounts.get(id);
     if(!a.moeinT&&r['عنوان حساب معین']) a.moeinT=String(r['عنوان حساب معین']).trim();
-    const d=parseAmount(r['بدهکار']), c=parseAmount(r['بستانکار']);
-    if(r['نوع سند']==='ابتدای سال'){a.openingDebit+=d;a.openingCredit+=c;}
-    else {a.debit+=d;a.credit+=c;}
+    const detail=detailLevels.map(x=>({label:x.label,code:SRE.normCode(r[x.code]),title:String(r[x.title]??'').trim()}));
+    if(detail.some(x=>x.code||x.title)){
+      const key=JSON.stringify(detail.map(x=>[x.code,x.title]));
+      if(!a.details.has(key)) a.details.set(key,{levels:detail,openingDebit:0,openingCredit:0,debit:0,credit:0});
+    }
+    const d=parseAmount(r['بدهکار']), c=parseAmount(r['بستانکار']), opening=r['نوع سند']==='ابتدای سال';
+    const target=opening?'openingDebit':'debit', contra=opening?'openingCredit':'credit';
+    a[target]+=d; a[contra]+=c;
+    if(detail.some(x=>x.code||x.title)){
+      const child=a.details.get(JSON.stringify(detail.map(x=>[x.code,x.title])));
+      child[target]+=d; child[contra]+=c;
+    }
   });
   const cmp=(a,b)=>String(a).localeCompare(String(b),'fa',{numeric:true});
   return [...byKol.values()].sort((a,b)=>cmp(a.kol,b.kol)).map(g=>{
-    g.accounts=[...g.accounts.values()].sort((a,b)=>cmp(a.moein,b.moein));
+    g.accounts=[...g.accounts.values()].sort((a,b)=>cmp(a.moein,b.moein)).map(a=>({...a,details:[...a.details.values()].sort((x,y)=>cmp(x.levels.map(z=>z.code||z.title).join('|'),y.levels.map(z=>z.code||z.title).join('|')))}));
     const total=g.accounts.reduce((t,a)=>({openingDebit:t.openingDebit+a.openingDebit,openingCredit:t.openingCredit+a.openingCredit,debit:t.debit+a.debit,credit:t.credit+a.credit}),{openingDebit:0,openingCredit:0,debit:0,credit:0});
     return {...g,total};
   });
@@ -12810,7 +12824,7 @@ function runAnalysis(){
     SR.nextModel=SRE.build({files:source,auditFileId:next.id});
     SR.nextResult=SRE.analyze(SR.nextModel,srSettingsFor(SR.nextModel));
   }
-  SR.view.limit=200; SR.view.key=null; SR.view.T=0; SR.view.accountSelection=null; SR.view.tbSelection=new Set([...SR.roles.keys()]);
+  SR.view.limit=200; SR.view.key=null; SR.view.T=0; SR.view.accountSelection=null; SR.view.tbSelection=new Set([...SR.roles.keys()]); SR.view.selectionConfirmed=false;
 }
 /* ------------------------------------------------------ مرحلهٔ ۶: گزارش‌ها */
 /* ------------------------------------------------------ مرحلهٔ ۶: گزارش‌ها */
@@ -12844,7 +12858,7 @@ function renderReports(){
     ${R.checks.length?`<div class="card"><div class="err"><b>کنترل صحت محاسبات در ${fa(R.checks.length)} مورد ناموفق بود.</b> مبالغ کلیدهای دارای کنترل ناموفق نیازمند بررسی‌اند. ${R.checks.slice(0,5).map(c=>e_((c.key||'')+' — '+c.detail)).join('<br>')}</div></div>`:'<p class="sr-okbar">کنترل جمع لایه‌ها با ماندهٔ دفتر و استقلال محاسبهٔ سال بعد برقرار است.</p>'}
     <div class="sr-tabs">${TABS.map(([id,label])=>`<button type="button" class="${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('')}</div>
     <div class="sr-tools"><input class="sr-search" id="srQ" placeholder="جست‌وجوی کد یا عنوان معین و تفصیلی" value="${e_(SR.view.filter)}">
-      <button type="button" class="btn" id="srPrint">چاپ کاربرگ</button><button type="button" class="btn" id="srXlsx">خروجی اکسل</button></div>
+      <button type="button" class="btn" id="srPrint" ${tab!=='work'||!SR.view.selectionConfirmed?'disabled':''}>چاپ کاربرگ</button><button type="button" class="btn" id="srXlsx" ${tab!=='work'||!SR.view.selectionConfirmed?'disabled':''}>خروجی اکسل</button></div>
     <div id="srReport" class="${tab==='work'?'sr-report-shell':'card'}">${tab==='work'?'':headerHtml()}${tabHtml(tab)}</div>
     ${nav('s5',null)}`;
   host.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ SR.view.tab=b.dataset.tab; renderReports(); });
@@ -12853,16 +12867,91 @@ function renderReports(){
   bindReport(); bindNav(host,()=>{});
 }
 
+function applyTrialBalanceFilter(root){
+  const table=root.querySelector('#srTbTable'),input=root.querySelector('#srTbFilter');if(!table||!input)return;
+  const q=SRE.normText(input.value||''),rows=[...table.querySelectorAll('tbody tr[data-tb-kind]')],moeinById=new Map(rows.filter(x=>x.dataset.tbKind==='moein').map(x=>[x.dataset.tbAccount,x]));
+  if(!q){rows.forEach(x=>x.hidden=false);return;}
+  const accountHit=new Set(),kolDirect=new Set(),kolHasMatch=new Set();
+  rows.filter(x=>x.dataset.tbKind==='detail'&&SRE.normText(x.dataset.search||'').includes(q)).forEach(x=>accountHit.add(x.dataset.tbAccount));
+  rows.filter(x=>x.dataset.tbKind==='moein').forEach(x=>{if(SRE.normText(x.dataset.search||'').includes(q))accountHit.add(x.dataset.tbAccount);});
+  rows.filter(x=>x.dataset.tbKind==='kol'&&SRE.normText(x.dataset.search||'').includes(q)).forEach(x=>kolDirect.add(x.querySelector('[data-pick-kol]')?.dataset.pickKol||''));
+  accountHit.forEach(id=>{const account=moeinById.get(id);if(account)kolHasMatch.add(account.dataset.tbKol||'');});
+  rows.forEach(x=>{
+    const kind=x.dataset.tbKind;
+    if(kind==='kol'){const code=x.querySelector('[data-pick-kol]')?.dataset.pickKol||'';x.hidden=!(kolDirect.has(code)||kolHasMatch.has(code));}
+    else if(kind==='moein'){const account=x.dataset.tbAccount,kol=x.dataset.tbKol;x.hidden=!(kolDirect.has(kol)||accountHit.has(account));}
+    else {const account=x.dataset.tbAccount,moein=moeinById.get(account),kol=moein?.dataset.tbKol;x.hidden=!(moein&&!moein.hidden&&(kolDirect.has(kol)||accountHit.has(account)||SRE.normText(x.dataset.search||'').includes(q)));}
+  });
+}
+function paginateWorkpaperPreview(host){
+  const source=host?.querySelector('.sr-workpaper-source'),sourceTable=source?.querySelector('.sr-paper-table');if(!source||!sourceTable)return;
+  const body=sourceTable.tBodies[0];if(!body)return;
+  const rows=[...body.rows].map(row=>row.cloneNode(true)),base=source.cloneNode(true),baseBody=base.querySelector('.sr-paper-table tbody');
+  if(!baseBody)return;
+  baseBody.replaceChildren();base.classList.add('sr-aged-page-sheet');
+  const addPageNumber=sheet=>{const inner=sheet.querySelector('.inner');if(inner){const num=document.createElement('div');num.className='sample-page-num sr-aged-page-number';num.textContent='صفحه';inner.appendChild(num);}};
+  addPageNumber(base);
+  const measureBox=document.createElement('div');measureBox.className='sample-paper-box sr-aged-page sr-aged-measuring';
+  measureBox.style.cssText='position:absolute!important;left:-100000px!important;top:0!important;width:297mm!important;height:210mm!important;min-height:210mm!important;visibility:hidden!important;pointer-events:none!important;';
+  measureBox.style.setProperty('--sample-full-width','297mm');measureBox.style.setProperty('--sample-full-height','210mm');
+  const measureSheet=base.cloneNode(true);measureBox.appendChild(measureSheet);host.appendChild(measureBox);
+  const measureBody=measureSheet.querySelector('.sr-paper-table tbody');
+  const computed=getComputedStyle(measureBox),available=measureBox.clientHeight-(parseFloat(computed.paddingTop)||0)-(parseFloat(computed.paddingBottom)||0)-2;
+  const fixedHeight=measureSheet.getBoundingClientRect().height;
+  const measuredRows=rows.map(row=>{const clone=row.cloneNode(true);measureBody.appendChild(clone);return clone;});
+  const rowHeights=measuredRows.map(row=>row.getBoundingClientRect().height);
+  measureBox.remove();
+  const capacity=Math.max(0,available-fixedHeight),buckets=[[]],overflowFlags=[false];let used=0;
+  rows.forEach((row,i)=>{
+    const h=rowHeights[i]||1;
+    if(buckets[buckets.length-1].length&&used+h>capacity){buckets.push([]);overflowFlags.push(false);used=0;}
+    buckets[buckets.length-1].push(row);used+=h;
+    if(h>capacity||fixedHeight>available)overflowFlags[overflowFlags.length-1]=true;
+  });
+  const pagesHost=document.createElement('div');pagesHost.className='sr-aged-preview-pages';source.replaceWith(pagesHost);
+  buckets.forEach((pageRows,pageIndex)=>{
+    const box=document.createElement('div');box.className='sample-paper-box sr-aged-page';box.style.width='297mm';box.style.height='210mm';box.style.minHeight='210mm';
+    box.style.setProperty('--sample-full-width','297mm');box.style.setProperty('--sample-full-height','210mm');
+    if(overflowFlags[pageIndex]){box.classList.add('sr-aged-page-overflow');box.style.height='auto';box.style.overflow='visible';}
+    const sheet=base.cloneNode(true),pageBody=sheet.querySelector('.sr-paper-table tbody');
+    pageRows.forEach(row=>pageBody.appendChild(row));
+    const num=sheet.querySelector('.sr-aged-page-number');if(num)num.textContent=`صفحهٔ ${fa(pageIndex+1)} از ${fa(buckets.length)}`;
+    box.appendChild(sheet);box.dataset.pageIndex=String(pageIndex+1);box.dataset.pageCount=String(buckets.length);pagesHost.appendChild(box);
+  });
+}
 function bindReport(){
   const r=$('srReport'); if(!r) return;
-  const allAccounts=srTrialBalanceData().flatMap(g=>g.accounts.map(a=>a.id));
+  const groups=srTrialBalanceData(),allAccounts=groups.flatMap(g=>g.accounts.map(a=>a.id));
   const currentSelection=()=>SR.view.accountSelection instanceof Set?new Set(SR.view.accountSelection):new Set(allAccounts);
-  const repaintWork=()=>{SR.view.tab='work';const host=$('srReport');if(host){host.innerHTML=tabHtml('work');bindReport();}};
-  r.querySelectorAll('[data-pick-account]').forEach(c=>c.onchange=()=>{const set=currentSelection();c.checked?set.add(c.dataset.pickAccount):set.delete(c.dataset.pickAccount);SR.view.accountSelection=set;repaintWork();});
-  r.querySelectorAll('[data-pick-kol]').forEach(c=>{const g=srTrialBalanceData().find(x=>x.kol===c.dataset.pickKol),ids=(g?.accounts||[]).map(a=>a.id),set=currentSelection(),n=ids.filter(id=>set.has(id)).length;c.indeterminate=n>0&&n<ids.length;c.onchange=()=>{const next=currentSelection();ids.forEach(id=>c.checked?next.add(id):next.delete(id));SR.view.accountSelection=next;repaintWork();};});
-  const pickQ=r.querySelector('#srAccountPickQ'); if(pickQ) pickQ.oninput=()=>{SR.view.accFilter=pickQ.value;clearTimeout(pickQ._t);pickQ._t=setTimeout(repaintWork,180);};
-  const pickAll=r.querySelector('#srPickAll'); if(pickAll) pickAll.onclick=()=>{SR.view.accountSelection=new Set(allAccounts);repaintWork();};
-  const pickNone=r.querySelector('#srPickNone'); if(pickNone) pickNone.onclick=()=>{SR.view.accountSelection=new Set();repaintWork();};
+  const syncSelectionUI=()=>{
+    const selected=currentSelection(),count=allAccounts.filter(id=>selected.has(id)).length;
+    r.querySelectorAll('[data-pick-account]').forEach(c=>{c.checked=selected.has(c.dataset.pickAccount);});
+    r.querySelectorAll('[data-pick-kol]').forEach(c=>{const g=groups.find(x=>x.kol===c.dataset.pickKol),ids=(g?.accounts||[]).map(a=>a.id),n=ids.filter(id=>selected.has(id)).length;c.checked=ids.length>0&&n===ids.length;c.indeterminate=n>0&&n<ids.length;const badge=c.closest('tr')?.querySelector('.sr-tree-count');if(badge)badge.textContent=fa(n)+' از '+fa(ids.length)+' معین';});
+    const all=r.querySelector('#srTbSelectAll');if(all){all.checked=allAccounts.length>0&&count===allAccounts.length;all.indeterminate=count>0&&count<allAccounts.length;}
+    const countNode=r.querySelector('#srTbSelectedCount');if(countNode)countNode.textContent=fa(count)+' از '+fa(allAccounts.length)+' حساب معین انتخاب شده';
+    const confirm=r.querySelector('#srConfirmAccounts');if(confirm)confirm.disabled=count===0;
+    const hint=r.querySelector('#srTbSelectionHint');if(hint)hint.textContent=SR.view.selectionConfirmed?'حساب‌ها تأیید شده‌اند. با تغییر انتخاب، دوباره تأیید کنید.':'همهٔ حساب‌های معین به‌طور پیش‌فرض انتخاب شده‌اند؛ تیک هر «کل» همهٔ معین‌های زیرمجموعه را تغییر می‌دهد. برای ساخت/به‌روزرسانی کاربرگ، تأیید را بزنید.';
+  };
+  const invalidatePreview=()=>{
+    const wasConfirmed=SR.view.selectionConfirmed;SR.view.selectionConfirmed=false;
+    const preview=r.querySelector('#srFinalPreview');if(preview&&wasConfirmed)preview.classList.add('sr-stale-preview');
+    const print=r.querySelector('#srPrint'),xlsx=r.querySelector('#srXlsx');if(print)print.disabled=true;if(xlsx)xlsx.disabled=true;
+    syncSelectionUI();
+  };
+  const setSelection=(next)=>{SR.view.accountSelection=next.size===allAccounts.length?null:next;invalidatePreview();};
+  r.querySelectorAll('[data-pick-account]').forEach(c=>c.onchange=()=>{const next=currentSelection();c.checked?next.add(c.dataset.pickAccount):next.delete(c.dataset.pickAccount);setSelection(next);});
+  r.querySelectorAll('[data-pick-kol]').forEach(c=>c.onchange=()=>{const g=groups.find(x=>x.kol===c.dataset.pickKol);if(!g)return;const next=currentSelection();g.accounts.forEach(a=>c.checked?next.add(a.id):next.delete(a.id));setSelection(next);});
+  const selectAll=r.querySelector('#srTbSelectAll');if(selectAll)selectAll.onchange=()=>setSelection(selectAll.checked?new Set(allAccounts):new Set());
+  const tbFilter=r.querySelector('#srTbFilter');if(tbFilter)tbFilter.oninput=()=>{SR.view.tbFilter=tbFilter.value;applyTrialBalanceFilter(r);};
+  const confirmAccounts=r.querySelector('#srConfirmAccounts');if(confirmAccounts)confirmAccounts.onclick=()=>{
+    const selected=currentSelection();if(!selected.size){window.alert('برای ساخت کاربرگ دست‌کم یک حساب معین را انتخاب کنید.');return;}
+    SR.view.accountSelection=selected.size===allAccounts.length?null:selected;SR.view.selectionConfirmed=true;
+    const preview=r.querySelector('#srFinalPreview');if(preview){preview.classList.remove('sr-stale-preview');preview.innerHTML=workpaperHtml();paginateWorkpaperPreview(preview);}
+    const print=r.querySelector('#srPrint'),xlsx=r.querySelector('#srXlsx');if(print)print.disabled=false;if(xlsx)xlsx.disabled=false;
+    syncSelectionUI();
+  };
+  applyTrialBalanceFilter(r);syncSelectionUI();
+  if(SR.view.selectionConfirmed){const preview=r.querySelector('#srFinalPreview');if(preview&&preview.querySelector('.sr-workpaper-source'))paginateWorkpaperPreview(preview);}
   r.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{ SR.view.limit+=200; r.innerHTML=(SR.view.tab==='work'?'':headerHtml())+tabHtml(SR.view.tab); bindReport(); });
   r.querySelectorAll('[data-key]').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); SR.view.key=a.dataset.key; SR.view.tab='detail'; renderReports(); });
   r.querySelectorAll('[data-T]').forEach(b=>b.onclick=()=>{ SR.view.T=Number(b.dataset.T); r.innerHTML=(SR.view.tab==='work'?'':headerHtml())+tabHtml(SR.view.tab); bindReport(); });
@@ -13048,86 +13137,42 @@ function rangeText(r){
 function srPreviewRows(){
   return finalWorkpaperRows(SR.view.accountSelection instanceof Set?SR.view.accountSelection:null);
 }
-function srAccountPickerHtml(){
-  const groups=srTrialBalanceData();
-  const all=groups.flatMap(g=>g.accounts.map(a=>a.id));
+function trialBalancePreviewHtml(){
+  const groups=srTrialBalanceData(), all=groups.flatMap(g=>g.accounts.map(a=>a.id));
   const selected=SR.view.accountSelection instanceof Set?SR.view.accountSelection:new Set(all);
   const selectedCount=all.filter(id=>selected.has(id)).length;
-  const q=SRE.normText(SR.view.accFilter||'');
-  const visible=groups.map(g=>({...g,accounts:g.accounts.filter(a=>!q||SRE.normText([g.kol,g.kolT,a.moein,a.moeinT].join(' ')).includes(q))})).filter(g=>g.accounts.length);
-  const checked=ids=>ids.length>0&&ids.every(id=>selected.has(id));
-  return `<section class="sr-account-picker" aria-label="انتخاب حساب‌های کاربرگ">
-    <div class="sr-picker-head"><div><b>انتخاب حساب‌ها</b><div class="hint">حساب‌های موردنظر را مانند کاربرگ نمونه‌گیری تیک بزنید.</div></div>
-      <span class="sr-chip" id="srSelectedCount">${fa(selectedCount)} از ${fa(all.length)} حساب انتخاب شده</span></div>
-    <div class="sr-row"><input class="sr-search" id="srAccountPickQ" placeholder="جست‌وجوی کد یا عنوان حساب کل و معین" value="${e_(SR.view.accFilter||'')}">
-      <button type="button" class="btn" id="srPickAll">انتخاب همه</button><button type="button" class="btn ghost" id="srPickNone">لغو انتخاب همه</button></div>
-    <div class="sr-account-tree">${visible.map(g=>{const ids=g.accounts.map(a=>a.id);return `<details open><summary><label><input type="checkbox" data-pick-kol="${e_(g.kol)}" ${checked(g.accounts.map(a=>a.id))?'checked':''}><b>کل ${fa(e_(g.kol))} — ${e_(g.kolT)}</b></label><small>${fa(ids.filter(id=>selected.has(id)).length)} از ${fa(ids.length)}</small></summary>
-      <div class="sr-account-children">${g.accounts.map(a=>`<label><input type="checkbox" data-pick-account="${e_(a.id)}" ${selected.has(a.id)?'checked':''}><span>معین ${fa(e_(a.moein))} — ${e_(a.moeinT)}</span></label>`).join('')}</div></details>`;}).join('')}</div>
-    <div class="sr-picker-foot">انتخاب حساب‌ها فقط دامنهٔ کاربرگ را تعیین می‌کند؛ تراز سال جاری در همین پیش‌نمایش قابل مشاهده است.</div>
+  const num=v=>v?fmtB(v):'';
+  const bal=(dr,cr)=>{const x=(dr||0)-(cr||0);return x?fmtB(Math.abs(x))+(x<0?' (بستانکار)':' (بدهکار)'):'۰';};
+  const total=groups.reduce((t,g)=>({openingDebit:t.openingDebit+g.total.openingDebit,openingCredit:t.openingCredit+g.total.openingCredit,debit:t.debit+g.total.debit,credit:t.credit+g.total.credit}),{openingDebit:0,openingCredit:0,debit:0,credit:0});
+  const searchText=(...parts)=>e_(SRE.normText(parts.filter(Boolean).join(' ')));
+  const rows=groups.map(g=>{
+    const ids=g.accounts.map(a=>a.id),n=ids.filter(id=>selected.has(id)).length;
+    const children=g.accounts.map(a=>{
+      const detailRows=a.details.map(d=>{
+        const vals=d.levels.filter(x=>x.code||x.title).map(x=>[x.label,x.code,x.title].filter(Boolean).join(' '));
+        const code=d.levels.filter(x=>x.code).map(x=>x.code).join(' / ')||'—';
+        const title=d.levels.filter(x=>x.title).map(x=>x.title).join(' / ')||'—';
+        return `<tr class="sr-tb-detail" data-tb-kind="detail" data-tb-account="${e_(a.id)}" data-search="${searchText(g.kol,g.kolT,a.moein,a.moeinT,...vals)}"><td></td><td>تفصیلی</td><td class="sr-tb-code">${fa(e_(code))}</td><td class="sr-tb-title">${e_(title)}</td><td>${bal(d.openingDebit,d.openingCredit)}</td><td class="num">${num(d.debit)}</td><td class="num">${num(d.credit)}</td><td>${bal(d.openingDebit+d.debit,d.openingCredit+d.credit)}</td></tr>`;
+      }).join('');
+      return `<tr class="sr-tb-moein" data-tb-kind="moein" data-tb-account="${e_(a.id)}" data-tb-kol="${e_(g.kol)}" data-search="${searchText(g.kol,g.kolT,a.moein,a.moeinT)}"><td><input type="checkbox" data-pick-account="${e_(a.id)}" aria-label="انتخاب معین ${fa(e_(a.moein))}" ${selected.has(a.id)?'checked':''}></td><td>معین</td><td class="sr-tb-code">${fa(e_(a.moein))}</td><td class="sr-tb-title">${e_(a.moeinT)}</td><td>${bal(a.openingDebit,a.openingCredit)}</td><td class="num">${num(a.debit)}</td><td class="num">${num(a.credit)}</td><td>${bal(a.openingDebit+a.debit,a.openingCredit+a.credit)}</td></tr>${detailRows}`;
+    }).join('');
+    return `<tr class="sr-tb-kol" data-tb-kind="kol" data-search="${searchText(g.kol,g.kolT)}"><td><input type="checkbox" data-pick-kol="${e_(g.kol)}" aria-label="انتخاب همهٔ حساب‌های معین کل ${fa(e_(g.kol))}" ${n===ids.length&&ids.length?'checked':''}></td><td>کل</td><td class="sr-tb-code">${fa(e_(g.kol))}</td><td class="sr-tb-title"><b>${e_(g.kolT)}</b><small class="sr-tree-count">${fa(n)} از ${fa(ids.length)} معین</small></td><td>${bal(g.total.openingDebit,g.total.openingCredit)}</td><td class="num">${num(g.total.debit)}</td><td class="num">${num(g.total.credit)}</td><td>${bal(g.total.openingDebit+g.total.debit,g.total.openingCredit+g.total.credit)}</td></tr>${children}`;
+  }).join('');
+  return `<section class="sr-tb-card" aria-label="تراز شناور و انتخاب حساب‌ها">
+    <div class="sr-tb-titlebar"><div><b>تراز شناور سال جاری — ${e_(srCurrentYearLabel())}</b><small>سطوح کل، معین و تفصیلی</small></div><span class="sr-chip" id="srTbSelectedCount">${fa(selectedCount)} از ${fa(all.length)} حساب معین انتخاب شده</span></div>
+    <div class="sr-tb-toolbar"><label class="sr-tb-selectall"><input type="checkbox" id="srTbSelectAll" ${all.length&&selectedCount===all.length?'checked':''}> انتخاب همهٔ حساب‌های معین</label><input class="sr-search" id="srTbFilter" placeholder="جست‌وجوی کد یا عنوان کل، معین و تفصیلی" value="${e_(SR.view.tbFilter||'')}"></div>
+    <div class="sr-tb-period"><span>مانده ابتدای سال</span><b>${bal(total.openingDebit,total.openingCredit)}</b><span>گردش بدهکار</span><b>${num(total.debit)||'۰'}</b><span>گردش بستانکار</span><b>${num(total.credit)||'۰'}</b><span>مانده پایان</span><b>${bal(total.openingDebit+total.debit,total.openingCredit+total.credit)}</b></div>
+    <div class="sr-tb-scroll" id="srTbScroll"><table class="sr-tb-table" id="srTbTable"><thead><tr><th>انتخاب</th><th>سطح</th><th>کد</th><th>عنوان حساب</th><th>مانده ابتدا</th><th>گردش بدهکار</th><th>گردش بستانکار</th><th>مانده پایان</th></tr></thead><tbody>${rows||'<tr><td colspan="8">ردیف حسابی برای تراز پیدا نشد.</td></tr>'}<tr class="sr-tb-total"><td></td><td colspan="3">جمع کل تراز</td><td>${bal(total.openingDebit,total.openingCredit)}</td><td class="num">${num(total.debit)||'۰'}</td><td class="num">${num(total.credit)||'۰'}</td><td>${bal(total.openingDebit+total.debit,total.openingCredit+total.credit)}</td></tr></tbody></table></div>
+    <div class="sr-tb-footer"><span id="srTbSelectionHint" aria-live="polite">${SR.view.selectionConfirmed?'حساب‌ها تأیید شده‌اند. با تغییر انتخاب، دوباره تأیید کنید.':'همهٔ حساب‌های معین به‌طور پیش‌فرض انتخاب شده‌اند؛ تیک هر «کل» همهٔ معین‌های زیرمجموعه را تغییر می‌دهد. برای ساخت/به‌روزرسانی کاربرگ، تأیید را بزنید.'}</span><button type="button" class="confirm" id="srConfirmAccounts" ${all.length?'':'disabled'}>تأیید حساب‌ها و ساخت کاربرگ</button></div>
   </section>`;
 }
-function trialBalancePreviewHtml(){
-  const groups=srTrialBalanceData();
-  const num=v=>v?fmtB(v):'';
-  const bal=(dr,cr)=>{const x=(dr||0)-(cr||0);return x?fmtB(Math.abs(x))+(x<0?' (بستانکار)':' (بدهکار)'):'';};
-  const total=groups.reduce((t,g)=>({openingDebit:t.openingDebit+g.total.openingDebit,openingCredit:t.openingCredit+g.total.openingCredit,debit:t.debit+g.total.debit,credit:t.credit+g.total.credit}),{openingDebit:0,openingCredit:0,debit:0,credit:0});
-  return `<details class="sr-preview-trial-balance" open><summary>تراز کل سال جاری — ${e_(srCurrentYearLabel())}</summary>
-    <div class="scrollx"><table class="sr-t"><thead><tr><th>سطح</th><th>کد حساب</th><th>عنوان حساب</th><th>مانده ابتدای سال</th><th>گردش بدهکار</th><th>گردش بستانکار</th><th>مانده پایان سال</th></tr></thead><tbody>
-    ${groups.map(g=>`<tr class="sr-kol-row"><td>کل</td><td>${fa(e_(g.kol))}</td><td>${e_(g.kolT)}</td><td>${bal(g.total.openingDebit,g.total.openingCredit)}</td><td>${num(g.total.debit)}</td><td>${num(g.total.credit)}</td><td>${bal(g.total.openingDebit+g.total.debit,g.total.openingCredit+g.total.credit)}</td></tr>${g.accounts.map(a=>`<tr><td>معین</td><td>${fa(e_(a.moein))}</td><td>${e_(a.moeinT)}</td><td>${bal(a.openingDebit,a.openingCredit)}</td><td>${num(a.debit)}</td><td>${num(a.credit)}</td><td>${bal(a.openingDebit+a.debit,a.openingCredit+a.credit)}</td></tr>`).join('')}`).join('')}
-    <tr class="sr-tb-total"><td colspan="3">جمع کل تراز</td><td>${bal(total.openingDebit,total.openingCredit)}</td><td>${num(total.debit)}</td><td>${num(total.credit)}</td><td>${bal(total.openingDebit+total.debit,total.openingCredit+total.credit)}</td></tr>
-    </tbody></table></div></details>`;
-}
+
 function tabHtml(tab){
   const R=SR.result;
   if(tab==='work'){
-    const rows=srPreviewRows().filter(r=>[r.amount1403,r.amount1404,r.followUp,r.offset1404,r.finalAmount].some(v=>v!==null&&v!==undefined&&v!==0n&&v!==0)), cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
-    let today=''; try{ today=new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()); }catch{ today=new Date().toLocaleDateString('fa-IR'); }
-    const cell=v=>e_(String(v??'').split(' ؛ ').filter(Boolean).join('\n')).replace(/\n/g,'<br>');
-    const amount=v=>v===null||v===undefined||v===0n?'':fmtB(v);
-    const balance=v=>v===null||v===undefined||v===0n?'':signedBalanceText(v);
-    const showTaf1=!!SR.view.showTaf1, showTaf2=!!SR.view.showTaf2;
-    const visibleCols=9+(showTaf1?2:0)+(showTaf2?2:0);
-    const widths=showTaf1&&showTaf2?[5,7,5,7,5,7,5,7,9,9,11,10,13]:showTaf1?[6,10,6,10,6,10,0,0,9,9,11,10,13]:showTaf2?[6,10,6,10,0,0,6,10,9,9,11,10,13]:[8,14,8,14,0,0,0,0,10,10,12,10,13];
-    const colgroup='<colgroup>'+widths.map((w,i)=>`<col style="width:${w}%;"${(i===4||i===5)?' data-level="taf1"':''}${(i===6||i===7)?' data-level="taf2"':''}>`).join('')+'</colgroup>';
-    const auditYear=SR.result?.audit?.label||'۱۴۰۴';
-    const priorYear=SR.result?.chain?.length>1?SR.result.chain[SR.result.chain.length-2].label:'۱۴۰۳';
     return `<section class="sr-report-output" dir="rtl">
-      ${srAccountPickerHtml()}
       ${trialBalancePreviewHtml()}
-      <section class="sheet sampling-template sr-paper" dir="rtl">
-       <div class="inner">
-        <div class="meta sr-screen-head">
-          <div class="ref-oval sr-refbox" aria-label="محل درج عطف کارت‌برگ"></div>
-          <div class="big sr-head-company"><div><span class="k">شرکت مورد رسیدگی:</span> <span class="v">${e_(cfg.company||'—')}</span></div><div><span class="k">موضوع:</span> <span class="v">کاربرگ اقلام سنواتی و راکد</span></div><div><span class="k">دوره مالی:</span> <span class="v">${e_(auditYear)}</span></div></div>
-          <div class="side sr-head-prep"><div>تاریخ تهیه: ${e_(cfg.date||today)}</div><div>تهیه‌کننده: ${e_(cfg.prep||'—')}</div><div>بررسی‌کننده: ${e_(cfg.rev||'—')}</div></div>
-        </div>
-        <div class="path sr-report-title"><b>کاربرگ اقلام سنواتی و راکد</b><span>مبالغ به ریال</span></div>
-        <div class="frame sr-rows-box">
-        <table class="sr-paper-table ${SR.view.showTaf1?'show-taf1':''} ${SR.view.showTaf2?'show-taf2':''}">
-          ${colgroup}
-          <thead>
-            <tr class="sr-print-meta"><th colspan="${visibleCols}"><div class="meta sr-meta-grid">
-              <div class="ref-oval sr-refbox" aria-label="محل درج عطف کارت‌برگ"></div>
-              <div class="big sr-head-company"><div><span class="k">شرکت مورد رسیدگی:</span> <span class="v">${e_(cfg.company||'—')}</span></div><div><span class="k">موضوع:</span> <span class="v">کاربرگ اقلام سنواتی و راکد</span></div><div><span class="k">دوره مالی:</span> <span class="v">${e_(auditYear)}</span></div></div>
-              <div class="side sr-head-prep"><div>تاریخ تهیه: ${e_(cfg.date||today)}</div><div>تهیه‌کننده: ${e_(cfg.prep||'—')}</div><div>بررسی‌کننده: ${e_(cfg.rev||'—')}</div></div>
-            </div></th></tr>
-            <tr class="sr-print-title"><th colspan="${visibleCols}"><span>کاربرگ اقلام سنواتی و راکد</span><span>مبالغ به ریال</span></th></tr>
-            <tr class="cols sr-group-head">
-              <th>کد معین</th><th>عنوان معین</th>
-              <th>کد تفصیلی</th><th>عنوان تفصیلی</th><th data-level="taf1">کد تفصیلی ۱</th><th data-level="taf1">عنوان تفصیلی ۱</th><th data-level="taf2">کد تفصیلی ۲</th><th data-level="taf2">عنوان تفصیلی ۲</th>
-              <th>۱۴۰۳</th><th>۱۴۰۴</th><th>پیگیری سال آتی</th><th>تهاتر با حساب‌های دیگر</th><th>راکد و سنواتی</th>
-            </tr>
-          </thead>
-          <tbody>${rows.map(r=>{
-            return `<tr>
-              <td class="sr-code">${cell(r.moeinCode)}</td><td>${cell(r.moeinTitle)}</td>
-              <td class="sr-code">${cell(r.tafCode||(r.unmatchedPrior?r.detailCode:''))}</td><td>${cell(r.tafTitle||(r.unmatchedPrior?r.detailTitle:''))}</td><td data-level="taf1" class="sr-code">${cell(r.taf1Code)}</td><td data-level="taf1">${cell(r.taf1Title)}</td><td data-level="taf2" class="sr-code">${cell(r.taf2Code)}</td><td data-level="taf2">${cell(r.taf2Title)}</td>
-              <td class="num">${balance(r.amount1403)}</td><td class="num">${balance(r.amount1404)}</td><td class="num">${balance(r.followUp)}</td><td class="num">${amount(r.offset1404)}</td><td class="num">${balance(r.finalAmount)}</td>
-            </tr>`;
-          }).join('')||`<tr><td colspan="${visibleCols}">ردیفی برای نمایش وجود ندارد.</td></tr>`}</tbody>
-        </table></div>
-       </div>
-      </section>
+      <section id="srFinalPreview" class="sr-final-preview">${SR.view.selectionConfirmed?workpaperHtml():`<div class="sr-confirm-panel"><b>حساب‌های موردنظر را در تراز بالا انتخاب کنید.</b><span>پس از زدن «تأیید حساب‌ها و ساخت کاربرگ»، پیش‌نمایش صفحه‌بندی‌شده ساخته می‌شود.</span></div>`}</section>
     </section>`;
   }
   if(tab==='exc'){
@@ -13139,6 +13184,52 @@ function tabHtml(tab){
   }
   if(tab==='help') return helpHtml();
   return '';
+}
+
+function workpaperHtml(){
+  const rows=srPreviewRows().filter(r=>[r.amount1403,r.amount1404,r.followUp,r.offset1404,r.finalAmount].some(v=>v!==null&&v!==undefined&&v!==0n&&v!==0)), cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
+  let today=''; try{ today=new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()); }catch{ today=new Date().toLocaleDateString('fa-IR'); }
+  const cell=v=>e_(String(v??'').split(' ؛ ').filter(Boolean).join('\n')).replace(/\n/g,'<br>');
+  const amount=v=>v===null||v===undefined||v===0n?'':fmtB(v);
+  const balance=v=>v===null||v===undefined||v===0n?'':signedBalanceText(v);
+  const showTaf1=!!SR.view.showTaf1, showTaf2=!!SR.view.showTaf2;
+  const visibleCols=9+(showTaf1?2:0)+(showTaf2?2:0);
+  const widths=showTaf1&&showTaf2?[5,7,5,7,5,7,5,7,9,9,11,10,13]:showTaf1?[6,10,6,10,6,10,0,0,9,9,11,10,13]:showTaf2?[6,10,6,10,0,0,6,10,9,9,11,10,13]:[8,14,8,14,0,0,0,0,10,10,12,10,13];
+  const colgroup='<colgroup>'+widths.map((w,i)=>`<col style="width:${w}%;"${(i===4||i===5)?' data-level="taf1"':''}${(i===6||i===7)?' data-level="taf2"':''}>`).join('')+'</colgroup>';
+  const auditYear=SR.result?.audit?.label||'۱۴۰۴';
+  return `<section class="sheet sampling-template sr-paper sr-workpaper-source" dir="rtl">
+    <div class="inner">
+      <div class="meta sr-screen-head">
+        <div class="ref-oval sr-refbox" aria-label="محل درج عطف کاربرگ"></div>
+        <div class="big sr-head-company"><div><span class="k">شرکت:</span> <span class="v">${e_(cfg.company||'—')}</span> <span class="k">· دوره:</span> <span class="v">${e_(auditYear)}</span></div></div>
+        <div class="side sr-head-prep"><div>تهیه: ${e_(cfg.prep||'—')} · بررسی: ${e_(cfg.rev||'—')}</div><div>تاریخ: ${e_(cfg.date||today)}</div></div>
+      </div>
+      <div class="path sr-report-title"><b>کاربرگ اقلام سنواتی و راکد</b><span>مبالغ به ریال</span></div>
+      <div class="frame sr-rows-box">
+        <table class="sr-paper-table ${showTaf1?'show-taf1':''} ${showTaf2?'show-taf2':''}">
+          ${colgroup}
+          <thead>
+            <tr class="sr-print-meta"><th colspan="${visibleCols}"><div class="meta sr-meta-grid">
+              <div class="ref-oval sr-refbox" aria-label="محل درج عطف کاربرگ"></div>
+              <div class="big sr-head-company"><div><span class="k">شرکت:</span> <span class="v">${e_(cfg.company||'—')}</span> <span class="k">· دوره:</span> <span class="v">${e_(auditYear)}</span></div></div>
+              <div class="side sr-head-prep"><div>تهیه: ${e_(cfg.prep||'—')} · بررسی: ${e_(cfg.rev||'—')}</div><div>تاریخ: ${e_(cfg.date||today)}</div></div>
+            </div></th></tr>
+            <tr class="sr-print-title"><th colspan="${visibleCols}"><span>کاربرگ اقلام سنواتی و راکد</span><span>مبالغ به ریال</span></th></tr>
+            <tr class="cols sr-group-head">
+              <th>کد معین</th><th>عنوان معین</th>
+              <th>کد تفصیلی</th><th>عنوان تفصیلی</th><th data-level="taf1">کد تفصیلی ۱</th><th data-level="taf1">عنوان تفصیلی ۱</th><th data-level="taf2">کد تفصیلی ۲</th><th data-level="taf2">عنوان تفصیلی ۲</th>
+              <th>۱۴۰۳</th><th>۱۴۰۴</th><th>پیگیری سال آتی</th><th>تهاتر با حساب‌های دیگر</th><th>راکد و سنواتی</th>
+            </tr>
+          </thead>
+          <tbody>${rows.map(r=>`<tr>
+            <td class="sr-code">${cell(r.moeinCode)}</td><td>${cell(r.moeinTitle)}</td>
+            <td class="sr-code">${cell(r.tafCode||(r.unmatchedPrior?r.detailCode:''))}</td><td>${cell(r.tafTitle||(r.unmatchedPrior?r.detailTitle:''))}</td><td data-level="taf1" class="sr-code">${cell(r.taf1Code)}</td><td data-level="taf1">${cell(r.taf1Title)}</td><td data-level="taf2" class="sr-code">${cell(r.taf2Code)}</td><td data-level="taf2">${cell(r.taf2Title)}</td>
+            <td class="num">${balance(r.amount1403)}</td><td class="num">${balance(r.amount1404)}</td><td class="num">${balance(r.followUp)}</td><td class="num">${amount(r.offset1404)}</td><td class="num">${balance(r.finalAmount)}</td>
+          </tr>`).join('')||`<tr><td colspan="${visibleCols}">ردیفی برای نمایش وجود ندارد.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+  </section>`;
 }
 
 function layerTable(L){
@@ -13185,53 +13276,47 @@ function helpHtml(){
   </div>`;
 }
 function printReport(){
-  const src=$('srReport'); if(!src) return;
-  if(typeof window.__activePrintRestore==='function') window.__activePrintRestore();
-  const ph=$('printHost'); let done=false; const old=document.title;
-  const rule=document.createElement('style'); rule.dataset.srLandscapePrint='true';
-  rule.textContent=`@page srAgedLandscape{size:A4 landscape;margin:5mm}
+  if(!SR.view.selectionConfirmed){window.alert('ابتدا حساب‌ها را در تراز انتخاب و تأیید کنید.');return;}
+  const preview=$('srFinalPreview'),pageNodes=preview?[...preview.querySelectorAll('.sr-aged-preview-pages>.sr-aged-page')]:[];
+  if(!pageNodes.length){window.alert('پیش‌نمایش صفحه‌بندی‌شده آماده نیست؛ پس از تأیید حساب‌ها دوباره تلاش کنید.');return;}
+  if(pageNodes.some(page=>page.classList.contains('sr-aged-page-overflow'))){window.alert('یک ردیف در صفحه جا نشده است؛ برای جلوگیری از بریدن اطلاعات، چاپ متوقف شد. لطفاً ردیف‌های بسیار بلند را بررسی کنید.');return;}
+  if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
+  const ph=$('printHost');if(!ph)return;
+  let done=false;const old=document.title,rule=document.createElement('style');rule.dataset.srLandscapePrint='true';
+  rule.textContent=`@page srAgedLandscape{size:A4 landscape;margin:0!important}
     @media print{
       html,body{width:100%!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important}
+      body.printing>*:not(#printHost){display:none!important}
       body.printing #printHost{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;overflow:visible!important}
-      .sr-print{width:100%!important;margin:0!important;padding:0!important;direction:rtl!important;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:6.8pt!important}
-      .sr-print .sr-report-shell{overflow:visible!important;padding:0!important}
-      .sr-print .sr-paper{page:srAgedLandscape!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;height:auto!important;margin:0!important;padding:2px!important;box-shadow:none!important;border:1.8px solid #9e0000!important;border-radius:12px!important}
-      .sr-print .sr-paper>.inner{border:1.2px solid #64748b!important;border-radius:9px!important;padding:3px!important}
-      .sr-print .sr-account-picker,.sr-print .sr-report-sub,.sr-print .sr-preview-trial-balance{display:none!important}
-      .sr-print .sr-screen-head,.sr-print .sr-report-title{display:none!important}
-      .sr-print .sr-paper-table{width:100%!important;table-layout:fixed!important;border-collapse:separate!important;border-spacing:0!important;page-break-inside:auto!important;break-inside:auto!important}
-      .sr-print .sr-paper-table thead{display:table-header-group!important}
-      .sr-print .sr-paper-table thead tr.sr-print-meta,.sr-print .sr-paper-table thead tr.sr-print-title{display:table-row!important}
-      .sr-print .sr-paper-table tbody{display:table-row-group!important}
-      .sr-print .sr-paper-table tr{break-inside:avoid!important;page-break-inside:avoid!important}
-      .sr-print .sr-paper-table th,.sr-print .sr-paper-table td{font-size:6.2pt!important;padding:.8mm .55mm!important;line-height:1.22!important;overflow-wrap:anywhere!important}
-      .sr-print .sr-paper-table td.num{font-size:6pt!important;white-space:nowrap!important;direction:ltr!important}
-      .sr-print .sr-meta-grid{display:grid!important;grid-template-columns:11mm minmax(0,1.8fr) minmax(0,.9fr)!important;gap:1.5mm!important;align-items:center!important;min-height:8mm!important;padding:1px 4px!important;background:linear-gradient(180deg,#fffaf0,#fff2cc)!important;border-bottom:1px solid #334155!important}
-      .sr-print .sr-meta-grid .sr-head-company,.sr-print .sr-meta-grid .sr-head-prep{font-size:7pt!important;line-height:1.18!important}
-      .sr-print .sr-meta-grid .sr-refbox{width:10mm!important;height:6.5mm!important}
-      .sr-print .sr-meta-grid .sr-head-prep{padding-right:4px!important}
-      .sr-print .sr-paper-table .sr-print-title th{font-size:8pt!important;line-height:1.15!important;padding:.6mm 1.5mm!important}
-      .sr-print .sr-meta-grid .sr-refbox{width:13mm!important;height:8.5mm!important;border:1.6px solid #9e0000!important;border-radius:50%!important;background:#fff!important}
-      .sr-print .sr-meta-grid .sr-head-prep{border-right:1px dashed #475569!important;padding-right:6px!important}
-      .sr-print .sr-paper-table .sr-print-meta th{padding:0!important;background:transparent!important;border:0!important}
-      .sr-print .sr-paper-table .sr-print-title th{padding:1mm 2mm!important;background:#fff!important;text-align:right!important}
-      .sr-print .sr-paper-table .sr-print-title th span:last-child{float:left!important;font-weight:normal!important}
-      .sr-print .sr-paper-table thead th{background:#fff2cc!important;color:#1f2937!important}
-      .sr-print .sr-paper-table tbody tr:nth-child(even) td{background:#fffcf2!important}
-      .sr-print .sr-paper .frame{border:1.5px solid #9e0000!important;border-radius:8px!important;overflow:visible!important;width:100%!important;margin:0!important}
-      .sr-print .sr-year-cell{font-size:5.8pt!important;line-height:1.2!important}
-      .sr-print .compact-note{break-inside:avoid!important;page-break-inside:avoid!important;margin-top:1mm!important}
+      .sr-aged-page{page:srAgedLandscape!important;display:block!important;box-sizing:border-box!important;width:297mm!important;min-width:297mm!important;max-width:297mm!important;height:210mm!important;min-height:210mm!important;margin:0!important;padding:16mm 7.5mm 14mm!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important}
+      .sr-aged-page:last-child{break-after:auto!important;page-break-after:auto!important}
+      .sr-aged-page-sheet{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:2px!important;box-shadow:none!important;border:1.5px solid #9e0000!important;border-radius:10px!important;overflow:visible!important;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:7pt!important}
+      .sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:1px solid #64748b!important;border-radius:7px!important;padding:2px!important}
+      .sr-aged-page-sheet .sr-screen-head,.sr-aged-page-sheet .sr-report-title{display:none!important}
+      .sr-aged-page-sheet .sr-paper-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;border-spacing:0!important;page-break-inside:auto!important;break-inside:auto!important}
+      .sr-aged-page-sheet .sr-paper-table thead{display:table-header-group!important}
+      .sr-aged-page-sheet .sr-paper-table tbody{display:table-row-group!important}
+      .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:6.5pt!important;padding:.7mm .5mm!important;line-height:1.15!important;overflow-wrap:anywhere!important}
+      .sr-aged-page-sheet .sr-paper-table td.num{font-size:6.3pt!important;white-space:nowrap!important;direction:ltr!important}
+      .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:10mm minmax(0,2fr) minmax(0,1fr)!important;gap:1mm!important;align-items:center!important;min-height:6mm!important;padding:0 3px!important;background:#fffaf0!important;border-bottom:1px solid #64748b!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:6.5pt!important;line-height:1.1!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:8mm!important;height:5mm!important;border:1px solid #9e0000!important}
+      .sr-aged-page-sheet .sr-print-title th{font-size:7pt!important;line-height:1.1!important;padding:.5mm 1mm!important;background:#fff!important;text-align:right!important}
+      .sr-aged-page-sheet .sr-print-title th span:last-child{float:left!important;font-weight:normal!important}
+      .sr-aged-page-sheet .sr-paper-table thead .sr-group-head th{background:#fff2cc!important;color:#1f2937!important}
+      .sr-aged-page-sheet .sr-paper-table tbody tr:nth-child(even) td{background:#fffcf2!important}
+      .sr-aged-page-number{font-size:7pt!important;line-height:1.1!important;padding-top:1mm!important;text-align:center!important;color:#111827!important}
     }`;
-  const restore=()=>{ if(done) return; done=true; if(window.__activePrintRestore===restore) window.__activePrintRestore=null; document.title=old; document.body.classList.remove('printing'); ph.innerHTML=''; rule.remove(); };
-  ph.innerHTML=`<div class="sr-print" dir="rtl">${src.innerHTML}</div>`;
-  ph.querySelectorAll('select').forEach(s=>{ const t=s.options[s.selectedIndex]?s.options[s.selectedIndex].text:''; s.replaceWith(document.createTextNode(t)); });
-  ph.querySelectorAll('button,.sr-tabs,input').forEach(x=>x.remove());
-  document.head.appendChild(rule); document.body.classList.add('printing'); document.title=' ';
-  if(typeof schedulePrintRestore==='function') schedulePrintRestore(restore); else window.addEventListener('afterprint',restore,{once:true});
+  const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=old;document.body.classList.remove('printing');ph.replaceChildren();rule.remove();};
+  ph.replaceChildren(...pageNodes.map(node=>node.cloneNode(true)));
+  ph.querySelectorAll('.sr-aged-page-number').forEach((el,i)=>{el.textContent=`صفحهٔ ${fa(i+1)} از ${fa(pageNodes.length)}`;});
+  document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';
+  if(typeof schedulePrintRestore==='function')schedulePrintRestore(restore);else window.addEventListener('afterprint',restore,{once:true});
   window.print();
 }
 function exportXlsx(){
-  const R=SR.result, rows=finalWorkpaperRows(), wb=XLSX.utils.book_new();
+  if(!SR.view.selectionConfirmed){window.alert('ابتدا حساب‌ها را در تراز انتخاب و تأیید کنید.');return;}
+  const R=SR.result, rows=finalWorkpaperRows(SR.view.accountSelection instanceof Set?SR.view.accountSelection:null), wb=XLSX.utils.book_new();
   const xval=x=>{
     if(x===null||x===undefined||x===0n||x===0) return '';
     if(typeof x==='bigint') return x<=9007199254740991n&&x>=-9007199254740991n?Number(x):x.toString();
@@ -13383,24 +13468,12 @@ css.textContent=`
   .sr-print .sr-paper-table tr{break-inside:avoid;page-break-inside:avoid}
 }
 /* نسخهٔ کارت‌برگ سنواتی با هویت بصری کارت‌برگ نمونه‌گیری */
-.sr-preview-trial-balance{margin:0 0 14px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel)}.sr-preview-trial-balance>summary{cursor:pointer;font-weight:700;padding:4px 2px}.sr-preview-trial-balance .scrollx{max-height:420px;overflow:auto;margin-top:10px}
-.sr-account-picker{border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0 12px;background:var(--panel)}
 .sr-paper .sr-screen-head{grid-template-columns:11mm minmax(0,1.8fr) minmax(0,.9fr);gap:6px;padding:3px 8px}
 .sr-paper .sr-refbox{width:10mm;height:6.5mm}
 .sr-paper .sr-head-company,.sr-paper .sr-head-prep{font-size:9px;line-height:1.22}
 .sr-paper .sr-report-title{padding:2px 8px;font-size:10px;line-height:1.25}
 .sr-paper .sr-report-sub{font-size:8px;padding:2px 6px}
 
-.sr-picker-head,.sr-picker-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.sr-picker-head{margin-bottom:8px}.sr-picker-foot{margin-top:8px;color:var(--muted);font-size:.82rem}
-.sr-account-tree{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px;max-height:250px;overflow:auto}
-.sr-account-tree details{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--bg)}
-.sr-account-tree summary{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-size:.88rem}
-.sr-account-tree summary label,.sr-account-children label{display:flex;align-items:center;gap:6px;cursor:pointer}
-.sr-account-tree summary small{color:var(--muted);white-space:nowrap}
-.sr-account-children{display:grid;gap:4px;padding:7px 20px 3px;font-size:.82rem}
-.sr-account-tree input{accent-color:var(--accent)}
-.sr-level-toggle{display:flex;gap:12px;flex-wrap:wrap;font-size:.82rem}.sr-level-toggle label{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .sr-entry-card{max-width:820px;margin-inline:auto;padding:24px}
 .sr-entry-year{font-size:1rem;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .sr-entry-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
@@ -13465,6 +13538,31 @@ css.textContent=`
 .sr-paper .sr-meta-grid .sr-refbox{width:13mm;height:8.5mm;border:1.6px solid #9e0000;border-radius:50%}
 .sr-paper .sr-print-title th{display:table-cell;text-align:right}.sr-paper .sr-print-title th span:last-child{float:left;font-weight:normal}
 @media(max-width:700px){.sr-paper.sampling-template{width:297mm;max-width:none}.sr-report-shell{overflow:auto}}
+
+/* تراز شناور و انتخاب بدون بازسازی DOM؛ تغییر چک‌باکس‌ها نباید اسکرول را جابه‌جا کند. */
+.sr-tb-card{margin:0 0 14px;padding:14px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;box-shadow:0 5px 18px #14282810}
+.sr-tb-titlebar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.sr-tb-titlebar>div{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.sr-tb-titlebar small{color:#64748b}
+.sr-tb-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}.sr-tb-toolbar .sr-search{flex:1;min-width:240px}
+.sr-tb-scroll{max-height:58vh;overflow:auto;border:1px solid #cbd5e1;border-radius:10px;overscroll-behavior:contain;scrollbar-gutter:stable}
+.sr-tb-table{width:100%;min-width:1120px;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px;line-height:1.45}
+.sr-tb-table th,.sr-tb-table td{border-left:1px solid #d7dee5;border-bottom:1px solid #d7dee5;padding:6px 7px;text-align:center;vertical-align:middle}
+.sr-tb-table th:first-child,.sr-tb-table td:first-child{width:58px}.sr-tb-table th:nth-child(2),.sr-tb-table td:nth-child(2){width:78px}.sr-tb-table th:nth-child(3),.sr-tb-table td:nth-child(3){width:105px}.sr-tb-table th:nth-child(4),.sr-tb-table td:nth-child(4){width:260px}
+.sr-tb-table thead th{position:sticky;top:0;z-index:3;background:#fff2cc;color:#1f2937;box-shadow:0 1px 0 #9ca3af;font-weight:700}
+.sr-tb-table td.num{direction:ltr;white-space:nowrap;font-variant-numeric:tabular-nums}.sr-tb-table td.sr-tb-code{direction:ltr;unicode-bidi:plaintext;white-space:nowrap}.sr-tb-table td.sr-tb-title{text-align:right;white-space:normal;overflow-wrap:anywhere}
+.sr-tb-table .sr-tb-kol td{background:#edf2f7;font-weight:700;border-top:2px solid #64748b}.sr-tb-table .sr-tb-kol td:nth-child(4){text-align:right}.sr-tb-table .sr-tb-moein td.sr-tb-code,.sr-tb-table .sr-tb-moein td.sr-tb-title{padding-right:18px}.sr-tb-table .sr-tb-detail td.sr-tb-code,.sr-tb-table .sr-tb-detail td.sr-tb-title{padding-right:36px;color:#475569}.sr-tb-table .sr-tb-detail td{background:#fbfcfd;font-size:11px}
+.sr-tb-table .sr-tb-total td{background:#fff2cc;font-weight:700;border-top:2px solid #9e0000}.sr-tb-table input[type=checkbox]{width:17px;height:17px;accent-color:#9e0000;vertical-align:middle;cursor:pointer}
+.sr-tb-period{padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;font-size:.83rem}.sr-tb-period b{font-variant-numeric:tabular-nums;white-space:nowrap}.sr-tb-footer{margin:10px 0 0;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.sr-tb-footer span{color:#64748b;font-size:.82rem}.sr-tb-footer button:disabled{opacity:.5;cursor:not-allowed}
+.sr-final-preview{position:relative;overflow:visible}.sr-confirm-panel{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:14px;border:1px dashed #b7c2cc;border-radius:10px;color:#334155;background:#f8fafc}.sr-confirm-panel span{font-size:.86rem;color:#64748b}.sr-stale-preview{opacity:.48;filter:grayscale(.18)}
+.sr-aged-preview-pages{display:flex;flex-direction:column;align-items:center;gap:16px;max-width:100%;overflow-x:auto;padding:6px 2px 16px;scrollbar-gutter:stable}
+.sample-paper-box.sr-aged-page{box-sizing:border-box;width:297mm;height:210mm;min-height:210mm;padding:16mm 7.5mm 14mm;margin:0 auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 18px #00000014;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;overflow:hidden;break-after:page;page-break-after:always}
+.sr-aged-page-sheet{box-sizing:border-box;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:2px!important;box-shadow:none!important;border:1.5px solid #9e0000!important;border-radius:10px!important;overflow:visible!important}
+.sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:1px solid #64748b!important;border-radius:7px!important;padding:2px!important}
+.sr-aged-page-sheet .sr-screen-head{grid-template-columns:10mm minmax(0,2fr) minmax(0,1fr);gap:1.5mm;padding:2px 5px}.sr-aged-page-sheet .sr-refbox{width:8mm;height:5mm}.sr-aged-page-sheet .sr-head-company,.sr-aged-page-sheet .sr-head-prep{font-size:9px;line-height:1.25}.sr-aged-page-sheet .sr-head-prep{padding-right:5px}
+.sr-aged-page-sheet .sr-report-title{font-size:9px;padding:1px 5px}.sr-aged-page-sheet .sr-screen-head,.sr-aged-page-sheet .sr-report-title{display:none!important}.sr-aged-page-sheet .sr-rows-box{overflow:visible}
+.sr-aged-page-sheet .sr-meta-grid{grid-template-columns:10mm minmax(0,2fr) minmax(0,1fr);gap:1mm;padding:1px 4px}.sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:8mm;height:5mm}.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:7px;line-height:1.15}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{padding-right:4px}
+.sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{padding:2px 1.5px;line-height:1.16}.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-meta,.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-title{display:table-row}.sr-aged-page-sheet .sr-paper-table .sr-print-title th{font-size:8px;padding:1px 4px}
+.sr-aged-page-number{flex:0 0 auto;margin-top:2px;padding-top:2px;text-align:center;font-size:10px;font-weight:700;color:#334155}.sr-aged-page-overflow{height:auto!important;min-height:210mm!important;overflow:visible!important;border-color:#b91c1c;box-shadow:0 0 0 2px #fecaca}
+@media(max-width:720px){.sr-tb-titlebar,.sr-tb-footer{align-items:stretch}.sr-tb-titlebar>div,.sr-tb-toolbar{width:100%}.sr-aged-preview-pages{align-items:flex-start}}
 `;
 document.head.appendChild(css);
 })();
