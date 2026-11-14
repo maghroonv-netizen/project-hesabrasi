@@ -12201,7 +12201,7 @@ el('routerForget').onclick=()=>{
 'use strict';
 if(typeof SRE==='undefined') return;
 const U=SRE.UNKNOWN;
-const SR={files:[],auditId:null,seq:0,mapped:false,model:null,result:null,priorModel:null,priorResult:null,nextModel:null,nextResult:null,priorWorkpaper:null,roles:new Map(),tagOverrides:new Map(),
+const SR={files:[],auditId:null,seq:0,mapped:false,model:null,result:null,priorModel:null,priorResult:null,nextModel:null,nextResult:null,priorWorkpaper:null,partyNameMatches:[],roles:new Map(),tagOverrides:new Map(),
   linkSug:[],linkOk:new Set(),codingSug:[],codingOk:new Set(),
   settings:{thresholds:[12],cutoffMethod:'months',inclusive:true},
   view:{tab:'work',T:0,filter:'',limit:200,key:null,accFilter:'',tagFilter:'',tbFilter:'',tbSelection:new Set(),accountSelection:null,selectionConfirmed:false},busy:false};
@@ -12711,6 +12711,37 @@ function buildModel(){
 }
 
 /* ------------------------------------------------------ مرحلهٔ ۴: حساب‌ها */
+function partyNameMatchCandidates(){
+  const groups=srTrialBalanceData();
+  const receive=/دریافتنی|بدهکاران|حساب\s*های\s*دریافت|مشتریان|طلبکاران/;
+  const pay=/پرداختنی|بستانکاران|حساب\s*های\s*پرداخت|فروشندگان|تامین\s*کنندگان|تأمین\s*کنندگان/;
+  const people={receivable:[],payable:[]};
+  const categoryWords=new Set(['حساب','حسابها','حسابهای','های','اشخاص','شخص','دریافتنی','پرداختنی','بدهکاران','بستانکاران','مشتریان','مشتری','فروشندگان','فروشنده','تامین','تأمین','کنندگان','کننده','طلبکاران']);
+  for(const g of groups) for(const a of g.accounts){
+    const context=SRE.normText(g.kolT+' '+a.moeinT);
+    const side=receive.test(context)?'receivable':(pay.test(context)?'payable':'');
+    if(!side) continue;
+    const title=String(a.moeinT||'').trim(), normalized=SRE.normText(title);
+    const tokens=normalized.split(/\s+/).filter(word=>word&&!categoryWords.has(word)).sort();
+    if(tokens.length<2) continue;
+    people[side].push({id:a.id,code:a.moein,title,normalized,tokens,kolT:g.kolT});
+  }
+  const matches=[], payableByToken=new Map();
+  for(const creditor of people.payable) for(const token of new Set(creditor.tokens)){
+    if(!payableByToken.has(token)) payableByToken.set(token,[]);
+    payableByToken.get(token).push(creditor);
+  }
+  for(const debtor of people.receivable){
+    const candidates=new Set(debtor.tokens.flatMap(token=>payableByToken.get(token)||[]));
+    for(const creditor of candidates){
+      if(debtor.id===creditor.id) continue;
+      const sameTokens=debtor.tokens.length===creditor.tokens.length&&debtor.tokens.every((t,i)=>t===creditor.tokens[i]);
+      const score=sameTokens?1:SRE.similarity(debtor.tokens.join(' '),creditor.tokens.join(' '));
+      if(sameTokens||score>=0.88) matches.push({debtor,creditor,score,exact:sameTokens});
+    }
+  }
+  return matches.sort((a,b)=>b.score-a.score||a.debtor.title.localeCompare(b.debtor.title,'fa')).slice(0,100);
+}
 function renderAccounts(){
   const host=$('srS4'); if(!host) return;
   const accs=[...SR.model.accounts.values()].sort((a,b)=>(a.kol+'|'+a.moein).localeCompare(b.kol+'|'+b.moein,'fa',{numeric:true}));
@@ -12719,8 +12750,10 @@ function renderAccounts(){
   accs.forEach(a=>{const key=String(a.kol||'');if(!groups.has(key))groups.set(key,{kol:a.kol||'—',title:a.kolT||'—',accounts:[]});const g=groups.get(key);if(a.kolT)g.title=a.kolT;g.accounts.push(a);});
   const visibleGroups=[...groups.values()].map(g=>({...g,shown:g.accounts.filter(a=>!q||SRE.normText(a.kol+' '+a.moein+' '+a.kolT+' '+a.moeinT).includes(q))})).filter(g=>g.shown.length);
   const pending=[...SR.roles.values()].filter(r=>!r.confirmed).length;
+  const nameMatches=partyNameMatchCandidates(); SR.partyNameMatches=nameMatches;
   host.innerHTML=`
     <h1>تعیین نوع و ماهیت حساب‌ها</h1>
+    ${nameMatches.length?`<div class="card sr-party-match-warning" role="status"><b>عناوین مشابه در دریافتنی و پرداختنی نیازمند بررسی (${fa(nameMatches.length)})</b><p class="hint">این موارد فقط پیشنهاد تطبیق‌اند؛ هیچ حسابی به‌طور خودکار ادغام یا اصلاح نمی‌شود. لطفاً مشخص کنید آیا واقعاً به یک شخص مربوط‌اند.</p><div class="scrollx"><table class="sr-t"><thead><tr><th>معین دریافتنی</th><th>معین پرداختنی</th><th>شباهت</th></tr></thead><tbody>${nameMatches.map(m=>`<tr><td>${fa(e_(m.debtor.code))} — ${e_(m.debtor.title)}</td><td>${fa(e_(m.creditor.code))} — ${e_(m.creditor.title)}</td><td>${m.exact?'نام یکسان با ترتیب واژه‌های متفاوت':'شباهت احتمالی ('+Math.round(m.score*100)+'٪)'}</td></tr>`).join('')}</tbody></table></div></div>`:''}
     <p class="sub">همه حساب‌های واجد شرایط در محاسبات لحاظ می‌شوند. در این مرحله فقط نوع و ماهیت حساب‌ها را بازبینی کنید؛ انتخاب یا حذف حساب از دامنه رسیدگی انجام نمی‌شود.</p>
     <div class="card">
       <div class="sr-row"><input class="sr-search" id="srAccQ" placeholder="جست‌وجوی کد یا عنوان کل و معین" value="${e_(SR.view.accFilter)}">
@@ -12872,17 +12905,16 @@ function applyTrialBalanceFilter(root){
   const q=SRE.normText(input.value||''),rows=[...table.querySelectorAll('tbody tr[data-tb-kind]')],moeinById=new Map(rows.filter(x=>x.dataset.tbKind==='moein').map(x=>[x.dataset.tbAccount,x]));
   if(!q){rows.forEach(x=>x.hidden=false);return;}
   const accountHit=new Set(),kolDirect=new Set(),kolHasMatch=new Set();
-  rows.filter(x=>x.dataset.tbKind==='detail'&&SRE.normText(x.dataset.search||'').includes(q)).forEach(x=>accountHit.add(x.dataset.tbAccount));
-  rows.filter(x=>x.dataset.tbKind==='moein').forEach(x=>{if(SRE.normText(x.dataset.search||'').includes(q))accountHit.add(x.dataset.tbAccount);});
+  rows.filter(x=>x.dataset.tbKind==='moein'&&SRE.normText(x.dataset.search||'').includes(q)).forEach(x=>accountHit.add(x.dataset.tbAccount));
   rows.filter(x=>x.dataset.tbKind==='kol'&&SRE.normText(x.dataset.search||'').includes(q)).forEach(x=>kolDirect.add(x.querySelector('[data-pick-kol]')?.dataset.pickKol||''));
   accountHit.forEach(id=>{const account=moeinById.get(id);if(account)kolHasMatch.add(account.dataset.tbKol||'');});
   rows.forEach(x=>{
     const kind=x.dataset.tbKind;
     if(kind==='kol'){const code=x.querySelector('[data-pick-kol]')?.dataset.pickKol||'';x.hidden=!(kolDirect.has(code)||kolHasMatch.has(code));}
-    else if(kind==='moein'){const account=x.dataset.tbAccount,kol=x.dataset.tbKol;x.hidden=!(kolDirect.has(kol)||accountHit.has(account));}
-    else {const account=x.dataset.tbAccount,moein=moeinById.get(account),kol=moein?.dataset.tbKol;x.hidden=!(moein&&!moein.hidden&&(kolDirect.has(kol)||accountHit.has(account)||SRE.normText(x.dataset.search||'').includes(q)));}
+    else {const account=x.dataset.tbAccount,kol=x.dataset.tbKol;x.hidden=!(kolDirect.has(kol)||accountHit.has(account));}
   });
 }
+
 function paginateWorkpaperPreview(host){
   const source=host?.querySelector('.sr-workpaper-source'),sourceTable=source?.querySelector('.sr-paper-table');if(!source||!sourceTable)return;
   const body=sourceTable.tBodies[0];if(!body)return;
@@ -13147,20 +13179,12 @@ function trialBalancePreviewHtml(){
   const searchText=(...parts)=>e_(SRE.normText(parts.filter(Boolean).join(' ')));
   const rows=groups.map(g=>{
     const ids=g.accounts.map(a=>a.id),n=ids.filter(id=>selected.has(id)).length;
-    const children=g.accounts.map(a=>{
-      const detailRows=a.details.map(d=>{
-        const vals=d.levels.filter(x=>x.code||x.title).map(x=>[x.label,x.code,x.title].filter(Boolean).join(' '));
-        const code=d.levels.filter(x=>x.code).map(x=>x.code).join(' / ')||'—';
-        const title=d.levels.filter(x=>x.title).map(x=>x.title).join(' / ')||'—';
-        return `<tr class="sr-tb-detail" data-tb-kind="detail" data-tb-account="${e_(a.id)}" data-search="${searchText(g.kol,g.kolT,a.moein,a.moeinT,...vals)}"><td></td><td>تفصیلی</td><td class="sr-tb-code">${fa(e_(code))}</td><td class="sr-tb-title">${e_(title)}</td><td>${bal(d.openingDebit,d.openingCredit)}</td><td class="num">${num(d.debit)}</td><td class="num">${num(d.credit)}</td><td>${bal(d.openingDebit+d.debit,d.openingCredit+d.credit)}</td></tr>`;
-      }).join('');
-      return `<tr class="sr-tb-moein" data-tb-kind="moein" data-tb-account="${e_(a.id)}" data-tb-kol="${e_(g.kol)}" data-search="${searchText(g.kol,g.kolT,a.moein,a.moeinT)}"><td><input type="checkbox" data-pick-account="${e_(a.id)}" aria-label="انتخاب معین ${fa(e_(a.moein))}" ${selected.has(a.id)?'checked':''}></td><td>معین</td><td class="sr-tb-code">${fa(e_(a.moein))}</td><td class="sr-tb-title">${e_(a.moeinT)}</td><td>${bal(a.openingDebit,a.openingCredit)}</td><td class="num">${num(a.debit)}</td><td class="num">${num(a.credit)}</td><td>${bal(a.openingDebit+a.debit,a.openingCredit+a.credit)}</td></tr>${detailRows}`;
-    }).join('');
+    const children=g.accounts.map(a=>`<tr class="sr-tb-moein" data-tb-kind="moein" data-tb-account="${e_(a.id)}" data-tb-kol="${e_(g.kol)}" data-search="${searchText(g.kol,g.kolT,a.moein,a.moeinT)}"><td><input type="checkbox" data-pick-account="${e_(a.id)}" aria-label="انتخاب معین ${fa(e_(a.moein))}" ${selected.has(a.id)?'checked':''}></td><td>معین</td><td class="sr-tb-code">${fa(e_(a.moein))}</td><td class="sr-tb-title">${e_(a.moeinT)}</td><td>${bal(a.openingDebit,a.openingCredit)}</td><td class="num">${num(a.debit)}</td><td class="num">${num(a.credit)}</td><td>${bal(a.openingDebit+a.debit,a.openingCredit+a.credit)}</td></tr>`).join('');
     return `<tr class="sr-tb-kol" data-tb-kind="kol" data-search="${searchText(g.kol,g.kolT)}"><td><input type="checkbox" data-pick-kol="${e_(g.kol)}" aria-label="انتخاب همهٔ حساب‌های معین کل ${fa(e_(g.kol))}" ${n===ids.length&&ids.length?'checked':''}></td><td>کل</td><td class="sr-tb-code">${fa(e_(g.kol))}</td><td class="sr-tb-title"><b>${e_(g.kolT)}</b><small class="sr-tree-count">${fa(n)} از ${fa(ids.length)} معین</small></td><td>${bal(g.total.openingDebit,g.total.openingCredit)}</td><td class="num">${num(g.total.debit)}</td><td class="num">${num(g.total.credit)}</td><td>${bal(g.total.openingDebit+g.total.debit,g.total.openingCredit+g.total.credit)}</td></tr>${children}`;
   }).join('');
   return `<section class="sr-tb-card" aria-label="تراز شناور و انتخاب حساب‌ها">
-    <div class="sr-tb-titlebar"><div><b>تراز شناور سال جاری — ${e_(srCurrentYearLabel())}</b><small>سطوح کل، معین و تفصیلی</small></div><span class="sr-chip" id="srTbSelectedCount">${fa(selectedCount)} از ${fa(all.length)} حساب معین انتخاب شده</span></div>
-    <div class="sr-tb-toolbar"><label class="sr-tb-selectall"><input type="checkbox" id="srTbSelectAll" ${all.length&&selectedCount===all.length?'checked':''}> انتخاب همهٔ حساب‌های معین</label><input class="sr-search" id="srTbFilter" placeholder="جست‌وجوی کد یا عنوان کل، معین و تفصیلی" value="${e_(SR.view.tbFilter||'')}"></div>
+    <div class="sr-tb-titlebar"><div><b>تراز شناور سال جاری — ${e_(srCurrentYearLabel())}</b><small>سطوح کل و معین</small></div><span class="sr-chip" id="srTbSelectedCount">${fa(selectedCount)} از ${fa(all.length)} حساب معین انتخاب شده</span></div>
+    <div class="sr-tb-toolbar"><label class="sr-tb-selectall"><input type="checkbox" id="srTbSelectAll" ${all.length&&selectedCount===all.length?'checked':''}> انتخاب همهٔ حساب‌های معین</label><input class="sr-search" id="srTbFilter" placeholder="جست‌وجوی کد یا عنوان کل و معین" value="${e_(SR.view.tbFilter||'')}"></div>
     <div class="sr-tb-period"><span>مانده ابتدای سال</span><b>${bal(total.openingDebit,total.openingCredit)}</b><span>گردش بدهکار</span><b>${num(total.debit)||'۰'}</b><span>گردش بستانکار</span><b>${num(total.credit)||'۰'}</b><span>مانده پایان</span><b>${bal(total.openingDebit+total.debit,total.openingCredit+total.credit)}</b></div>
     <div class="sr-tb-scroll" id="srTbScroll"><table class="sr-tb-table" id="srTbTable"><thead><tr><th>انتخاب</th><th>سطح</th><th>کد</th><th>عنوان حساب</th><th>مانده ابتدا</th><th>گردش بدهکار</th><th>گردش بستانکار</th><th>مانده پایان</th></tr></thead><tbody>${rows||'<tr><td colspan="8">ردیف حسابی برای تراز پیدا نشد.</td></tr>'}<tr class="sr-tb-total"><td></td><td colspan="3">جمع کل تراز</td><td>${bal(total.openingDebit,total.openingCredit)}</td><td class="num">${num(total.debit)||'۰'}</td><td class="num">${num(total.credit)||'۰'}</td><td>${bal(total.openingDebit+total.debit,total.openingCredit+total.credit)}</td></tr></tbody></table></div>
     <div class="sr-tb-footer"><span id="srTbSelectionHint" aria-live="polite">${SR.view.selectionConfirmed?'حساب‌ها تأیید شده‌اند. با تغییر انتخاب، دوباره تأیید کنید.':'همهٔ حساب‌های معین به‌طور پیش‌فرض انتخاب شده‌اند؛ تیک هر «کل» همهٔ معین‌های زیرمجموعه را تغییر می‌دهد. برای ساخت/به‌روزرسانی کاربرگ، تأیید را بزنید.'}</span><button type="button" class="confirm" id="srConfirmAccounts" ${all.length?'':'disabled'}>تأیید حساب‌ها و ساخت کاربرگ</button></div>
@@ -13281,7 +13305,7 @@ function printReport(){
   if(!pageNodes.length){window.alert('پیش‌نمایش صفحه‌بندی‌شده آماده نیست؛ پس از تأیید حساب‌ها دوباره تلاش کنید.');return;}
   if(pageNodes.some(page=>page.classList.contains('sr-aged-page-overflow'))){window.alert('یک ردیف در صفحه جا نشده است؛ برای جلوگیری از بریدن اطلاعات، چاپ متوقف شد. لطفاً ردیف‌های بسیار بلند را بررسی کنید.');return;}
   if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
-  const ph=$('printHost');if(!ph)return;
+  const ph=$('printHost');if(!ph){window.alert('بخش چاپ در صفحه پیدا نشد؛ صفحه را تازه‌سازی و دوباره تلاش کنید.');return;}
   let done=false;const old=document.title,rule=document.createElement('style');rule.dataset.srLandscapePrint='true';
   rule.textContent=`@page srAgedLandscape{size:A4 landscape;margin:0!important}
     @media print{
@@ -13312,10 +13336,12 @@ function printReport(){
   ph.querySelectorAll('.sr-aged-page-number').forEach((el,i)=>{el.textContent=`صفحهٔ ${fa(i+1)} از ${fa(pageNodes.length)}`;});
   document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';
   if(typeof schedulePrintRestore==='function')schedulePrintRestore(restore);else window.addEventListener('afterprint',restore,{once:true});
-  window.print();
+  try{window.print();}catch(error){restore();console.error('Aged workpaper print failed',error);window.alert('بازکردن پنجرهٔ چاپ ناموفق بود: '+(error?.message||String(error)));}
 }
 function exportXlsx(){
   if(!SR.view.selectionConfirmed){window.alert('ابتدا حساب‌ها را در تراز انتخاب و تأیید کنید.');return;}
+  if(typeof XLSX==='undefined'||!XLSX.utils){window.alert('کتابخانهٔ ساخت فایل اکسل بارگذاری نشده است؛ صفحه را تازه‌سازی و دوباره تلاش کنید.');return;}
+  try{
   const R=SR.result, rows=finalWorkpaperRows(SR.view.accountSelection instanceof Set?SR.view.accountSelection:null), wb=XLSX.utils.book_new();
   const xval=x=>{
     if(x===null||x===undefined||x===0n||x===0) return '';
@@ -13358,7 +13384,8 @@ function exportXlsx(){
   const exws=XLSX.utils.aoa_to_sheet(ex); exws['!cols']=[{wch:30},{wch:12},{wch:12},{wch:42},{wch:20},{wch:72}]; exws['!freeze']={xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
   XLSX.utils.book_append_sheet(wb,exws,'استثناها');
   wb.Workbook={Views:[{RTL:true}]};
-  XLSX.writeFile(wb,'کاربرگ-اقلام-سنواتی-و-راکد-۱۴۰۴.xlsx');
+  XLSX.writeFile(wb,'کاربرگ-اقلام-سنواتی-و-راکد-۱۴۰۴.xlsx',{bookType:'xlsx',compression:true});
+  }catch(error){console.error('Aged workpaper XLSX export failed',error);window.alert('ساخت فایل اکسل ناموفق بود: '+(error?.message||String(error)));}
 }
 
 /* ------------------------------------------------------------- سبک‌ها */
@@ -13392,6 +13419,7 @@ css.textContent=`
 .sr-search{padding:8px 10px;border:1px solid var(--line);border-radius:8px;min-width:240px;background:var(--panel);color:var(--ink);font:inherit}
 .sr-ok{color:var(--ok);font-weight:600}.sr-pend{color:var(--muted)}
 .sr-okbar{background:var(--ok-bg);color:var(--ok);padding:10px 14px;border-radius:10px;font-size:.88rem}
+.sr-party-match-warning{border-color:#d97706;background:#fff7ed}.sr-party-match-warning>p{margin:.4em 0}.sr-party-match-warning .sr-t th{background:#ffedd5}
 .sr-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .sr-tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer;font:inherit;font-size:.85rem}
 .sr-tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
