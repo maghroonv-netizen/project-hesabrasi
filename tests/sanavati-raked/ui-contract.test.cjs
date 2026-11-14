@@ -61,6 +61,19 @@ const balanceMarkup = html.slice(balanceStart, balanceEnd);
 assert.doesNotMatch(balanceMarkup, /data-tb-kind="detail"|data-pick-detail|تفصیلی<\/small>/);
 assert.match(balanceMarkup, /data-pick-kol/);
 assert.match(balanceMarkup, /data-pick-account/);
+assert.ok(balanceMarkup.includes("return x<0?'('+fmtB(-x)+')':(x>0?fmtB(x):'۰')"));
+assert.doesNotMatch(balanceMarkup, /\(بستانکار\)|\(بدهکار\)/);
+
+const workpaperStart = html.indexOf('function workpaperHtml(){');
+const workpaperEnd = html.indexOf('\nfunction layerTable(', workpaperStart);
+const workpaperMarkup = html.slice(workpaperStart, workpaperEnd);
+assert.match(workpaperMarkup, /نام واحد مورد رسیدگی/);
+assert.match(workpaperMarkup, /موضوع :/);
+assert.match(workpaperMarkup, /سال مالی مورد رسیدگی/);
+assert.match(workpaperMarkup, /تهیه‌کننده :/);
+assert.match(workpaperMarkup, /بررسی‌کننده :/);
+assert.doesNotMatch(workpaperMarkup, /sr-report-title|sr-print-title/);
+assert.match(workpaperMarkup, /sr-refbox/);
 
 const printStart = html.indexOf('function printReport(){');
 const exportStart = html.indexOf('function exportXlsx(){', printStart);
@@ -73,5 +86,14 @@ assert.match(printCode, /window\.print\(\)/);
 assert.match(exportCode, /selectionConfirmed/);
 assert.match(exportCode, /XLSX\.utils\.book_new\(\)/);
 assert.match(exportCode, /XLSX\.writeFile\(/);
+assert.match(exportCode, /x\.code==='TRANSFER_REVIEW'&&x\.fileId===currentFileId/);
+assert.doesNotMatch(exportCode, /const allResults=\[R,SR\.priorResult,SR\.nextResult\]/);
+assert.match(html, /انتقال‌های حساب سال مورد رسیدگی نیازمند بررسی/);
+assert.match(html, /هشدارهای نیازمند بررسی:<\/b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر/);
+const bindingStart = html.indexOf('function bindReport(){');
+const bindingEnd = html.indexOf('\nfunction totalsRow(', bindingStart);
+const bindingCode = html.slice(bindingStart, bindingEnd);
+assert.match(bindingCode, /const print=\$\('srPrint'\),xlsx=\$\('srXlsx'\);if\(print\)print\.disabled=false/);
+assert.match(bindingCode, /const print=\$\('srPrint'\),xlsx=\$\('srXlsx'\);if\(print\)print\.disabled=true/);
 
 console.log('PASS: reversed/fuzzy party-name suggestions, kol/moein-only balance, and confirmed print/XLSX paths');

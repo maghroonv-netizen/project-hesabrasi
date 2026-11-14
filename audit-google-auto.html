@@ -12861,7 +12861,7 @@ function runAnalysis(){
 }
 /* ------------------------------------------------------ مرحلهٔ ۶: گزارش‌ها */
 /* ------------------------------------------------------ مرحلهٔ ۶: گزارش‌ها */
-const TABS=[['work','کاربرگ اقلام سنواتی و راکد'],['exc','استثناها'],['help','روش محاسبه']];
+const TABS=[['work','کاربرگ اقلام سنواتی و راکد'],['exc','انتقال‌های نیازمند بررسی'],['help','روش محاسبه']];
 function keysShown(){
   const R=SR.result, q=SRE.normText(SR.view.filter);
   return R.keys.filter(k=>k.endSide&&(!q||SRE.normText(k.title+' '+k.key).includes(q))).sort((a,b)=>(b.end>a.end?1:(b.end<a.end?-1:0)));
@@ -12967,7 +12967,7 @@ function bindReport(){
   const invalidatePreview=()=>{
     const wasConfirmed=SR.view.selectionConfirmed;SR.view.selectionConfirmed=false;
     const preview=r.querySelector('#srFinalPreview');if(preview&&wasConfirmed)preview.classList.add('sr-stale-preview');
-    const print=r.querySelector('#srPrint'),xlsx=r.querySelector('#srXlsx');if(print)print.disabled=true;if(xlsx)xlsx.disabled=true;
+    const print=$('srPrint'),xlsx=$('srXlsx');if(print)print.disabled=true;if(xlsx)xlsx.disabled=true;
     syncSelectionUI();
   };
   const setSelection=(next)=>{SR.view.accountSelection=next.size===allAccounts.length?null:next;invalidatePreview();};
@@ -12979,7 +12979,7 @@ function bindReport(){
     const selected=currentSelection();if(!selected.size){window.alert('برای ساخت کاربرگ دست‌کم یک حساب معین را انتخاب کنید.');return;}
     SR.view.accountSelection=selected.size===allAccounts.length?null:selected;SR.view.selectionConfirmed=true;
     const preview=r.querySelector('#srFinalPreview');if(preview){preview.classList.remove('sr-stale-preview');preview.innerHTML=workpaperHtml();paginateWorkpaperPreview(preview);}
-    const print=r.querySelector('#srPrint'),xlsx=r.querySelector('#srXlsx');if(print)print.disabled=false;if(xlsx)xlsx.disabled=false;
+    const print=$('srPrint'),xlsx=$('srXlsx');if(print)print.disabled=false;if(xlsx)xlsx.disabled=false;
     syncSelectionUI();
   };
   applyTrialBalanceFilter(r);syncSelectionUI();
@@ -13174,7 +13174,7 @@ function trialBalancePreviewHtml(){
   const selected=SR.view.accountSelection instanceof Set?SR.view.accountSelection:new Set(all);
   const selectedCount=all.filter(id=>selected.has(id)).length;
   const num=v=>v?fmtB(v):'';
-  const bal=(dr,cr)=>{const x=(dr||0)-(cr||0);return x?fmtB(Math.abs(x))+(x<0?' (بستانکار)':' (بدهکار)'):'۰';};
+  const bal=(dr,cr)=>{const x=(dr||0)-(cr||0);return x<0?'('+fmtB(-x)+')':(x>0?fmtB(x):'۰');};
   const total=groups.reduce((t,g)=>({openingDebit:t.openingDebit+g.total.openingDebit,openingCredit:t.openingCredit+g.total.openingCredit,debit:t.debit+g.total.debit,credit:t.credit+g.total.credit}),{openingDebit:0,openingCredit:0,debit:0,credit:0});
   const searchText=(...parts)=>e_(SRE.normText(parts.filter(Boolean).join(' ')));
   const rows=groups.map(g=>{
@@ -13201,9 +13201,9 @@ function tabHtml(tab){
   }
   if(tab==='exc'){
     const q=SRE.normText(SR.view.filter), title=k=>(SR.model.keys.get(k)||{}).title||k;
-    const list=R.exceptions.filter(x=>!q||SRE.normText((EXC_LABEL[x.code]||x.code)+' '+(x.key||'')+' '+title(x.key)+' '+(x.detail||'')).includes(q));
-    return `<h2>موارد نیازمند بررسی (${fa(list.length)})</h2><div class="scrollx"><table class="sr-t"><thead><tr><th>مورد</th><th>سال</th><th>حساب / تفصیلی</th><th>مبلغ</th><th>توضیح</th></tr></thead><tbody>
-      ${list.slice(0,1000).map(x=>{const f=SR.model.files.find(y=>y.id===x.fileId);return `<tr><td>${EXC_LABEL[x.code]||x.code}</td><td>${e_(f?f.label:'')}</td><td>${e_(x.key?title(x.key):(x.account||''))}</td><td>${x.amount!=null?fmtB(x.amount):'—'}</td><td>${e_(fa(x.detail||''))}</td></tr>`;}).join('')||'<tr><td colspan="5">موردی ثبت نشده است.</td></tr>'}
+    const list=R.exceptions.filter(x=>x.code==='TRANSFER_REVIEW'&&x.fileId===R.audit.id&&(!q||SRE.normText((EXC_LABEL[x.code]||x.code)+' '+(x.key||'')+' '+title(x.key)+' '+(x.detail||'')).includes(q)));
+    return `<h2>انتقال‌های حساب سال مورد رسیدگی نیازمند بررسی (${fa(list.length)})</h2><p class="hint">فقط انتقال‌های ثبت‌شده در سال رسیدگی جاری نمایش داده می‌شوند. هشدارها به‌تنهایی مانده حساب را اصلاح یا کسر نمی‌کنند.</p><div class="scrollx"><table class="sr-t"><thead><tr><th>مورد</th><th>حساب / تفصیلی</th><th>مبلغ انتقال</th><th>توضیح</th></tr></thead><tbody>
+      ${list.slice(0,1000).map(x=>`<tr><td>${EXC_LABEL[x.code]||x.code}</td><td>${e_(x.key?title(x.key):(x.account||''))}</td><td>${x.amount!=null?fmtB(x.amount):'—'}</td><td>${e_(fa(x.detail||''))}</td></tr>`).join('')||'<tr><td colspan="4">انتقالی برای بررسی در سال مورد رسیدگی ثبت نشده است.</td></tr>'}
     </tbody></table></div>`;
   }
   if(tab==='help') return helpHtml();
@@ -13218,27 +13218,45 @@ function workpaperHtml(){
   const balance=v=>v===null||v===undefined||v===0n?'':signedBalanceText(v);
   const showTaf1=!!SR.view.showTaf1, showTaf2=!!SR.view.showTaf2;
   const visibleCols=9+(showTaf1?2:0)+(showTaf2?2:0);
+  const auditYear=SR.result?.audit?.label||'۱۴۰۴';
+  const fiscalYear=cfg.year||auditYear;
+  const periodEnd=SR.result?.audit?.end?fmtD(SR.result.audit.end):fiscalYear;
   const widths=showTaf1&&showTaf2?[5,7,5,7,5,7,5,7,9,9,11,10,13]:showTaf1?[6,10,6,10,6,10,0,0,9,9,11,10,13]:showTaf2?[6,10,6,10,0,0,6,10,9,9,11,10,13]:[8,14,8,14,0,0,0,0,10,10,12,10,13];
   const colgroup='<colgroup>'+widths.map((w,i)=>`<col style="width:${w}%;"${(i===4||i===5)?' data-level="taf1"':''}${(i===6||i===7)?' data-level="taf2"':''}>`).join('')+'</colgroup>';
-  const auditYear=SR.result?.audit?.label||'۱۴۰۴';
   return `<section class="sheet sampling-template sr-paper sr-workpaper-source" dir="rtl">
     <div class="inner">
       <div class="meta sr-screen-head">
-        <div class="ref-oval sr-refbox" aria-label="محل درج عطف کاربرگ"></div>
-        <div class="big sr-head-company"><div><span class="k">شرکت:</span> <span class="v">${e_(cfg.company||'—')}</span> <span class="k">· دوره:</span> <span class="v">${e_(auditYear)}</span></div></div>
-        <div class="side sr-head-prep"><div>تهیه: ${e_(cfg.prep||'—')} · بررسی: ${e_(cfg.rev||'—')}</div><div>تاریخ: ${e_(cfg.date||today)}</div></div>
+        <div class="sr-refbox" aria-label="محل درج عطف کاربرگ"></div>
+        <div class="sr-head-company">
+          <div><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${e_(cfg.company||'—')}</span></div>
+          <div><span class="k">موضوع :</span> <span class="v">کاربرگ اقلام سنواتی و راکد</span></div>
+          <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span> <span class="k">(تاریخ ترازنامه :</span> <span class="v">${e_(periodEnd)} )</span></div>
+          <small class="sr-currency-note">ارقام به ریال</small>
+        </div>
+        <div class="side sr-head-prep">
+          <div><span class="k">تاریخ تهیه :</span> <span class="v">${e_(cfg.date||today)}</span></div>
+          <div><span class="k">تهیه‌کننده :</span> <span class="v">${e_(cfg.prep||'—')}</span></div>
+          <div><span class="k">بررسی‌کننده :</span> <span class="v">${e_(cfg.rev||'—')}</span></div>
+        </div>
       </div>
-      <div class="path sr-report-title"><b>کاربرگ اقلام سنواتی و راکد</b><span>مبالغ به ریال</span></div>
       <div class="frame sr-rows-box">
         <table class="sr-paper-table ${showTaf1?'show-taf1':''} ${showTaf2?'show-taf2':''}">
           ${colgroup}
           <thead>
             <tr class="sr-print-meta"><th colspan="${visibleCols}"><div class="meta sr-meta-grid">
-              <div class="ref-oval sr-refbox" aria-label="محل درج عطف کاربرگ"></div>
-              <div class="big sr-head-company"><div><span class="k">شرکت:</span> <span class="v">${e_(cfg.company||'—')}</span> <span class="k">· دوره:</span> <span class="v">${e_(auditYear)}</span></div></div>
-              <div class="side sr-head-prep"><div>تهیه: ${e_(cfg.prep||'—')} · بررسی: ${e_(cfg.rev||'—')}</div><div>تاریخ: ${e_(cfg.date||today)}</div></div>
+              <div class="sr-refbox" aria-label="محل درج عطف کاربرگ"></div>
+              <div class="sr-head-company">
+                <div><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${e_(cfg.company||'—')}</span></div>
+                <div><span class="k">موضوع :</span> <span class="v">کاربرگ اقلام سنواتی و راکد</span></div>
+                <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span> <span class="k">(تاریخ ترازنامه :</span> <span class="v">${e_(periodEnd)} )</span></div>
+                <small class="sr-currency-note">ارقام به ریال</small>
+              </div>
+              <div class="side sr-head-prep">
+                <div><span class="k">تاریخ تهیه :</span> <span class="v">${e_(cfg.date||today)}</span></div>
+                <div><span class="k">تهیه‌کننده :</span> <span class="v">${e_(cfg.prep||'—')}</span></div>
+                <div><span class="k">بررسی‌کننده :</span> <span class="v">${e_(cfg.rev||'—')}</span></div>
+              </div>
             </div></th></tr>
-            <tr class="sr-print-title"><th colspan="${visibleCols}"><span>کاربرگ اقلام سنواتی و راکد</span><span>مبالغ به ریال</span></th></tr>
             <tr class="cols sr-group-head">
               <th>کد معین</th><th>عنوان معین</th>
               <th>کد تفصیلی</th><th>عنوان تفصیلی</th><th data-level="taf1">کد تفصیلی ۱</th><th data-level="taf1">عنوان تفصیلی ۱</th><th data-level="taf2">کد تفصیلی ۲</th><th data-level="taf2">عنوان تفصیلی ۲</th>
@@ -13293,8 +13311,9 @@ function helpHtml(){
     <p><b>ادغام سنواتی و راکد:</b> سنواتی و راکد دو گروه مستقل برای جمع‌زدن نیستند و می‌توانند یک لایه مشترک داشته باشند. برنامه به‌جای جمع آن‌ها، بازه‌ای را انتخاب می‌کند که اتحاد هر دو طبقه را پوشش دهد؛ یعنی مبنای قدیمی‌تر/گسترده‌تر از دو آستانه. به این ترتیب یک لایه دوبار شمرده نمی‌شود و در خروجی فقط یک مبلغ نمایش داده می‌شود.</p>
     <p><b>پیگیری سال آتی:</b> موتور محاسبه، فقط لایه‌های اولیه‌ای را که در ستون ۱۴۰۴ مشمول بررسی شده‌اند به سال بعد منتقل و اثر گردش‌های سال بعد بر همان لایه‌ها را بررسی می‌کند. این ستون ماندهٔ قابل ردیابی همان اقلام است، نه مانده خالص کل حساب و نه شامل اقلام جدید یا لایه‌های غیرمشمول ایجادشده در ۱۴۰۵. در نبود فایل سال بعد، اطلاعات این ستون و نتیجه نهایی قابل تعیین نیست.</p>
     <p><b>تهاتر با حساب‌های دیگر:</b> مبلغ تهاتر به‌صورت مثبت نمایش داده می‌شود و بر اساس تفصیلی همسان و حساب‌های اشخاص تأییدشده محاسبه می‌شود. این محاسبه تحلیلی به‌تنهایی حق قانونی تهاتر یا مجازبودن ارائه خالص در صورت‌های مالی را اثبات نمی‌کند.</p>
+    <p><b>هشدارهای نیازمند بررسی:</b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر یا تراز کم نمی‌شود و ثبت اصلاحی ایجاد نمی‌کند. انتقال‌های علامت‌گذاری‌شده تسویهٔ واقعی محسوب نمی‌شوند و ابهام منشأ آن‌ها در بازه‌های محاسباتی منعکس می‌شود. ستون تهاتر جداگانه نشان داده می‌شود و فقط در محاسبهٔ مبلغ سنواتی/راکدِ قابل تهاتر اثر دارد، نه در ماندهٔ دفتری حساب.</p>
     <p><b>ستون «راکد و سنواتی»:</b> مبلغ نهایی پس از اعمال تهاتر ۱۴۰۴ و تطبیق با ماندهٔ لایه‌های قابل پیگیری در سال بعد است. این ستون تنها یک مبلغ واحد دارد؛ تفکیک مبلغ به سنواتی و راکد انجام نمی‌شود، زیرا هم‌پوشانی ممکن است موجب دوباره‌شماری شود.</p>
-    <p><b>ماندن یا خروج از وضعیت:</b> کاهش یا افزایش مانده کل حساب به‌تنهایی قدمت لایه قدیمی را از بین نمی‌برد. فقط مبلغی که با گردش‌ها و شواهد قابل اتکا به همان لایه تخصیص یابد از آن کسر می‌شود. در نبود تخصیص قابل اتکا، دامنهٔ عدم‌قطعیت در شیت استثناها منعکس می‌شود.</p>
+    <p><b>ماندن یا خروج از وضعیت:</b> کاهش یا افزایش مانده کل حساب به‌تنهایی قدمت لایه قدیمی را از بین نمی‌برد. فقط مبلغی که با گردش‌ها و شواهد قابل اتکا به همان لایه تخصیص یابد از آن کسر می‌شود. در نبود تخصیص قابل اتکا، دامنهٔ عدم‌قطعیت در بازه‌های محاسبات و نمای ریز حساب منعکس می‌شود.</p>
     <p><b>محدودیت بازسازی:</b> اگر نه فایل سال ۱۴۰۲ موجود باشد و نه افتتاحیه معتبر ۱۴۰۳، قدمت قبل از ۱۴۰۳ از داده‌های موجود قابل بازسازی نیست. آستانه رکود نیز سیاست تحلیلی قابل تنظیم است و تعریف ثابت استاندارد حسابرسی نیست.</p>
     <p><b>دامنه:</b> دارایی‌های ثابت، موجودی‌ها و حساب‌های موقتِ قابل تشخیص از عنوان حساب در این نسخه وارد کاربرگ نمی‌شوند. مبالغ با کد و بر پایه ارقام فایل محاسبه می‌شوند و هوش مصنوعی در محاسبات عددی دخالت ندارد.</p>
   </div>`;
@@ -13322,11 +13341,10 @@ function printReport(){
       .sr-aged-page-sheet .sr-paper-table tbody{display:table-row-group!important}
       .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:6.5pt!important;padding:.7mm .5mm!important;line-height:1.15!important;overflow-wrap:anywhere!important}
       .sr-aged-page-sheet .sr-paper-table td.num{font-size:6.3pt!important;white-space:nowrap!important;direction:ltr!important}
-      .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:10mm minmax(0,2fr) minmax(0,1fr)!important;gap:1mm!important;align-items:center!important;min-height:6mm!important;padding:0 3px!important;background:#fffaf0!important;border-bottom:1px solid #64748b!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:6.5pt!important;line-height:1.1!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:8mm!important;height:5mm!important;border:1px solid #9e0000!important}
-      .sr-aged-page-sheet .sr-print-title th{font-size:7pt!important;line-height:1.1!important;padding:.5mm 1mm!important;background:#fff!important;text-align:right!important}
-      .sr-aged-page-sheet .sr-print-title th span:last-child{float:left!important;font-weight:normal!important}
+      .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr)!important;gap:1.5mm!important;align-items:center!important;min-height:15mm!important;padding:1mm 2mm!important;background:#fffaf0!important;border-bottom:1px solid #64748b!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:6.5pt!important;line-height:1.2!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:22mm!important;height:14mm!important;box-sizing:border-box!important;border:1px solid #c00000!important;border-radius:9px!important;background:#ddebf7!important}
+      .sr-aged-page-sheet .sr-currency-note{font-size:5.8pt!important;line-height:1!important}
       .sr-aged-page-sheet .sr-paper-table thead .sr-group-head th{background:#fff2cc!important;color:#1f2937!important}
       .sr-aged-page-sheet .sr-paper-table tbody tr:nth-child(even) td{background:#fffcf2!important}
       .sr-aged-page-number{font-size:7pt!important;line-height:1.1!important;padding-top:1mm!important;text-align:center!important;color:#111827!important}
@@ -13351,36 +13369,34 @@ function exportXlsx(){
   const cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
   let today=''; try{ today=new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()); }catch{ today=new Date().toLocaleDateString('fa-IR'); }
   const topHeaders=['کد کل','عنوان کل','کد معین','عنوان معین','کد تفصیلی','عنوان تفصیلی','کد تفصیلی یک','عنوان تفصیلی یک','کد تفصیلی دو','عنوان تفصیلی دو','۱۴۰۳','۱۴۰۴','پیگیری سال آتی','تهاتر با حسابهای دیگر','راکد و سنواتی','کلید تطبیق'];
+  const fiscalYear=cfg.year||R.audit.label||'—';
+  const periodEnd=R.audit.end?fmtD(R.audit.end):fiscalYear;
   const data=[
-    ['شرکت مورد رسیدگی',cfg.company||'—'],
+    ['نام واحد مورد رسیدگی',cfg.company||'—'],
     ['موضوع','کاربرگ اقلام سنواتی و راکد'],
-    ['دوره مالی','۱۴۰۴'],
-    ['تاریخ تهیه',cfg.date||today,'تهیه کننده',cfg.prep||'—','بررسی کننده',cfg.rev||'—'],
+    ['سال مالی مورد رسیدگی',fiscalYear,'تاریخ ترازنامه',periodEnd],
+    ['تاریخ تهیه',cfg.date||today],
+    ['تهیه‌کننده',cfg.prep||'—'],
+    ['بررسی‌کننده',cfg.rev||'—'],
     [],topHeaders,
     ...rows.map(r=>[r.kolCode,r.kolTitle,r.moeinCode,r.moeinTitle,r.tafCode||r.detailCode,r.tafTitle||r.detailTitle,r.taf1Code,r.taf1Title,r.taf2Code,r.taf2Title,xval(r.amount1403),xval(r.amount1404),xval(r.followUp),xval(r.offset1404),xval(r.finalAmount),r.groupKey])
   ];
   const ws=XLSX.utils.aoa_to_sheet(data);
-  // مانده‌های منفی (بستانکار) در خروجی اکسل نیز داخل پرانتز نمایش داده شوند.
-  for(let ri=6;ri<6+rows.length;ri++) for(let ci=10;ci<=14;ci++){const cell=ws[XLSX.utils.encode_cell({r:ri,c:ci})];if(cell&&cell.t==='n')cell.z='#,##0;(#,##0);';}
-  ws['!cols']=[{wch:12},{wch:22},{wch:12},{wch:22},{wch:14},{wch:20},{wch:14},{wch:20},{wch:14},{wch:20},{wch:17},{wch:17},{wch:18},{wch:18},{wch:17},{wch:2,hidden:true}];
-  ws['!rows']=[{hpt:24},{hpt:22},{hpt:22},{hpt:22},{hpt:8},{hpt:32},...rows.map(()=>({hpt:30}))];
-  ws['!merges']=[{s:{r:0,c:1},e:{r:0,c:15}},{s:{r:1,c:1},e:{r:1,c:15}},{s:{r:2,c:1},e:{r:2,c:15}}];
-  ws['!freeze']={xSplit:10,ySplit:6,topLeftCell:'K7',activePane:'bottomRight',state:'frozen'};
-  ws['!autofilter']={ref:`A6:P${Math.max(6,6+rows.length)}`};
+  // مانده‌های بستانکار در خروجی اکسل داخل پرانتز نمایش داده شوند؛ بدهکارها عادی‌اند.
+  for(let ri=8;ri<8+rows.length;ri++) for(let ci=10;ci<=14;ci++){const cell=ws[XLSX.utils.encode_cell({r:ri,c:ci})];if(cell&&cell.t==='n')cell.z='#,##0;(#,##0);'}
+  ws['!cols']=[{wch:24},{wch:34},{wch:16},{wch:26},{wch:14},{wch:20},{wch:14},{wch:20},{wch:14},{wch:20},{wch:17},{wch:17},{wch:18},{wch:18},{wch:17},{wch:2,hidden:true}];
+  ws['!rows']=[{hpt:24},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:8},{hpt:32},...rows.map(()=>({hpt:30}))];
+  ws['!merges']=[... [0,1,3,4,5].map(r=>({s:{r,c:1},e:{r,c:15}})),{s:{r:2,c:3},e:{r:2,c:15}}];
+  ws['!freeze']={xSplit:10,ySplit:8,topLeftCell:'K9',activePane:'bottomRight',state:'frozen'};
+  ws['!autofilter']={ref:`A8:P${Math.max(8,8+rows.length)}`};
   ws['!pageSetup']={orientation:'landscape',paperSize:9,fitToWidth:1,fitToHeight:0};
   ws['!margins']={left:0.25,right:0.25,top:0.35,bottom:0.35,header:0.15,footer:0.15};
   XLSX.utils.book_append_sheet(wb,ws,'کاربرگ');
-  const ex=[['مورد','شدت','سال','حساب / تفصیلی','مبلغ','توضیح']];
-  const allResults=[R,SR.priorResult,SR.nextResult].filter(Boolean);
-  allResults.forEach(res=>res.exceptions.forEach(x=>{ const f=(SR.model.files||[]).find(y=>y.id===x.fileId); ex.push([EXC_LABEL[x.code]||x.code,SEV_LABEL[x.severity]||'',f?f.label:'',x.key||x.account||'',xval(x.amount),x.detail||'']); }));
-  rows.forEach(r=>{
-    for(const [field,label,year] of [['amount1403Range','مبلغ نهایی ۱۴۰۳','۱۴۰۳'],['amount1404Range','اقلام اولیه ۱۴۰۴','۱۴۰۴'],['followUpRange','پیگیری سال آتی','۱۴۰۵'],['finalRange','راکد و سنواتی نهایی','۱۴۰۴']]){
-      const v=r[field]; if(v&&v.min!==v.max) ex.push(['دامنه عدم‌قطعیت','هشدار',year,r.subPlain+' | '+r.detailPlain,xval(v.max-v.min),'حد پایین '+v.min.toString()+'؛ حد بالا '+v.max.toString()]);
-    }
-    if(r.finalRange===null&&!r.unmatchedPrior) ex.push(['نبود اطلاعات پیگیری سال بعد','هشدار','۱۴۰۴',r.subPlain+' | '+r.detailPlain,'','برای تعیین مبلغ نهایی «راکد و سنواتی»، فایل/اطلاعات سال مالی بعد لازم است.']);
-    if(r.unmatchedPrior) ex.push(['تطبیق‌نیافتن کاربرگ قبلی','هشدار','۱۴۰۳',r.subPlain+' | '+r.detailPlain,'','برای جلوگیری از انتساب اشتباه، ردیف قبلی با حساب جاری تطبیق داده نشد.']);
-  });
-  if(SR.priorWorkpaper) SR.priorWorkpaper.rows.forEach(x=>{});
+  const ex=[['انتقال حساب نیازمند بررسی','شدت','سال رسیدگی','حساب / تفصیلی','مبلغ انتقال','توضیح']];
+  const currentFileId=R.audit?.id;
+  const currentYearTransfers=(R.exceptions||[]).filter(x=>x.code==='TRANSFER_REVIEW'&&x.fileId===currentFileId);
+  currentYearTransfers.forEach(x=>{const f=(SR.model.files||[]).find(y=>y.id===x.fileId);ex.push([EXC_LABEL[x.code]||x.code,SEV_LABEL[x.severity]||'هشدار',f?f.label:(R.audit?.label||''),x.key||x.account||'',xval(x.amount),x.detail||'']);});
+  if(!currentYearTransfers.length) ex.push(['انتقالی برای بررسی در سال مورد رسیدگی ثبت نشده است.','','','','','']);
   const exws=XLSX.utils.aoa_to_sheet(ex); exws['!cols']=[{wch:30},{wch:12},{wch:12},{wch:42},{wch:20},{wch:72}]; exws['!freeze']={xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft',state:'frozen'};
   XLSX.utils.book_append_sheet(wb,exws,'استثناها');
   wb.Workbook={Views:[{RTL:true}]};
@@ -13539,11 +13555,14 @@ css.textContent=`
 .audit-template.sheet.sr-paper.sampling-template{box-sizing:border-box;width:100%;min-width:0;max-width:none;min-height:0;height:auto;margin:10px auto;padding:4px}
 .sr-paper.sampling-template{--sample-red:#9e0000;--sample-gold:#fff2cc;--sample-line:#475569;--sample-ink:#111827;box-sizing:border-box;width:100%;min-width:0;max-width:none;margin:10px auto;background:#fff;color:#111827;border:1.8px solid #9e0000;border-radius:15px;padding:4px;box-shadow:0 6px 24px #00000022;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif}
 .sr-paper.sampling-template>.inner{border:1.2px solid #64748b;border-radius:12px;padding:5px;overflow:hidden}
-.sr-paper .sr-screen-head{display:grid;grid-template-columns:14mm minmax(0,1.95fr) minmax(0,.95fr);align-items:center;gap:8px;padding:4.5px 11px;background:linear-gradient(180deg,#fffaf0,#fff2cc);border-bottom:1.3px solid #334155;text-align:right;margin:0}
-.sr-paper .sr-refbox{box-sizing:border-box;width:13mm;height:8.5mm;justify-self:center;border:1.6px solid #9e0000;border-radius:50%;background:#fff;padding:0}
-.sr-paper .sr-head-company,.sr-paper .sr-head-prep{font-size:11px;line-height:1.36;text-align:right}
+.sr-paper .sr-screen-head{display:grid;grid-template-columns:24mm minmax(0,1.7fr) minmax(0,1fr);align-items:center;gap:8px;padding:6px 11px;background:linear-gradient(180deg,#fffaf0,#fff2cc);border-bottom:1.3px solid #334155;text-align:right;margin:0}
+.sr-paper .sr-refbox{box-sizing:border-box;width:23mm;height:17mm;justify-self:center;border:1px solid #c00000;border-radius:9px;background:#ddebf7;padding:0}
+.sr-paper .sr-screen-head .sr-refbox{width:23mm;height:17mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}
+.sr-paper .sr-head-company,.sr-paper .sr-head-prep{font-size:11px;line-height:1.45;text-align:right}
 .sr-paper .sr-head-company .k{color:#005a9e;font-weight:bold}.sr-paper .sr-head-company .v{font-weight:bold}
-.sr-paper .sr-head-prep{border-right:1.2px dashed #475569;padding-right:10px}
+.sr-paper .sr-head-prep{border-right:1.2px dashed #a8a8a8;padding-right:10px}
+.sr-paper .sr-screen-head .sr-head-prep{border-right:1.2px dashed #a8a8a8;padding-right:10px}
+.sr-paper .sr-currency-note{display:block;font-size:9px;color:#475569;line-height:1.2}
 .sr-paper .sr-report-title{background:#fff;padding:2.5px 10px;text-align:right;border-bottom:1.1px solid #475569;line-height:1.35;border-left:0;border-right:0;border-top:0}
 .sr-paper .sr-report-title span{float:left;font-weight:normal}
 .sr-paper .sr-report-sub{font-size:9px;padding:3px 8px;text-align:right;color:#475569}
@@ -13562,9 +13581,9 @@ css.textContent=`
 .sr-paper .sr-year-cell span{white-space:normal}
 .sr-paper .sr-paper-table .sr-print-meta th{background:transparent}
 .sr-paper .sr-paper-table .sr-print-title th{background:#fff;text-align:right}
-.sr-paper .sr-meta-grid{display:grid;grid-template-columns:14mm minmax(0,1.95fr) minmax(0,.95fr);gap:2mm;align-items:center;direction:rtl;text-align:right;padding:4px 9px;background:linear-gradient(180deg,#fffaf0,#fff2cc)}
-.sr-paper .sr-meta-grid .sr-refbox{width:13mm;height:8.5mm;border:1.6px solid #9e0000;border-radius:50%}
-.sr-paper .sr-print-title th{display:table-cell;text-align:right}.sr-paper .sr-print-title th span:last-child{float:left;font-weight:normal}
+.sr-paper .sr-meta-grid{display:grid;grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:2mm;align-items:center;direction:rtl;text-align:right;padding:6px 9px;background:linear-gradient(180deg,#fffaf0,#fff2cc)}
+.sr-paper .sr-meta-grid .sr-refbox{width:22mm;height:15mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}
+.sr-paper .sr-currency-note{display:block;font-size:9px;color:#475569;line-height:1.2}
 @media(max-width:700px){.sr-paper.sampling-template{width:297mm;max-width:none}.sr-report-shell{overflow:auto}}
 
 /* تراز شناور و انتخاب بدون بازسازی DOM؛ تغییر چک‌باکس‌ها نباید اسکرول را جابه‌جا کند. */
@@ -13585,9 +13604,9 @@ css.textContent=`
 .sample-paper-box.sr-aged-page{box-sizing:border-box;width:297mm;height:210mm;min-height:210mm;padding:16mm 7.5mm 14mm;margin:0 auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 18px #00000014;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;overflow:hidden;break-after:page;page-break-after:always}
 .sr-aged-page-sheet{box-sizing:border-box;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:2px!important;box-shadow:none!important;border:1.5px solid #9e0000!important;border-radius:10px!important;overflow:visible!important}
 .sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:1px solid #64748b!important;border-radius:7px!important;padding:2px!important}
-.sr-aged-page-sheet .sr-screen-head{grid-template-columns:10mm minmax(0,2fr) minmax(0,1fr);gap:1.5mm;padding:2px 5px}.sr-aged-page-sheet .sr-refbox{width:8mm;height:5mm}.sr-aged-page-sheet .sr-head-company,.sr-aged-page-sheet .sr-head-prep{font-size:9px;line-height:1.25}.sr-aged-page-sheet .sr-head-prep{padding-right:5px}
-.sr-aged-page-sheet .sr-report-title{font-size:9px;padding:1px 5px}.sr-aged-page-sheet .sr-screen-head,.sr-aged-page-sheet .sr-report-title{display:none!important}.sr-aged-page-sheet .sr-rows-box{overflow:visible}
-.sr-aged-page-sheet .sr-meta-grid{grid-template-columns:10mm minmax(0,2fr) minmax(0,1fr);gap:1mm;padding:1px 4px}.sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:8mm;height:5mm}.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:7px;line-height:1.15}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{padding-right:4px}
+.sr-aged-page-sheet .sr-screen-head{grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:1.5mm;padding:2px 5px}.sr-aged-page-sheet .sr-refbox{width:22mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}.sr-aged-page-sheet .sr-head-company,.sr-aged-page-sheet .sr-head-prep{font-size:7px;line-height:1.2}.sr-aged-page-sheet .sr-head-prep{padding-right:5px}
+.sr-aged-page-sheet .sr-screen-head{display:none!important}.sr-aged-page-sheet .sr-rows-box{overflow:visible}
+.sr-aged-page-sheet .sr-meta-grid{grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:1mm;padding:1px 4px}.sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:22mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:7px;line-height:1.15}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{padding-right:4px}
 .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{padding:2px 1.5px;line-height:1.16}.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-meta,.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-title{display:table-row}.sr-aged-page-sheet .sr-paper-table .sr-print-title th{font-size:8px;padding:1px 4px}
 .sr-aged-page-number{flex:0 0 auto;margin-top:2px;padding-top:2px;text-align:center;font-size:10px;font-weight:700;color:#334155}.sr-aged-page-overflow{height:auto!important;min-height:210mm!important;overflow:visible!important;border-color:#b91c1c;box-shadow:0 0 0 2px #fecaca}
 @media(max-width:720px){.sr-tb-titlebar,.sr-tb-footer{align-items:stretch}.sr-tb-titlebar>div,.sr-tb-toolbar{width:100%}.sr-aged-preview-pages{align-items:flex-start}}
