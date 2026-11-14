@@ -143,8 +143,8 @@ assert.match(html, /Array\.from\(\{length:n\},\(\)=>'<td class="ctl"><\/td>'\)/,
   'sampling audit-control cells remain while their checkbox marks are omitted');
 assert.doesNotMatch(html, /\.sampling-template \.box\{display:inline-block/,
   'sampling audit-control checkbox styling is removed');
-assert.match(html, /class="sample-page-ref" aria-label="محل عطف مانده به گردش دفاتر"/,
-  'sampling pages add a table-style reference cell beside the page number');
+assert.doesNotMatch(html, /sample-page-bottom|sample-page-ref/,
+  'sampling page footer retains its compact original layout without an oversized blank box');
 assert.match(html, /صفحه \$\{faNum\(i\+1\)\} از \$\{faNum\(pages\.length\)\}/,
   'sampling page numbers use the unified Persian wording without the small hamza');
 assert.match(html, /\.sr-aged-page-sheet \.sr-meta-grid \.sr-refbox\{[^}]*background:#fff!important/,

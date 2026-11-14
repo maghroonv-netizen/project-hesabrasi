@@ -1664,10 +1664,8 @@
 .sampling-template.sample-print-page .sample-recap{flex:0 0 auto;margin-top:5px}
 .sampling-template .sample-brought-forward td{background:#fff2cc!important;font-weight:bold;line-height:15px;height:21px;border-bottom:1.2px solid #334155}
 .sampling-template.sample-print-page .sample-page-footer tr.total td{border-top:0}
-.sampling-template .sample-page-bottom{width:calc(var(--sample-table-width,261mm) + 3px);margin:2mm auto 0;border-collapse:collapse;table-layout:fixed;direction:rtl}
-.sampling-template .sample-page-bottom td{height:8mm;padding:1mm 2mm;border:1px solid var(--sample-line);background:#fff;text-align:center;vertical-align:middle}
-.sampling-template .sample-page-bottom .sample-page-ref{width:58%}
-.sampling-template .sample-page-bottom .sample-page-num{width:42%;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif;font-size:10.5px;line-height:1.25;font-weight:bold;color:var(--sample-ink)}
+.sampling-template .sample-page-num{flex:0 0 auto;text-align:center;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif;font-weight:bold;font-size:10.5px;line-height:1.25;padding-top:4px;color:var(--sample-ink);margin-top:2px}
+.sample-measuring .sampling-template .sample-page-num{margin-top:auto}
 .sampling-template td:first-child{padding-inline:1px}
 .sampling-template .cols th:first-child{font-size:9px}
 .sampling-template .cols th.sample-controls-title{white-space:normal;overflow-wrap:normal;font-size:9px;line-height:1.25}
@@ -3388,7 +3386,7 @@ function sheetHTML(w, sel, excludedRows=[]){
   return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" data-sample-density="${layout.density||'normal'}" style="--sample-full-width:${layout.paperWidth}mm;--sample-full-height:${layout.paperHeight}mm;--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-control-font:${controlFont.toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
   <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="ref-oval" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(subjectText)}</span></div><div class="big"><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="sample-meta-prep"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
   <tr class="cols">${resizableHeads}<th class="sample-controls-title" colspan="${n}">کنترل‌های حسابرسی</th></tr><tr class="cols">${nums}</tr></thead><tbody>${body}${total}</tbody></table></div>
-  <div class="recap frame sample-recap"><div class="ttl">تفکیک گردش و مانده</div><table class="sum"><thead><tr><th style="width:34%">تفکیک</th><th>بدهکار (ریال)</th><th style="width:11%">درصد</th><th>بستانکار (ریال)</th><th style="width:11%">درصد</th></tr></thead><tbody>${R('افتتاحیه (مانده ابتدای سال)',opD,opC)}${R('اقلام رسیدگی‌شده',sd,sc)}${R('سایر اقلام (رسیدگی‌نشده)',othD,othC)}${R('جمع',totD,totC,'sumrow')}<tr class="rest"><td class="lab">مانده در پایان سال مالی</td><td class="num" colspan="4" style="text-align:right;padding-right:14px;direction:rtl">${fmtSignedBalance(end)}</td></tr></tbody></table></div><table class="sample-page-bottom"><tbody><tr><td class="sample-page-ref" aria-label="محل عطف مانده به گردش دفاتر"></td><td class="sample-page-num">صفحه ۱ از ۱</td></tr></tbody></table></div></div>`;
+  <div class="recap frame sample-recap"><div class="ttl">تفکیک گردش و مانده</div><table class="sum"><thead><tr><th style="width:34%">تفکیک</th><th>بدهکار (ریال)</th><th style="width:11%">درصد</th><th>بستانکار (ریال)</th><th style="width:11%">درصد</th></tr></thead><tbody>${R('افتتاحیه (مانده ابتدای سال)',opD,opC)}${R('اقلام رسیدگی‌شده',sd,sc)}${R('سایر اقلام (رسیدگی‌نشده)',othD,othC)}${R('جمع',totD,totC,'sumrow')}<tr class="rest"><td class="lab">مانده در پایان سال مالی</td><td class="num" colspan="4" style="text-align:right;padding-right:14px;direction:rtl">${fmtSignedBalance(end)}</td></tr></tbody></table></div></div></div>`;
 }
 // متن‌های واردشده از فایل اکسل نباید HTML را بشکنند
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -6800,6 +6798,8 @@ function sampleTemplatePreparePrint(host,opts){
     const tb=document.createElement('tbody');tb.appendChild(totalRow('sample-page-total','جمع تا پایان این صفحه'));footer.appendChild(tb);
     p.querySelector('.sample-main-frame').appendChild(footer);
    }
+   const pgNum=document.createElement('div');pgNum.className='sample-page-num';pgNum.textContent='صفحه ۱ از ۱';
+   p.querySelector('.inner').appendChild(pgNum);
    pages.push(p);wrappers.push(box);return p;
   };
   const estimatePx=p=>{
@@ -6808,7 +6808,7 @@ function sampleTemplatePreparePrint(host,opts){
    const isCompact=layout.density==='compact';
    const limitPx=layout.height*96/25.4;
    const isRecapOnly=p.classList.contains('sample-recap-only-page');
-   let used=(isRecapOnly?(isCompact?48:58):(isCompact?78:92))+56;
+   let used=isRecapOnly?(isCompact?48:58):(isCompact?78:92);
    if(p.querySelector('.sample-brought-forward'))used+=isCompact?18:22;
    const glyphW=isCompact?3.95:4.2;
    const charPerLineDesc=Math.max(12,Math.floor((layout.columns[3]*96/25.4-10)/(glyphW+0.05)));
@@ -6950,14 +6950,14 @@ function sampleTemplatePreparePrint(host,opts){
    }
   }
   if(recap){
-   const pageFooter=page.querySelector('.sample-page-bottom');
-   page.querySelector('.inner').insertBefore(recap,pageFooter);
+   const pageNumEl=page.querySelector('.sample-page-num');
+   page.querySelector('.inner').insertBefore(recap,pageNumEl);
    if(overflow(page)){
     recap.remove();
     // Create a recap-only continuation page (NO vouchers -> NO carry-forward or page-total rows!)
     page=makePage(true);
-    const nextPageFooter=page.querySelector('.sample-page-bottom');
-    page.querySelector('.inner').insertBefore(recap,nextPageFooter);
+    const nextNumEl=page.querySelector('.sample-page-num');
+    page.querySelector('.inner').insertBefore(recap,nextNumEl);
    }
   }
   let lastVoucherPageIdx=-1;
