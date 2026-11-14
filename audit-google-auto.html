@@ -13229,6 +13229,8 @@ function workpaperHtml(){
   const balance=v=>v===null||v===undefined||v===0n?'':signedBalanceText(v);
   const showTaf1=!!SR.view.showTaf1, showTaf2=!!SR.view.showTaf2;
   const visibleCols=9+(showTaf1?2:0)+(showTaf2?2:0);
+  const sumColumn=field=>rows.reduce((sum,row)=>sum+(typeof row[field]==='bigint'?row[field]:0n),0n);
+  const columnTotals={amount1403:sumColumn('amount1403'),amount1404:sumColumn('amount1404'),followUp:sumColumn('followUp'),offset1404:sumColumn('offset1404'),finalAmount:sumColumn('finalAmount')};
   const auditYear=SR.result?.audit?.label||'۱۴۰۴';
   const fiscalYear=cfg.year||auditYear;
   const periodEnd=SR.result?.audit?.end?fmtD(SR.result.audit.end):fiscalYear;
@@ -13244,7 +13246,7 @@ function workpaperHtml(){
           <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span> <span class="k">(تاریخ ترازنامه :</span> <span class="v">${e_(periodEnd)} )</span></div>
           <small class="sr-currency-note">ارقام به ریال</small>
         </div>
-        <div class="side sr-head-prep">
+        <div class="sr-head-prep">
           <div><span class="k">تاریخ تهیه :</span> <span class="v">${e_(cfg.date||today)}</span></div>
           <div><span class="k">تهیه‌کننده :</span> <span class="v">${e_(cfg.prep||'—')}</span></div>
           <div><span class="k">بررسی‌کننده :</span> <span class="v">${e_(cfg.rev||'—')}</span></div>
@@ -13262,7 +13264,7 @@ function workpaperHtml(){
                 <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span> <span class="k">(تاریخ ترازنامه :</span> <span class="v">${e_(periodEnd)} )</span></div>
                 <small class="sr-currency-note">ارقام به ریال</small>
               </div>
-              <div class="side sr-head-prep">
+              <div class="sr-head-prep">
                 <div><span class="k">تاریخ تهیه :</span> <span class="v">${e_(cfg.date||today)}</span></div>
                 <div><span class="k">تهیه‌کننده :</span> <span class="v">${e_(cfg.prep||'—')}</span></div>
                 <div><span class="k">بررسی‌کننده :</span> <span class="v">${e_(cfg.rev||'—')}</span></div>
@@ -13278,7 +13280,7 @@ function workpaperHtml(){
             <td class="sr-code">${cell(r.moeinCode)}</td><td>${cell(r.moeinTitle)}</td>
             <td class="sr-code">${cell(r.tafCode||(r.unmatchedPrior?r.detailCode:''))}</td><td>${cell(r.tafTitle||(r.unmatchedPrior?r.detailTitle:''))}</td><td data-level="taf1" class="sr-code">${cell(r.taf1Code)}</td><td data-level="taf1">${cell(r.taf1Title)}</td><td data-level="taf2" class="sr-code">${cell(r.taf2Code)}</td><td data-level="taf2">${cell(r.taf2Title)}</td>
             <td class="num">${balance(r.amount1403)}</td><td class="num">${balance(r.amount1404)}</td><td class="num">${balance(r.followUp)}</td><td class="num">${amount(r.offset1404)}</td><td class="num">${balance(r.finalAmount)}</td>
-          </tr>`).join('')||`<tr><td colspan="${visibleCols}">ردیفی برای نمایش وجود ندارد.</td></tr>`}</tbody>
+          </tr>`).join('')||`<tr><td colspan="${visibleCols}">ردیفی برای نمایش وجود ندارد.</td></tr>`}${rows.length?`<tr class="sr-workpaper-total"><td colspan="${visibleCols-5}" class="sr-total-label">جمع کل کاربرگ</td><td class="num">${signedBalanceText(columnTotals.amount1403)}</td><td class="num">${signedBalanceText(columnTotals.amount1404)}</td><td class="num">${signedBalanceText(columnTotals.followUp)}</td><td class="num">${fmtB(columnTotals.offset1404)}</td><td class="num">${signedBalanceText(columnTotals.finalAmount)}</td></tr>`:''}</tbody>
         </table>
       </div>
     </div>
@@ -13349,21 +13351,23 @@ function printReport(){
       .sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:1px solid #64748b!important;border-radius:7px!important;padding:2mm!important}
       .sr-aged-page-sheet .sr-rows-box{padding:1.5mm!important;overflow:visible!important;border:1.5px solid #9e0000!important;border-radius:7px!important;box-sizing:border-box!important}
       .sr-aged-page-sheet .sr-screen-head,.sr-aged-page-sheet .sr-report-title{display:none!important}
-      .sr-aged-page-sheet .sr-paper-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;border-spacing:0!important;page-break-inside:auto!important;break-inside:auto!important}
+      .sr-aged-page-sheet .sr-paper-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;border-spacing:0!important;border:1.2px solid #475569!important;page-break-inside:auto!important;break-inside:auto!important}
       .sr-aged-page-sheet .sr-paper-table thead{display:table-header-group!important}
       .sr-aged-page-sheet .sr-paper-table tbody{display:table-row-group!important}
       .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:7.6pt!important;padding:.8mm .55mm!important;line-height:1.18!important;overflow-wrap:anywhere!important}
       .sr-aged-page-sheet .sr-paper-table td.num{font-size:7.3pt!important;white-space:nowrap!important;direction:ltr!important}
-      .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:18mm minmax(0,1fr) 92mm!important;gap:2mm!important;align-items:center!important;min-height:19mm!important;padding:1.5mm 2.5mm!important;background:#fffaf0!important;border-bottom:1px solid #64748b!important}
+      .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:18mm minmax(0,1fr) minmax(0,92mm)!important;gap:2mm!important;align-items:center!important;min-height:19mm!important;padding:1.5mm 2.5mm!important;background:#fff!important;border-bottom:1px solid #64748b!important}
       .sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:8pt!important;line-height:1.25!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep{width:92mm!important;max-width:92mm!important;justify-self:start!important;border-right:0!important;border-left:1px dashed #a8a8a8!important;padding:0 0 0 2mm!important;text-align:right!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep>div{display:grid!important;grid-template-columns:max-content minmax(0,1fr)!important;column-gap:1mm!important;align-items:baseline!important;white-space:normal!important;word-break:normal!important;overflow-wrap:normal!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep .k{white-space:nowrap!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep .v{min-width:0!important;white-space:normal!important;word-break:normal!important;overflow-wrap:normal!important;text-align:left!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep{position:static!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;width:max-content!important;max-width:92mm!important;min-width:0!important;height:auto!important;justify-self:end!important;background:transparent!important;writing-mode:horizontal-tb!important;transform:none!important;display:flex!important;flex-direction:column!important;gap:.5mm!important;align-items:flex-start!important;border-left:0!important;border-right:1px dashed #a8a8a8!important;padding:0 2mm 0 0!important;text-align:right!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep>div{position:static!important;display:flex!important;flex-flow:row wrap!important;align-items:baseline!important;column-gap:1.2mm!important;white-space:normal!important;word-break:normal!important;overflow-wrap:normal!important;direction:rtl!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep .k{flex:0 0 auto!important;white-space:nowrap!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep .v{flex:0 1 auto!important;min-width:0!important;white-space:normal!important;word-break:normal!important;overflow-wrap:normal!important;text-align:right!important}
       .sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:18mm!important;height:14mm!important;box-sizing:border-box!important;border:1px solid #c00000!important;border-radius:9px!important;background:#fff!important}
       .sr-aged-page-sheet .sr-currency-note{font-size:7pt!important;line-height:1.15!important}
       .sr-aged-page-sheet .sr-paper-table thead .sr-group-head th{background:#fff2cc!important;color:#1f2937!important}
       .sr-aged-page-sheet .sr-paper-table tbody tr:nth-child(even) td{background:#fffcf2!important}
+      .sr-aged-page-sheet .sr-paper-table tbody tr.sr-workpaper-total{break-inside:avoid!important;page-break-inside:avoid!important}
+      .sr-aged-page-sheet .sr-paper-table tbody tr.sr-workpaper-total td{background:#fff2cc!important;font-weight:bold!important;border-top:1.6px solid #9e0000!important}
       .sr-aged-page-number{font-size:8pt!important;font-weight:700!important;line-height:1.25!important;padding-top:1mm!important;text-align:center!important;color:#111827!important}
     }`;
   const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=old;document.body.classList.remove('printing');ph.replaceChildren();rule.remove();};
@@ -13388,6 +13392,8 @@ function exportXlsx(){
   const topHeaders=['کد کل','عنوان کل','کد معین','عنوان معین','کد تفصیلی','عنوان تفصیلی','کد تفصیلی یک','عنوان تفصیلی یک','کد تفصیلی دو','عنوان تفصیلی دو','۱۴۰۳','۱۴۰۴','پیگیری سال آتی','تهاتر با حسابهای دیگر','راکد و سنواتی','کلید تطبیق'];
   const fiscalYear=cfg.year||R.audit.label||'—';
   const periodEnd=R.audit.end?fmtD(R.audit.end):fiscalYear;
+  const sumColumn=field=>rows.reduce((sum,row)=>sum+(typeof row[field]==='bigint'?row[field]:0n),0n);
+  const columnTotals={amount1403:sumColumn('amount1403'),amount1404:sumColumn('amount1404'),followUp:sumColumn('followUp'),offset1404:sumColumn('offset1404'),finalAmount:sumColumn('finalAmount')};
   const data=[
     ['نام واحد مورد رسیدگی',cfg.company||'—'],
     ['موضوع','کاربرگ اقلام سنواتی و راکد'],
@@ -13396,14 +13402,15 @@ function exportXlsx(){
     ['تهیه‌کننده',cfg.prep||'—'],
     ['بررسی‌کننده',cfg.rev||'—'],
     [],topHeaders,
-    ...rows.map(r=>[r.kolCode,r.kolTitle,r.moeinCode,r.moeinTitle,r.tafCode||r.detailCode,r.tafTitle||r.detailTitle,r.taf1Code,r.taf1Title,r.taf2Code,r.taf2Title,xval(r.amount1403),xval(r.amount1404),xval(r.followUp),xval(r.offset1404),xval(r.finalAmount),r.groupKey])
+    ...rows.map(r=>[r.kolCode,r.kolTitle,r.moeinCode,r.moeinTitle,r.tafCode||r.detailCode,r.tafTitle||r.detailTitle,r.taf1Code,r.taf1Title,r.taf2Code,r.taf2Title,xval(r.amount1403),xval(r.amount1404),xval(r.followUp),xval(r.offset1404),xval(r.finalAmount),r.groupKey]),
+    ['جمع کل کاربرگ','','','','','','','','','',xval(columnTotals.amount1403),xval(columnTotals.amount1404),xval(columnTotals.followUp),xval(columnTotals.offset1404),xval(columnTotals.finalAmount),'']
   ];
   const ws=XLSX.utils.aoa_to_sheet(data);
   // مانده‌های بستانکار در خروجی اکسل داخل پرانتز نمایش داده شوند؛ بدهکارها عادی‌اند.
-  for(let ri=8;ri<8+rows.length;ri++) for(let ci=10;ci<=14;ci++){const cell=ws[XLSX.utils.encode_cell({r:ri,c:ci})];if(cell&&cell.t==='n')cell.z='#,##0;(#,##0);'}
+  for(let ri=8;ri<=8+rows.length;ri++) for(let ci=10;ci<=14;ci++){const cell=ws[XLSX.utils.encode_cell({r:ri,c:ci})];if(cell&&cell.t==='n')cell.z='#,##0;(#,##0);'}
   ws['!cols']=[{wch:24},{wch:34},{wch:16},{wch:26},{wch:14},{wch:20},{wch:14},{wch:20},{wch:14},{wch:20},{wch:17},{wch:17},{wch:18},{wch:18},{wch:17},{wch:2,hidden:true}];
-  ws['!rows']=[{hpt:24},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:8},{hpt:32},...rows.map(()=>({hpt:30}))];
-  ws['!merges']=[... [0,1,3,4,5].map(r=>({s:{r,c:1},e:{r,c:15}})),{s:{r:2,c:3},e:{r:2,c:15}}];
+  ws['!rows']=[{hpt:24},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:8},{hpt:32},...rows.map(()=>({hpt:30})),{hpt:30}];
+  ws['!merges']=[... [0,1,3,4,5].map(r=>({s:{r,c:1},e:{r,c:15}})),{s:{r:2,c:3},e:{r:2,c:15}},{s:{r:8+rows.length,c:0},e:{r:8+rows.length,c:9}}];
   ws['!freeze']={xSplit:10,ySplit:8,topLeftCell:'K9',activePane:'bottomRight',state:'frozen'};
   ws['!autofilter']={ref:`A8:P${Math.max(8,8+rows.length)}`};
   ws['!pageSetup']={orientation:'landscape',paperSize:9,fitToWidth:1,fitToHeight:0};
@@ -13624,7 +13631,9 @@ css.textContent=`
 .sr-aged-page-sheet .sr-rows-box{padding:1.5mm!important;overflow:visible!important;border:1.5px solid #9e0000!important;border-radius:7px!important;box-sizing:border-box!important}
 .sr-aged-page-sheet .sr-screen-head{grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:1.5mm;padding:2px 5px}.sr-aged-page-sheet .sr-refbox{width:22mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#fff}.sr-aged-page-sheet .sr-head-company,.sr-aged-page-sheet .sr-head-prep{font-size:7px;line-height:1.2}.sr-aged-page-sheet .sr-head-prep{padding-right:5px}
 .sr-aged-page-sheet .sr-screen-head{display:none!important}.sr-aged-page-sheet .sr-rows-box{overflow:visible}
-.sr-aged-page-sheet .sr-meta-grid{grid-template-columns:18mm minmax(0,1fr) 92mm;gap:2mm;min-height:19mm;padding:1.5mm 2.5mm}.sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:18mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#fff}.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:8pt;line-height:1.25}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{width:92mm;max-width:92mm;justify-self:start;border-right:0;border-left:1px dashed #a8a8a8;padding:0 0 0 2mm;text-align:right}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep>div{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:1mm;align-items:baseline;white-space:normal;word-break:normal;overflow-wrap:normal}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep .k{white-space:nowrap}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep .v{min-width:0;white-space:normal;word-break:normal;overflow-wrap:normal;text-align:left}.sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:10.2px;line-height:1.18;padding:.8mm .55mm}.sr-aged-page-sheet .sr-paper-table td.num{font-size:9.7px}.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-meta,.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-title{display:table-row}.sr-aged-page-sheet .sr-paper-table .sr-print-title th{font-size:8px;padding:1px 4px}
+.sr-aged-page-sheet .sr-meta-grid{grid-template-columns:18mm minmax(0,1fr) minmax(0,92mm);gap:2mm;min-height:19mm;padding:1.5mm 2.5mm;background:#fff}.sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:18mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#fff}.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:8pt;line-height:1.25}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{position:static!important;inset:auto!important;width:max-content!important;max-width:92mm;min-width:0;height:auto!important;justify-self:end;background:transparent!important;writing-mode:horizontal-tb!important;transform:none!important;display:flex;flex-direction:column;gap:.5mm;align-items:flex-start;border-left:0;border-right:1px dashed #a8a8a8;padding:0 2mm 0 0;text-align:right}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep>div{position:static;display:flex;flex-flow:row wrap;align-items:baseline;column-gap:1.2mm;white-space:normal;word-break:normal;overflow-wrap:normal;direction:rtl}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep .k{flex:0 0 auto;white-space:nowrap}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep .v{flex:0 1 auto;min-width:0;white-space:normal;word-break:normal;overflow-wrap:normal;text-align:right}.sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:10.2px;line-height:1.18;padding:.8mm .55mm}.sr-aged-page-sheet .sr-paper-table td.num{font-size:9.7px}.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-meta,.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-title{display:table-row}.sr-aged-page-sheet .sr-paper-table .sr-print-title th{font-size:8px;padding:1px 4px}
+.sr-aged-page-sheet .sr-paper-table{border:1.2px solid #475569}
+.sr-aged-page-sheet .sr-paper-table tbody tr.sr-workpaper-total{break-inside:avoid;page-break-inside:avoid}.sr-aged-page-sheet .sr-paper-table tbody tr.sr-workpaper-total td{background:#fff2cc;font-weight:bold;border-top:1.6px solid #9e0000}
 .sr-aged-page-number{flex:0 0 auto;margin-top:2px;padding-top:2px;text-align:center;font-size:10.5px;font-weight:700;line-height:1.25;color:#334155}.sr-aged-page-overflow{height:auto!important;min-height:210mm!important;overflow:visible!important;border-color:#b91c1c;box-shadow:0 0 0 2px #fecaca}
 @media(max-width:720px){.sr-tb-titlebar,.sr-tb-footer{align-items:stretch}.sr-tb-titlebar>div,.sr-tb-toolbar{width:100%}.sr-aged-preview-pages{align-items:flex-start}}
 `;

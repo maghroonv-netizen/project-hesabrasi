@@ -100,10 +100,24 @@ assert.match(html, /\.sr-aged-page-sheet \.sr-meta-grid \.sr-refbox\{[^}]*backgr
   'aged worksheet reference box remains white in print');
 assert.match(html, /\.sr-aged-page-number\{font-size:8pt!important/,
   'aged worksheet page number matches the sampling footer scale');
-assert.match(html, /grid-template-columns:18mm minmax\(0,1fr\) 92mm!important/,
+assert.match(html, /grid-template-columns:18mm minmax\(0,1fr\) minmax\(0,92mm\)!important/,
   'aged worksheet preparation fields have a stable-width column at the left edge');
+assert.doesNotMatch(html, /class="side sr-head-prep"/,
+  'preparation metadata does not inherit the vertical green side-label style');
+assert.match(html, /sr-head-prep\{position:static!important;inset:auto!important/,
+  'preparation metadata is reset from the legacy absolute-positioned side style');
+assert.match(html, /sr-head-prep \.v\{[^}]*overflow-wrap:normal/,
+  'preparer values remain intact and wrap at spaces rather than within Persian words');
 assert.doesNotMatch(html, /sr-meta-grid \.sr-head-prep>div\{[^}]*overflow-wrap:anywhere/,
   'Persian preparation-field text is not allowed to break letter-by-letter');
+assert.match(workpaperMarkup, /class="sr-workpaper-total"/,
+  'the aged workpaper includes a totals row');
+assert.match(workpaperMarkup, /columnTotals\.amount1403[\s\S]*columnTotals\.finalAmount/,
+  'the totals row aggregates all five numeric columns');
+assert.match(exportCode, /\['جمع کل کاربرگ'[\s\S]*xval\(columnTotals\.finalAmount\)/,
+  'the XLSX worksheet also includes totals for all numeric columns');
+assert.match(html, /sr-paper-table\{border:1\.2px solid #475569/,
+  'the whole worksheet table has a visible perimeter border');
 assert.match(html, /const capacity=Math\.max\(0,available-fixedHeight-18\)/,
   'manual print pagination reserves a cross-browser layout safety margin');
 assert.match(html, /\.sr-aged-page-sheet\{[^}]*padding:2mm!important[^}]*border:1\.5px solid/,
