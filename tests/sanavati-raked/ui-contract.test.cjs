@@ -70,6 +70,10 @@ const workpaperMarkup = html.slice(workpaperStart, workpaperEnd);
 assert.match(workpaperMarkup, /نام واحد مورد رسیدگی/);
 assert.match(workpaperMarkup, /موضوع :/);
 assert.match(workpaperMarkup, /سال مالی مورد رسیدگی/);
+assert.match(workpaperMarkup, /yearPlan\?srYearText\(yearPlan\.prior\)/,
+  'the comparative column label is calculated from the configured case year');
+assert.doesNotMatch(workpaperMarkup, /<th>۱۴۰۳<\/th>|<th>۱۴۰۴<\/th>/,
+  'the printed worksheet does not hard-code annual column headings');
 assert.match(workpaperMarkup, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
 assert.doesNotMatch(workpaperMarkup, /تاریخ ترازنامه|periodEnd|SR\.result\?\.audit\?\.label/,
   'the aged worksheet does not invent a balance-sheet date or fall back to the uploaded file year');
@@ -94,6 +98,37 @@ assert.match(exportCode, /XLSX\.writeFile\(/);
 assert.match(exportCode, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
 assert.doesNotMatch(exportCode, /periodEnd|R\.audit\.label/,
   'the XLSX workpaper does not derive fiscal-year metadata from the accounting file');
+assert.doesNotMatch(exportCode, /today|new Date\(\)/,
+  'the XLSX date field never falls back to the current date');
+assert.match(exportCode, /yearPlan\?yearPlan\.audit:'بدون-سال'/,
+  'the XLSX output filename follows the configured fiscal year');
+assert.doesNotMatch(html, /if\(!SHEET_CFG\.date\)/,
+  'the application does not auto-fill the case preparation date');
+const yearHelpersStart = html.indexOf('function srCaseYear(){');
+const yearHelpersEnd = html.indexOf("const REQUIRED=", yearHelpersStart);
+assert(yearHelpersStart >= 0 && yearHelpersEnd > yearHelpersStart, 'fiscal-year planning helpers exist');
+const engineStart = html.indexOf('/* <<<SR-ENGINE-BEGIN>>> */');
+const engineEnd = html.indexOf('/* <<<SR-ENGINE-END>>> */', engineStart);
+const engineSandbox = {module:{exports:{}},console};
+vm.createContext(engineSandbox);
+vm.runInContext(html.slice(engineStart, engineEnd), engineSandbox);
+const yearSandbox = {SRE:engineSandbox.module.exports,SHEET_CFG:{year:'۲۹ اسفند سال ۱۴۰۴'},window:{},fa:String,SR:{},CUR_MODULE:'home',CUR_STEP:'s1',paint(){}};
+vm.createContext(yearSandbox);
+vm.runInContext(html.slice(yearHelpersStart, yearHelpersEnd), yearSandbox);
+assert.equal(yearSandbox.srCaseYear(), 1404, 'Persian month-name date text resolves to its Jalali year');
+assert.deepEqual({...yearSandbox.srYearPlan()}, {audit:1404,history:1402,prior:1403,next:1405});
+yearSandbox.SHEET_CFG.year='۱۴۰۴/۱۲/۲۹';
+assert.equal(yearSandbox.srCaseYear(), 1404, 'numeric Jalali dates resolve to their year');
+yearSandbox.SHEET_CFG.year='۱۴۰۴';
+assert.equal(yearSandbox.srCaseYear(), 1404, 'a year-only value is not mistaken for an Excel date serial');
+yearSandbox.SHEET_CFG.year='';
+assert.equal(yearSandbox.srCaseYear(), null, 'an empty case year is never inferred from ledger dates');
+assert.doesNotMatch(html, /id="srPriorFile"|بارگذاری اکسل اسناد ۱۴۰۳/,
+  'the raw prior-year ledger upload is no longer requested');
+assert.match(html, /id="srHistoryPick"[\s\S]*?srYearText\(plan\?\.history\)/,
+  'the required two-years-prior ledger upload prompt is generated from the case year');
+assert.match(html, /id="srNextPick"[\s\S]*?srYearText\(plan\?\.next\)/,
+  'the following-year ledger upload prompt is generated from the case year');
 assert.match(html, /if\(!SHEET_CFG\.company\.trim\(\)\)\{[\s\S]*?سال مالی اختیاری است/,
   'the case may continue with an empty fiscal-year field');
 assert.match(exportCode, /x\.code==='TRANSFER_REVIEW'&&x\.fileId===currentFileId/);
