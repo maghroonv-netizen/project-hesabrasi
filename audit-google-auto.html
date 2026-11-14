@@ -1993,7 +1993,7 @@ body.meta-stage-active .wrap{display:none!important;}
 <p style="color:var(--muted)">نسخهٔ رسمی ۹٫۱۹ + آزمایش محلی شواهد (مرحلهٔ اول)</p><h2>اطلاعات عمومی پرونده</h2><p>در ابتدای کار وارد کنید؛ این مشخصات در سربرگ همهٔ کاربرگ‌های همین پرونده استفاده می‌شوند. تاریخ تهیه پیش‌فرض امروز است و قابل ویرایش است. اطلاعات در این صفحه نگهداری می‌شوند؛ با تازه‌سازی صفحه از بین می‌روند.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px">
 <label>نام واحد مورد رسیدگی<input id="metaCompany" data-project-cfg="company" placeholder="نام شرکت یا واحد" style="display:block;width:100%;padding:10px"></label>
-<label>سال مالی مورد رسیدگی<input id="metaYear" data-project-cfg="year" placeholder="مثلاً ۱۴۰۴ یا سال منتهی به ۱۴۰۴/۱۲/۲۹" style="display:block;width:100%;padding:10px"></label>
+<label>سال مالی مورد رسیدگی (اختیاری)<input id="metaYear" data-project-cfg="year" placeholder="مطابق مشخصات پرونده؛ مثلاً ۱۴۰۴" style="display:block;width:100%;padding:10px"></label>
 <label>تهیه‌کننده<input id="metaPrep" data-project-cfg="prep" placeholder="نام تهیه‌کننده" style="display:block;width:100%;padding:10px"></label>
 <label>بررسی‌کننده<input id="metaRev" data-project-cfg="rev" placeholder="نام بررسی‌کننده" style="display:block;width:100%;padding:10px"></label>
 <label>تاریخ تهیه<input id="metaDate" data-project-cfg="date" placeholder="تاریخ تهیه" style="display:block;width:100%;padding:10px"></label>
@@ -3340,7 +3340,7 @@ function pctTxt(x,tot){ return tot>0 ? (Math.round(x/tot*1000)/10).toLocaleStrin
 
 const CFG_HELP = {
   company:'نام شرکت یا واحد مورد رسیدگی؛ در سربرگ کاربرگ چاپ می‌شود.',
-  year:'تاریخ ترازنامه‌ای که کاربرگ بابت آن تهیه شده است (مثلاً ۱۴۰۳/۱۲/۳۰).',
+  year:'سال مالی را دقیقاً مطابق مشخصات پرونده وارد کنید؛ در صورت خالی بودن، مقدار آن در کاربرگ نیز خالی می‌ماند و از تاریخ فایل حسابداری ساخته نمی‌شود.',
   prep:'نام تهیه‌کننده کاربرگ.',
   rev:'نام حسابرس یا بازبینی‌کننده کاربرگ.',
   date:'تاریخ تهیه کاربرگ.',
@@ -3383,7 +3383,7 @@ function sheetHTML(w, sel, excludedRows=[]){
   const headLabels=['ردیف','سند','تاریخ','شرح','طرف حساب','عطف','بدهکار (ریال)','بستانکار (ریال)'];
   const resizableHeads=headLabels.map((lbl,i)=>`<th rowspan="2">${lbl}<span class="col-resize-handle no-print" data-col-resize="${i}" title="برای تغییر عرض ستون بکشید (دوبار کلیک: بازنشانی)"></span></th>`).join('');
   return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" data-sample-density="${layout.density||'normal'}" style="--sample-full-width:${layout.paperWidth}mm;--sample-full-height:${layout.paperHeight}mm;--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-box:${boxSize.toFixed(2)}px;--sample-control-font:${controlFont.toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
-  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="ref-oval" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(subjectText)}</span></div><div class="big"><span class="k">تاریخ ترازنامه :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
+  <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="ref-oval" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(subjectText)}</span></div><div class="big"><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="side"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
   <tr class="cols">${resizableHeads}<th class="sample-controls-title" colspan="${n}">کنترل‌های حسابرسی</th></tr><tr class="cols">${nums}</tr></thead><tbody>${body}${total}</tbody></table></div>
   <div class="recap frame sample-recap"><div class="ttl">تفکیک گردش و مانده</div><table class="sum"><thead><tr><th style="width:34%">تفکیک</th><th>بدهکار (ریال)</th><th style="width:11%">درصد</th><th>بستانکار (ریال)</th><th style="width:11%">درصد</th></tr></thead><tbody>${R('افتتاحیه (مانده ابتدای سال)',opD,opC)}${R('اقلام رسیدگی‌شده',sd,sc)}${R('سایر اقلام (رسیدگی‌نشده)',othD,othC)}${R('جمع',totD,totC,'sumrow')}<tr class="rest"><td class="lab">مانده در پایان سال مالی</td><td class="num" colspan="4" style="text-align:right;padding-right:14px;direction:rtl">${fmtSignedBalance(end)}</td></tr></tbody></table></div></div></div>`;
 }
@@ -10554,9 +10554,9 @@ el('routerForget').onclick=()=>{
   window.scrollTo(0,0);
  }
  function closeMeta(){
-  if(!SHEET_CFG.company.trim()||!SHEET_CFG.year.trim()){
-   document.getElementById('metaStatus').textContent='نام واحد و سال مالی را وارد کنید تا به مرحلهٔ بعد بروید.';
-   document.getElementById(!SHEET_CFG.company.trim()?'metaCompany':'metaYear').focus();return;
+  if(!SHEET_CFG.company.trim()){
+   document.getElementById('metaStatus').textContent='نام واحد مورد رسیدگی را وارد کنید تا به مرحلهٔ بعد بروید؛ سال مالی اختیاری است.';
+   document.getElementById('metaCompany').focus();return;
   }
   started=true;meta.hidden=true;document.body.classList.remove('meta-stage-active');
   if(ANA.out.length&&CUR_MODULE==='analysis')anaPaintSheet();
@@ -13231,9 +13231,7 @@ function workpaperHtml(){
   const visibleCols=9+(showTaf1?2:0)+(showTaf2?2:0);
   const sumColumn=field=>rows.reduce((sum,row)=>sum+(typeof row[field]==='bigint'?row[field]:0n),0n);
   const columnTotals={amount1403:sumColumn('amount1403'),amount1404:sumColumn('amount1404'),followUp:sumColumn('followUp'),offset1404:sumColumn('offset1404'),finalAmount:sumColumn('finalAmount')};
-  const auditYear=SR.result?.audit?.label||'۱۴۰۴';
-  const fiscalYear=cfg.year||auditYear;
-  const periodEnd=SR.result?.audit?.end?fmtD(SR.result.audit.end):fiscalYear;
+  const fiscalYear=String(cfg.year??'').trim();
   const widths=showTaf1&&showTaf2?[5,7,5,7,5,7,5,7,9,9,11,10,13]:showTaf1?[6,10,6,10,6,10,0,0,9,9,11,10,13]:showTaf2?[6,10,6,10,0,0,6,10,9,9,11,10,13]:[8,14,8,14,0,0,0,0,10,10,12,10,13];
   const colgroup='<colgroup>'+widths.map((w,i)=>`<col style="width:${w}%;"${(i===4||i===5)?' data-level="taf1"':''}${(i===6||i===7)?' data-level="taf2"':''}>`).join('')+'</colgroup>';
   return `<section class="sheet sampling-template sr-paper sr-workpaper-source" dir="rtl">
@@ -13243,7 +13241,7 @@ function workpaperHtml(){
         <div class="sr-head-company">
           <div><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${e_(cfg.company||'—')}</span></div>
           <div><span class="k">موضوع :</span> <span class="v">کاربرگ اقلام سنواتی و راکد</span></div>
-          <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span> <span class="k">(تاریخ ترازنامه :</span> <span class="v">${e_(periodEnd)} )</span></div>
+          <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span></div>
           <small class="sr-currency-note">ارقام به ریال</small>
         </div>
         <div class="sr-head-prep">
@@ -13261,7 +13259,7 @@ function workpaperHtml(){
               <div class="sr-head-company">
                 <div><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${e_(cfg.company||'—')}</span></div>
                 <div><span class="k">موضوع :</span> <span class="v">کاربرگ اقلام سنواتی و راکد</span></div>
-                <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span> <span class="k">(تاریخ ترازنامه :</span> <span class="v">${e_(periodEnd)} )</span></div>
+                <div><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${e_(fiscalYear)}</span></div>
                 <small class="sr-currency-note">ارقام به ریال</small>
               </div>
               <div class="sr-head-prep">
@@ -13390,14 +13388,13 @@ function exportXlsx(){
   const cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
   let today=''; try{ today=new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()); }catch{ today=new Date().toLocaleDateString('fa-IR'); }
   const topHeaders=['کد کل','عنوان کل','کد معین','عنوان معین','کد تفصیلی','عنوان تفصیلی','کد تفصیلی یک','عنوان تفصیلی یک','کد تفصیلی دو','عنوان تفصیلی دو','۱۴۰۳','۱۴۰۴','پیگیری سال آتی','تهاتر با حسابهای دیگر','راکد و سنواتی','کلید تطبیق'];
-  const fiscalYear=cfg.year||R.audit.label||'—';
-  const periodEnd=R.audit.end?fmtD(R.audit.end):fiscalYear;
+  const fiscalYear=String(cfg.year??'').trim();
   const sumColumn=field=>rows.reduce((sum,row)=>sum+(typeof row[field]==='bigint'?row[field]:0n),0n);
   const columnTotals={amount1403:sumColumn('amount1403'),amount1404:sumColumn('amount1404'),followUp:sumColumn('followUp'),offset1404:sumColumn('offset1404'),finalAmount:sumColumn('finalAmount')};
   const data=[
     ['نام واحد مورد رسیدگی',cfg.company||'—'],
     ['موضوع','کاربرگ اقلام سنواتی و راکد'],
-    ['سال مالی مورد رسیدگی',fiscalYear,'تاریخ ترازنامه',periodEnd],
+    ['سال مالی مورد رسیدگی',fiscalYear],
     ['تاریخ تهیه',cfg.date||today],
     ['تهیه‌کننده',cfg.prep||'—'],
     ['بررسی‌کننده',cfg.rev||'—'],
@@ -13410,7 +13407,7 @@ function exportXlsx(){
   for(let ri=8;ri<=8+rows.length;ri++) for(let ci=10;ci<=14;ci++){const cell=ws[XLSX.utils.encode_cell({r:ri,c:ci})];if(cell&&cell.t==='n')cell.z='#,##0;(#,##0);'}
   ws['!cols']=[{wch:24},{wch:34},{wch:16},{wch:26},{wch:14},{wch:20},{wch:14},{wch:20},{wch:14},{wch:20},{wch:17},{wch:17},{wch:18},{wch:18},{wch:17},{wch:2,hidden:true}];
   ws['!rows']=[{hpt:24},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:22},{hpt:8},{hpt:32},...rows.map(()=>({hpt:30})),{hpt:30}];
-  ws['!merges']=[... [0,1,3,4,5].map(r=>({s:{r,c:1},e:{r,c:15}})),{s:{r:2,c:3},e:{r:2,c:15}},{s:{r:8+rows.length,c:0},e:{r:8+rows.length,c:9}}];
+  ws['!merges']=[... [0,1,3,4,5].map(r=>({s:{r,c:1},e:{r,c:15}})),{s:{r:8+rows.length,c:0},e:{r:8+rows.length,c:9}}];
   ws['!freeze']={xSplit:10,ySplit:8,topLeftCell:'K9',activePane:'bottomRight',state:'frozen'};
   ws['!autofilter']={ref:`A8:P${Math.max(8,8+rows.length)}`};
   ws['!pageSetup']={orientation:'landscape',paperSize:9,fitToWidth:1,fitToHeight:0};

@@ -70,6 +70,11 @@ const workpaperMarkup = html.slice(workpaperStart, workpaperEnd);
 assert.match(workpaperMarkup, /نام واحد مورد رسیدگی/);
 assert.match(workpaperMarkup, /موضوع :/);
 assert.match(workpaperMarkup, /سال مالی مورد رسیدگی/);
+assert.match(workpaperMarkup, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
+assert.doesNotMatch(workpaperMarkup, /تاریخ ترازنامه|periodEnd|SR\.result\?\.audit\?\.label/,
+  'the aged worksheet does not invent a balance-sheet date or fall back to the uploaded file year');
+assert.match(html, /سال مالی مورد رسیدگی :<\/span> <span class="v">\$\{esc\(sampleDisplayDigits\(c\.year\)\)\}/,
+  'sampling uses the exact optional fiscal-year value from case metadata');
 assert.match(workpaperMarkup, /تهیه‌کننده :/);
 assert.match(workpaperMarkup, /بررسی‌کننده :/);
 assert.doesNotMatch(workpaperMarkup, /sr-report-title|sr-print-title/);
@@ -86,6 +91,11 @@ assert.match(printCode, /window\.print\(\)/);
 assert.match(exportCode, /selectionConfirmed/);
 assert.match(exportCode, /XLSX\.utils\.book_new\(\)/);
 assert.match(exportCode, /XLSX\.writeFile\(/);
+assert.match(exportCode, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
+assert.doesNotMatch(exportCode, /periodEnd|R\.audit\.label/,
+  'the XLSX workpaper does not derive fiscal-year metadata from the accounting file');
+assert.match(html, /if\(!SHEET_CFG\.company\.trim\(\)\)\{[\s\S]*?سال مالی اختیاری است/,
+  'the case may continue with an empty fiscal-year field');
 assert.match(exportCode, /x\.code==='TRANSFER_REVIEW'&&x\.fileId===currentFileId/);
 assert.doesNotMatch(exportCode, /const allResults=\[R,SR\.priorResult,SR\.nextResult\]/);
 const finalRowsStart = html.indexOf('function finalWorkpaperRows(');
