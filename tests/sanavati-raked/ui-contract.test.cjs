@@ -139,12 +139,18 @@ assert(finalRowsStart >= 0 && finalRowsEnd > finalRowsStart);
 const finalRowsCode = html.slice(finalRowsStart, finalRowsEnd);
 assert.match(finalRowsCode, /const visible=rows\.filter\(r=>rangeHasNonZero\(r\.finalRange\)\)/,
   'final worksheet filters by its final aged/stale balance, not intermediate activity columns');
-assert.match(html, /Math\.max\(11,Math\.min\(3\.2,perCtrlMm-0\.55\)\*96\/25\.4\)/,
-  'sampling control checkboxes are printed at a larger size');
+assert.match(html, /Array\.from\(\{length:n\},\(\)=>'<td class="ctl"><\/td>'\)/,
+  'sampling audit-control cells remain while their checkbox marks are omitted');
+assert.doesNotMatch(html, /\.sampling-template \.box\{display:inline-block/,
+  'sampling audit-control checkbox styling is removed');
+assert.match(html, /class="sample-page-ref" aria-label="محل عطف مانده به گردش دفاتر"/,
+  'sampling pages add a table-style reference cell beside the page number');
+assert.match(html, /صفحه \$\{faNum\(i\+1\)\} از \$\{faNum\(pages\.length\)\}/,
+  'sampling page numbers use the unified Persian wording without the small hamza');
 assert.match(html, /\.sr-aged-page-sheet \.sr-meta-grid \.sr-refbox\{[^}]*background:#fff!important/,
   'aged worksheet reference box remains white in print');
-assert.match(html, /\.sr-aged-page-number\{font-size:8pt!important/,
-  'aged worksheet page number matches the sampling footer scale');
+assert.match(html, /\.sr-aged-page-number\{font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:10\.5px!important/,
+  'aged worksheet page number uses the unified font and size');
 assert.match(html, /grid-template-columns:18mm minmax\(0,1fr\) minmax\(0,92mm\)!important/,
   'aged worksheet preparation fields have a stable-width column at the left edge');
 assert.doesNotMatch(html, /class="side sr-head-prep"/,
