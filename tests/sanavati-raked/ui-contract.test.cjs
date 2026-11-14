@@ -106,6 +106,10 @@ assert.doesNotMatch(html, /sr-meta-grid \.sr-head-prep>div\{[^}]*overflow-wrap:a
   'Persian preparation-field text is not allowed to break letter-by-letter');
 assert.match(html, /const capacity=Math\.max\(0,available-fixedHeight-18\)/,
   'manual print pagination reserves a cross-browser layout safety margin');
+assert.match(html, /\.sr-aged-page-sheet\{[^}]*padding:2mm!important[^}]*border:1\.5px solid/,
+  'outer worksheet frame is separated from the inner frame');
+assert.match(html, /\.sr-aged-page-sheet \.sr-rows-box\{padding:1\.5mm!important/,
+  'rounded table frame has an inset so the corner strokes remain visible');
 assert.match(html, /انتقال‌های حساب سال مورد رسیدگی نیازمند بررسی/);
 assert.match(html, /هشدارهای نیازمند بررسی:<\/b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر/);
 const bindingStart = html.indexOf('function bindReport(){');
