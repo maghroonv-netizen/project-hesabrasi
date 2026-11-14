@@ -88,6 +88,18 @@ assert.match(exportCode, /XLSX\.utils\.book_new\(\)/);
 assert.match(exportCode, /XLSX\.writeFile\(/);
 assert.match(exportCode, /x\.code==='TRANSFER_REVIEW'&&x\.fileId===currentFileId/);
 assert.doesNotMatch(exportCode, /const allResults=\[R,SR\.priorResult,SR\.nextResult\]/);
+const finalRowsStart = html.indexOf('function finalWorkpaperRows(');
+const finalRowsEnd = html.indexOf('\nfunction signedText(', finalRowsStart);
+assert(finalRowsStart >= 0 && finalRowsEnd > finalRowsStart);
+const finalRowsCode = html.slice(finalRowsStart, finalRowsEnd);
+assert.match(finalRowsCode, /const visible=rows\.filter\(r=>rangeHasNonZero\(r\.finalRange\)\)/,
+  'final worksheet filters by its final aged/stale balance, not intermediate activity columns');
+assert.match(html, /Math\.max\(11,Math\.min\(3\.2,perCtrlMm-0\.55\)\*96\/25\.4\)/,
+  'sampling control checkboxes are printed at a larger size');
+assert.match(html, /\.sr-aged-page-sheet \.sr-meta-grid \.sr-refbox\{[^}]*background:#fff!important/,
+  'aged worksheet reference box remains white in print');
+assert.match(html, /\.sr-aged-page-number\{font-size:8pt!important/,
+  'aged worksheet page number matches the sampling footer scale');
 assert.match(html, /انتقال‌های حساب سال مورد رسیدگی نیازمند بررسی/);
 assert.match(html, /هشدارهای نیازمند بررسی:<\/b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر/);
 const bindingStart = html.indexOf('function bindReport(){');

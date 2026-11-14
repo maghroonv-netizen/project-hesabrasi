@@ -3378,8 +3378,8 @@ function sheetHTML(w, sel, excludedRows=[]){
   const perCtrlMm=layout.controls/n;
   const cols=widths.map((mm,i)=>`<col class="sample-col-${roles[i]}" style="width:${mm}mm">`).join('')+Array.from({length:n},()=>`<col class="sample-col-control" style="width:${perCtrlMm.toFixed(6)}mm">`).join('');
   const nums=Array.from({length:n},(_,i)=>`<th class="n cn">${faNum(i+1)}</th>`).join('');
-  const boxSize=Math.max(5.5,Math.min(2.55,perCtrlMm-0.55)*96/25.4);
-  const controlFont=Math.max(7.2,Math.min(9.5,(perCtrlMm*96/25.4-1.5)/1.2));
+  const boxSize=Math.max(11,Math.min(3.2,perCtrlMm-0.55)*96/25.4);
+  const controlFont=Math.max(8.5,Math.min(11,(perCtrlMm*96/25.4-1.5)/1.2));
   const headLabels=['ردیف','سند','تاریخ','شرح','طرف حساب','عطف','بدهکار (ریال)','بستانکار (ریال)'];
   const resizableHeads=headLabels.map((lbl,i)=>`<th rowspan="2">${lbl}<span class="col-resize-handle no-print" data-col-resize="${i}" title="برای تغییر عرض ستون بکشید (دوبار کلیک: بازنشانی)"></span></th>`).join('');
   return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" data-sample-density="${layout.density||'normal'}" style="--sample-full-width:${layout.paperWidth}mm;--sample-full-height:${layout.paperHeight}mm;--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-box:${boxSize.toFixed(2)}px;--sample-control-font:${controlFont.toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
@@ -6593,8 +6593,8 @@ function sampleBasePrintMetrics(){
  // Width 268mm (Landscape) / 192mm (Portrait) fits BOTH A4 (297x210) and US Letter (279.4x215.9) without browser downscaling,
  // while height 180mm / 258mm leaves a punch-safe 16mm top margin (پانچ از بالا) + 14mm bottom footer margin on every page.
  return orientation==='landscape'
-  ?{orientation,density,n,paperWidth:297,paperHeight:210,width:268,height:180,table:261,baseCols:[6.5,10.5,16.5,43,101.5,8,21.5,21.5],baseControls:32,minControl:3.2}
-  :{orientation,density,n,paperWidth:210,paperHeight:297,width:192,height:258,table:185,baseCols:[5.8,9.5,16,30,45.2,7.5,20,20],baseControls:31,minControl:3.1};
+  ?{orientation,density,n,paperWidth:297,paperHeight:210,width:268,height:180,table:261,baseCols:[6.5,10.5,16.5,43,101.5,8,21.5,21.5],baseControls:32,minControl:4.0}
+  :{orientation,density,n,paperWidth:210,paperHeight:297,width:192,height:258,table:185,baseCols:[5.8,9.5,16,30,45.2,7.5,20,20],baseControls:31,minControl:4.0};
 }
 function sampleDefaultColumnVector(m){
  const cols=m.baseCols.slice();
@@ -7047,8 +7047,8 @@ function sampleRenderOnScreenPages(viewEl){
 function sampleApplyLiveVectorToDOM(wrapEl,vec,n){
  if(!wrapEl||!Array.isArray(vec)||vec.length<9)return;
  const perCtrl=vec[8]/n;
- const boxSize=Math.max(5.5,Math.min(2.55,perCtrl-0.55)*96/25.4);
- const controlFont=Math.max(7.2,Math.min(9.5,(perCtrl*96/25.4-1.5)/1.2));
+  const boxSize=Math.max(11,Math.min(3.2,perCtrl-0.55)*96/25.4);
+  const controlFont=Math.max(8.5,Math.min(11,(perCtrl*96/25.4-1.5)/1.2));
  wrapEl.querySelectorAll('.sheet.sampling-template').forEach(sh=>{
   sh.style.setProperty('--sample-box',boxSize.toFixed(2)+'px');
   sh.style.setProperty('--sample-control-font',controlFont.toFixed(2)+'px');
@@ -8892,11 +8892,16 @@ function followUp(k,snap,next,settings,birthOf,voided,model){
   if(auditFile&&!settings.inclusive) staleCut-=1;
   const eligibleCut=auditFile?Math.max(auditFile.start-1,staleCut):UNKNOWN;
   out.remainingEligible={D:{min:0n,max:0n},C:{min:0n,max:0n}};
+  const eligibleOpening={D:{min:0n,max:0n},C:{min:0n,max:0n}};
   const openNet=ev.filter(e=>e.docType==='OPENING').reduce((s,e)=>s+signedOf(e.amount,e.side),0n);
   if(next.hasOpening&&next.start===model.files.find(f=>f.id===model.auditFileId).end+1&&openNet!==snap.end) out.openingDiff=openNet-snap.end;
   const res={};
   for(const pass of ['MIN','MAX']){
     const b=new Book(pass,true); b.load(snap[pass],true);
+    for(const side of ['D','C']){
+      const openingEligible=b.live().filter(L=>L.tracked&&L.side===side&&(pass==='MIN'?L.late<=eligibleCut:L.early<=eligibleCut)).reduce((s,L)=>s+L.size,0n);
+      eligibleOpening[side][pass==='MIN'?'min':'max']=openingEligible;
+    }
     const dummy=[], flags=[], created=[], role=new Map();
     const normal=ev.filter(e=>e.docType==='NORMAL');
     let i=0;
@@ -8911,10 +8916,14 @@ function followUp(k,snap,next,settings,birthOf,voided,model){
     }
     const tracked=b.live().filter(L=>L.tracked);
     res[pass]=tracked.reduce((s,L)=>s+L.size,0n);
-    for(const side of ['D','C']){
-      const eligible=tracked.filter(L=>L.side===side&&(pass==='MIN'?L.late<=eligibleCut:L.early<=eligibleCut)).reduce((s,L)=>s+L.size,0n);
-      out.remainingEligible[side][pass==='MIN'?'min':'max']=eligible;
-    }
+  }
+  // ستون پیگیری سنجشِ لایهٔ واجدشرایط ابتدای سال است: گردش هم‌جهتِ مانده
+  // فقط بدهی/طلب جدید می‌سازد و هرگز به لایهٔ سنواتی قبلی افزوده نمی‌شود؛
+  // گردش خلاف‌جهت از لایهٔ واجدشرایط ابتدای سال کسر می‌شود، حتی اگر در دفتر
+  // FIFO/LIFO یک گردش هم‌جهتِ جدیدتر نیز وجود داشته باشد.
+  for(const side of ['D','C']){
+    const reducing=side==='C'?out.grossD:out.grossC;
+    for(const bound of ['min','max']){ const left=eligibleOpening[side][bound]-reducing; out.remainingEligible[side][bound]=left>0n?left:0n; }
   }
   const endAmt=babs(snap.end);
   out.remaining={min:res.MIN,max:res.MAX};
@@ -12933,7 +12942,7 @@ function paginateWorkpaperPreview(host){
   const measuredRows=rows.map(row=>{const clone=row.cloneNode(true);measureBody.appendChild(clone);return clone;});
   const rowHeights=measuredRows.map(row=>row.getBoundingClientRect().height);
   measureBox.remove();
-  const capacity=Math.max(0,available-fixedHeight),buckets=[[]],overflowFlags=[false];let used=0;
+  const capacity=Math.max(0,available-fixedHeight-18),buckets=[[]],overflowFlags=[false];let used=0;
   rows.forEach((row,i)=>{
     const h=rowHeights[i]||1;
     if(buckets[buckets.length-1].length&&used+h>capacity){buckets.push([]);overflowFlags.push(false);used=0;}
@@ -13147,8 +13156,10 @@ function finalWorkpaperRows(accountFilter=null){
       usedImport.add(x);
     }
   }
-  const nonZero=x=>x!==null&&x!==undefined&&x!==0n;
-  const visible=rows.filter(r=>[r.amount1403,r.amount1404,r.followUp,r.offset1404,r.finalAmount].some(nonZero));
+  const rangeHasNonZero=range=>!!range&&(range.min!==0n||range.max!==0n);
+  // کاربرگ نهایی فقط اقلامی را نشان می‌دهد که ماندهٔ سنواتی/راکد نهایی‌شان
+  // غیرصفر باشد؛ گردش‌ها یا تهاترهای میانی به‌تنهایی ردیف صفر نهایی را زنده نمی‌کنند.
+  const visible=rows.filter(r=>rangeHasNonZero(r.finalRange));
   visible.sort((a,b)=>a.sortSub.localeCompare(b.sortSub,'fa',{numeric:true})||a.sortDetail.localeCompare(b.sortDetail,'fa',{numeric:true}));
   return visible;
 }
@@ -13326,12 +13337,13 @@ function printReport(){
   if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
   const ph=$('printHost');if(!ph){window.alert('بخش چاپ در صفحه پیدا نشد؛ صفحه را تازه‌سازی و دوباره تلاش کنید.');return;}
   let done=false;const old=document.title,rule=document.createElement('style');rule.dataset.srLandscapePrint='true';
-  rule.textContent=`@page srAgedLandscape{size:A4 landscape;margin:0!important}
+  rule.textContent=`@page{size:A4 landscape;margin:0!important}
+    @page srAgedLandscape{size:A4 landscape;margin:0!important}
     @media print{
       html,body{width:100%!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important}
       body.printing>*:not(#printHost){display:none!important}
       body.printing #printHost{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;overflow:visible!important}
-      .sr-aged-page{page:srAgedLandscape!important;display:block!important;box-sizing:border-box!important;width:297mm!important;min-width:297mm!important;max-width:297mm!important;height:210mm!important;min-height:210mm!important;margin:0!important;padding:16mm 7.5mm 14mm!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;overflow:hidden!important;break-after:page!important;page-break-after:always!important}
+      .sr-aged-page{page:srAgedLandscape!important;display:block!important;box-sizing:border-box!important;width:297mm!important;min-width:297mm!important;max-width:297mm!important;height:210mm!important;min-height:210mm!important;max-height:210mm!important;margin:0!important;padding:13mm 7.5mm 11mm!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;overflow:hidden!important;break-before:auto!important;break-inside:avoid!important;page-break-inside:avoid!important;break-after:page!important;page-break-after:always!important}
       .sr-aged-page:last-child{break-after:auto!important;page-break-after:auto!important}
       .sr-aged-page-sheet{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:2px!important;box-shadow:none!important;border:1.5px solid #9e0000!important;border-radius:10px!important;overflow:visible!important;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:7pt!important}
       .sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:1px solid #64748b!important;border-radius:7px!important;padding:2px!important}
@@ -13339,15 +13351,16 @@ function printReport(){
       .sr-aged-page-sheet .sr-paper-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;border-spacing:0!important;page-break-inside:auto!important;break-inside:auto!important}
       .sr-aged-page-sheet .sr-paper-table thead{display:table-header-group!important}
       .sr-aged-page-sheet .sr-paper-table tbody{display:table-row-group!important}
-      .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:6.5pt!important;padding:.7mm .5mm!important;line-height:1.15!important;overflow-wrap:anywhere!important}
-      .sr-aged-page-sheet .sr-paper-table td.num{font-size:6.3pt!important;white-space:nowrap!important;direction:ltr!important}
-      .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr)!important;gap:1.5mm!important;align-items:center!important;min-height:15mm!important;padding:1mm 2mm!important;background:#fffaf0!important;border-bottom:1px solid #64748b!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:6.5pt!important;line-height:1.2!important}
-      .sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:22mm!important;height:14mm!important;box-sizing:border-box!important;border:1px solid #c00000!important;border-radius:9px!important;background:#ddebf7!important}
-      .sr-aged-page-sheet .sr-currency-note{font-size:5.8pt!important;line-height:1!important}
+      .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:7.6pt!important;padding:.8mm .55mm!important;line-height:1.18!important;overflow-wrap:anywhere!important}
+      .sr-aged-page-sheet .sr-paper-table td.num{font-size:7.3pt!important;white-space:nowrap!important;direction:ltr!important}
+      .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:19mm minmax(0,1.55fr) minmax(0,1fr)!important;gap:2mm!important;align-items:center!important;min-height:19mm!important;padding:1.5mm 2.5mm!important;background:#fffaf0!important;border-bottom:1px solid #64748b!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:8pt!important;line-height:1.28!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-head-prep>div{white-space:normal!important;overflow-wrap:anywhere!important}
+      .sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:18mm!important;height:14mm!important;box-sizing:border-box!important;border:1px solid #c00000!important;border-radius:9px!important;background:#fff!important}
+      .sr-aged-page-sheet .sr-currency-note{font-size:7pt!important;line-height:1.15!important}
       .sr-aged-page-sheet .sr-paper-table thead .sr-group-head th{background:#fff2cc!important;color:#1f2937!important}
       .sr-aged-page-sheet .sr-paper-table tbody tr:nth-child(even) td{background:#fffcf2!important}
-      .sr-aged-page-number{font-size:7pt!important;line-height:1.1!important;padding-top:1mm!important;text-align:center!important;color:#111827!important}
+      .sr-aged-page-number{font-size:8pt!important;font-weight:700!important;line-height:1.25!important;padding-top:1mm!important;text-align:center!important;color:#111827!important}
     }`;
   const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=old;document.body.classList.remove('printing');ph.replaceChildren();rule.remove();};
   ph.replaceChildren(...pageNodes.map(node=>node.cloneNode(true)));
@@ -13556,8 +13569,8 @@ css.textContent=`
 .sr-paper.sampling-template{--sample-red:#9e0000;--sample-gold:#fff2cc;--sample-line:#475569;--sample-ink:#111827;box-sizing:border-box;width:100%;min-width:0;max-width:none;margin:10px auto;background:#fff;color:#111827;border:1.8px solid #9e0000;border-radius:15px;padding:4px;box-shadow:0 6px 24px #00000022;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif}
 .sr-paper.sampling-template>.inner{border:1.2px solid #64748b;border-radius:12px;padding:5px;overflow:hidden}
 .sr-paper .sr-screen-head{display:grid;grid-template-columns:24mm minmax(0,1.7fr) minmax(0,1fr);align-items:center;gap:8px;padding:6px 11px;background:linear-gradient(180deg,#fffaf0,#fff2cc);border-bottom:1.3px solid #334155;text-align:right;margin:0}
-.sr-paper .sr-refbox{box-sizing:border-box;width:23mm;height:17mm;justify-self:center;border:1px solid #c00000;border-radius:9px;background:#ddebf7;padding:0}
-.sr-paper .sr-screen-head .sr-refbox{width:23mm;height:17mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}
+.sr-paper .sr-refbox{box-sizing:border-box;width:23mm;height:17mm;justify-self:center;border:1px solid #c00000;border-radius:9px;background:#fff;padding:0}
+.sr-paper .sr-screen-head .sr-refbox{width:23mm;height:17mm;border:1px solid #c00000;border-radius:9px;background:#fff}
 .sr-paper .sr-head-company,.sr-paper .sr-head-prep{font-size:11px;line-height:1.45;text-align:right}
 .sr-paper .sr-head-company .k{color:#005a9e;font-weight:bold}.sr-paper .sr-head-company .v{font-weight:bold}
 .sr-paper .sr-head-prep{border-right:1.2px dashed #a8a8a8;padding-right:10px}
@@ -13582,7 +13595,7 @@ css.textContent=`
 .sr-paper .sr-paper-table .sr-print-meta th{background:transparent}
 .sr-paper .sr-paper-table .sr-print-title th{background:#fff;text-align:right}
 .sr-paper .sr-meta-grid{display:grid;grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:2mm;align-items:center;direction:rtl;text-align:right;padding:6px 9px;background:linear-gradient(180deg,#fffaf0,#fff2cc)}
-.sr-paper .sr-meta-grid .sr-refbox{width:22mm;height:15mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}
+.sr-paper .sr-meta-grid .sr-refbox{width:22mm;height:15mm;border:1px solid #c00000;border-radius:9px;background:#fff}
 .sr-paper .sr-currency-note{display:block;font-size:9px;color:#475569;line-height:1.2}
 @media(max-width:700px){.sr-paper.sampling-template{width:297mm;max-width:none}.sr-report-shell{overflow:auto}}
 
@@ -13604,11 +13617,11 @@ css.textContent=`
 .sample-paper-box.sr-aged-page{box-sizing:border-box;width:297mm;height:210mm;min-height:210mm;padding:16mm 7.5mm 14mm;margin:0 auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 18px #00000014;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;overflow:hidden;break-after:page;page-break-after:always}
 .sr-aged-page-sheet{box-sizing:border-box;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:2px!important;box-shadow:none!important;border:1.5px solid #9e0000!important;border-radius:10px!important;overflow:visible!important}
 .sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:1px solid #64748b!important;border-radius:7px!important;padding:2px!important}
-.sr-aged-page-sheet .sr-screen-head{grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:1.5mm;padding:2px 5px}.sr-aged-page-sheet .sr-refbox{width:22mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}.sr-aged-page-sheet .sr-head-company,.sr-aged-page-sheet .sr-head-prep{font-size:7px;line-height:1.2}.sr-aged-page-sheet .sr-head-prep{padding-right:5px}
+.sr-aged-page-sheet .sr-screen-head{grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:1.5mm;padding:2px 5px}.sr-aged-page-sheet .sr-refbox{width:22mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#fff}.sr-aged-page-sheet .sr-head-company,.sr-aged-page-sheet .sr-head-prep{font-size:7px;line-height:1.2}.sr-aged-page-sheet .sr-head-prep{padding-right:5px}
 .sr-aged-page-sheet .sr-screen-head{display:none!important}.sr-aged-page-sheet .sr-rows-box{overflow:visible}
-.sr-aged-page-sheet .sr-meta-grid{grid-template-columns:23mm minmax(0,1.7fr) minmax(0,1fr);gap:1mm;padding:1px 4px}.sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:22mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#ddebf7}.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:7px;line-height:1.15}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{padding-right:4px}
+.sr-aged-page-sheet .sr-meta-grid{grid-template-columns:19mm minmax(0,1.55fr) minmax(0,1fr);gap:2mm;min-height:19mm;padding:1.5mm 2.5mm}.sr-aged-page-sheet .sr-meta-grid .sr-refbox{width:18mm;height:14mm;border:1px solid #c00000;border-radius:9px;background:#fff}.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:8pt;line-height:1.28}.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{padding-right:4px}.sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:10px;line-height:1.18;padding:.8mm .55mm}.sr-aged-page-sheet .sr-paper-table td.num{font-size:9.7px}
 .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{padding:2px 1.5px;line-height:1.16}.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-meta,.sr-aged-page-sheet .sr-paper-table thead tr.sr-print-title{display:table-row}.sr-aged-page-sheet .sr-paper-table .sr-print-title th{font-size:8px;padding:1px 4px}
-.sr-aged-page-number{flex:0 0 auto;margin-top:2px;padding-top:2px;text-align:center;font-size:10px;font-weight:700;color:#334155}.sr-aged-page-overflow{height:auto!important;min-height:210mm!important;overflow:visible!important;border-color:#b91c1c;box-shadow:0 0 0 2px #fecaca}
+.sr-aged-page-number{flex:0 0 auto;margin-top:2px;padding-top:2px;text-align:center;font-size:10.5px;font-weight:700;line-height:1.25;color:#334155}.sr-aged-page-overflow{height:auto!important;min-height:210mm!important;overflow:visible!important;border-color:#b91c1c;box-shadow:0 0 0 2px #fecaca}
 @media(max-width:720px){.sr-tb-titlebar,.sr-tb-footer{align-items:stretch}.sr-tb-titlebar>div,.sr-tb-toolbar{width:100%}.sr-aged-preview-pages{align-items:flex-start}}
 `;
 document.head.appendChild(css);

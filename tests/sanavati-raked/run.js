@@ -202,6 +202,30 @@ test('T27 (بند ۱۵) تطبیق کدینگ: عنوان یکسان + پیوس�
   ok(!r1.exceptions.some(x=>x.code==='OPENING_MISMATCH'),'پس از تأیید، زنجیره پیوسته است');
 });
 
+console.log('\n— پیگیری ماندهٔ سنواتی در گردش سال بعد —');
+function followCase(auditYear,movements){
+  SEQ=0;
+  const prior=year('prior',auditYear,[row(1,auditYear+'/01/01',0,1000)]);
+  const nextYear=auditYear+1, nextRows=[row(1,nextYear+'/01/01',0,1000),...movements.map((m,i)=>row(i+2,nextYear+'/'+m.date,m.debit||0,m.credit||0))];
+  const current=year('next',nextYear,nextRows);
+  const {r}=run([prior,current],'prior',{thresholds:[12]});
+  return key1(r).next;
+}
+test('ماندهٔ پرداختنی ۱۰۰۰ در ۱۴۰۳ بدون گردش در ۱۴۰۴/۱۴۰۵ کاملاً پیگیری می‌شود',()=>{
+  for(const y of [1403,1404]){ const f=followCase(y,[]); eq(f.remainingEligible.C.min,1000n);eq(f.remainingEligible.C.max,1000n); }
+});
+test('گردش بستانکارِ افزایندهٔ پرداختنی، ماندهٔ سنواتی قدیمی را زیاد نمی‌کند',()=>{
+  for(const y of [1403,1404]){ const f=followCase(y,[{date:'06/01',credit:350}]);eq(f.remainingEligible.C.min,1000n);eq(f.remainingEligible.C.max,1000n); }
+});
+test('گردش بدهکارِ کاهندهٔ پرداختنی از لایهٔ قدیمی می‌کاهد؛ باقیمانده پیگیری می‌شود',()=>{
+  for(const y of [1403,1404]){ const f=followCase(y,[{date:'06/01',debit:275}]);eq(f.remainingEligible.C.min,725n);eq(f.remainingEligible.C.max,725n); }
+});
+test('ترکیب افزایش بستانکار و کاهش بدهکار فقط کاهش را از بدهی سنواتی کم می‌کند، مستقل از ترتیب گردش‌ها',()=>{
+  for(const y of [1403,1404]) for(const movements of [[{date:'05/01',credit:500},{date:'07/01',debit:300}],[{date:'05/01',debit:300},{date:'07/01',credit:500}]]){
+    const f=followCase(y,movements);eq(f.remainingEligible.C.min,700n);eq(f.remainingEligible.C.max,700n);
+  }
+});
+
 console.log('\n— چک، برگشت، فعالیت —');
 test('T17 (ایراد ۱) برگشت چکِ متصلِ تأییدشده ← حذف جفت و محاسبه از ابتدا (کمینه ۰)',()=>{
   SEQ=0;
