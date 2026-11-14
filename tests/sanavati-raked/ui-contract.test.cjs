@@ -100,6 +100,12 @@ assert.match(html, /\.sr-aged-page-sheet \.sr-meta-grid \.sr-refbox\{[^}]*backgr
   'aged worksheet reference box remains white in print');
 assert.match(html, /\.sr-aged-page-number\{font-size:8pt!important/,
   'aged worksheet page number matches the sampling footer scale');
+assert.match(html, /grid-template-columns:18mm minmax\(0,1fr\) 92mm!important/,
+  'aged worksheet preparation fields have a stable-width column at the left edge');
+assert.doesNotMatch(html, /sr-meta-grid \.sr-head-prep>div\{[^}]*overflow-wrap:anywhere/,
+  'Persian preparation-field text is not allowed to break letter-by-letter');
+assert.match(html, /const capacity=Math\.max\(0,available-fixedHeight-18\)/,
+  'manual print pagination reserves a cross-browser layout safety margin');
 assert.match(html, /انتقال‌های حساب سال مورد رسیدگی نیازمند بررسی/);
 assert.match(html, /هشدارهای نیازمند بررسی:<\/b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر/);
 const bindingStart = html.indexOf('function bindReport(){');
