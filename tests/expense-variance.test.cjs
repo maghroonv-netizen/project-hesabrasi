@@ -39,25 +39,28 @@ function dispatchFile(input, file) {
   try {
     await sleep(100);
     // Reveal the app's module picker as if the existing shared import has completed.
-    w.eval("ENTRY.phase='ready'; ACCOUNT_ROWS=[{}]; currentHeaders=['fixture']; renderModuleHome();");
+    w.eval(`ENTRY.phase='ready'; FULL_ROWS=[
+      {'کد حساب کل':'61','عنوان حساب کل':'هزینه‌های اداری','کد حساب معین':'006101','عنوان حساب معین':'حقوق','بدهکار':1500,'بستانکار':0,'شرح ردیف':'  پرداخت-123  '},
+      {'کد حساب کل':'61','عنوان حساب کل':'هزینه‌های اداری','کد حساب معین':'6102','عنوان حساب معین':'هزینه بدون مبنا','بدهکار':0,'بستانکار':0.4,'شرح ردیف':'شرح سال جاری'},
+      {'کد حساب کل':'61','عنوان حساب کل':'هزینه‌های اداری','کد حساب معین':'6103','عنوان حساب معین':'حساب فقط در سال جاری','بدهکار':500,'بستانکار':0,'شرح ردیف':''},
+      {'کد حساب کل':'62','عنوان حساب کل':'هزینه مالی','کد حساب معین':'6201','عنوان حساب معین':'هزینه تأمین مالی','بدهکار':250,'بستانکار':0,'شرح ردیف':'شرح هزینه مالی'}
+    ]; ACCOUNT_ROWS=FULL_ROWS; currentHeaders=['fixture']; renderModuleHome();`);
     assert.ok(w.document.querySelector('[data-open="variance"]'), 'expense variance appears in the module picker');
     w.document.querySelector('[data-open="variance"]').click();
     for (const input of w.document.querySelectorAll('.v-unit')) { input.value = 'million'; input.dispatchEvent(new w.Event('change', { bubbles: true })); }
 
+    assert.equal(w.document.querySelectorAll('#varianceV1 input.v-file').length, 1, 'only the prior-year file is requested here');
+    assert.ok(w.document.querySelector('#varianceV1').textContent.includes('بارگذاری دوباره لازم نیست'), 'the already-loaded current-year source is reused');
     const headers = ['کد حساب کل', 'عنوان حساب کل', 'کد حساب معین', 'عنوان حساب معین', 'بدهکار', 'بستانکار', 'شرح ردیف'];
     const prior = makeFile('سال قبل', [
       headers,
       ['61', 'هزینه‌های اداری', '', '', 90000, 0, 'جمع کل تکراری'],
       ['61', 'هزینه‌های اداری', '006101', 'حقوق', 1000, 0, 'پرداخت حقوق'],
-      ['61', 'هزینه‌های اداری', '6102', 'هزینه بدون مبنا', 0, 0, 'شرح سال قبل']
+      ['61', 'هزینه‌های اداری', '6102', 'هزینه بدون مبنا', 0, 0, 'شرح سال قبل'],
+      ['62', 'هزینه مالی', '', '', 300, 0, 'جمع کل دوم'],
+      ['62', 'هزینه مالی', '6201', 'هزینه تأمین مالی', 200, 0, 'شرح قبلی هزینه مالی']
     ], 'prior.xlsx');
-    const current = makeFile('سال جاری', [
-      headers,
-      ['61', 'هزینه‌های اداری', '', '', 99000, 0, 'جمع کل تکراری'],
-      ['61', 'هزینه‌های اداری', '006101', 'حقوق', 1500, 0, '  پرداخت-123  '],
-      ['61', 'هزینه‌های اداری', '6102', 'هزینه بدون مبنا', -0.4, 0, 'شرح سال جاری'],
-      ['61', 'هزینه‌های اداری', '6103', 'حساب فقط در سال جاری', 500, 0, '']
-    ], 'current.xlsx');
+
 
     for (const [index, year] of [[0, '۱۴۰۳'], [1, '۱۴۰۴']]) {
       const input = w.document.querySelector(`.v-year[data-i="${index}"]`);
@@ -65,19 +68,16 @@ function dispatchFile(input, file) {
       input.dispatchEvent(new w.Event('change', { bubbles: true }));
     }
     dispatchFile(w.document.querySelector('.v-file[data-i="0"]'), prior);
-    await sleep(100);
-    dispatchFile(w.document.querySelector('.v-file[data-i="1"]'), current);
-    for (let n = 0; n < 80 && (w.document.querySelectorAll('#varianceV1 .variance-fname').length < 2 || ![...w.document.querySelectorAll('#varianceV1 .variance-fname')].every(el => el.textContent.includes('فایل خوانده شد'))); n++) await sleep(25);
-    assert.equal(w.document.querySelectorAll('#varianceV1 .variance-fname').length, 2);
-    assert.ok([...w.document.querySelectorAll('#varianceV1 .variance-fname')].every(el => el.textContent.includes('فایل خوانده شد')));
+    for (let n = 0; n < 80 && !w.document.querySelector('#varianceV1 .variance-fname')?.textContent.includes('فایل خوانده شد'); n++) await sleep(25);
+    assert.ok(w.document.querySelector('#varianceV1 .variance-fname').textContent.includes('فایل خوانده شد'));
 
     w.document.querySelector('#varianceV1 [data-vnext]').click();
     w.document.querySelector('#varianceV2 [data-vmap-confirm]').click();
     assert.equal(w.eval('CUR_STEP'), 'v3');
-    assert.ok(w.document.querySelector('#varianceV3').textContent.includes('برای جلوگیری از دوباره‌شماری: 1'), 'major-level totals are ignored when detail accounts are present');
+    assert.ok(w.document.querySelector('#varianceV3').textContent.includes('برای جلوگیری از دوباره‌شماری: 2'), 'major-level totals are ignored when detail accounts are present');
     w.document.querySelector('#varianceV3 #vSelectVisible').click();
-    assert.equal(w.document.querySelectorAll('#varianceV3 [data-vaccount]:checked').length, 3);
-    for (const input of w.document.querySelectorAll('#varianceV3 [data-vcategory]')) { input.value = 'هزینه مالی'; input.dispatchEvent(new w.Event('change', { bubbles: true })); }
+    assert.equal(w.document.querySelectorAll('#varianceV3 [data-vaccount]:checked').length, 4);
+    assert.equal(w.document.querySelectorAll('#varianceV3 [data-vcategory]').length, 0, 'accounts are grouped by their major account without manual category selection');
     w.document.querySelector('#varianceV3 [data-vconfirm]').click();
 
     assert.equal(w.document.querySelector('#metaSubject'), null, 'the case-information form does not request a redundant subject');
@@ -86,11 +86,13 @@ function dispatchFile(input, file) {
     assert.equal(paper.querySelectorAll('thead th').length, 8, 'main table has exactly eight columns');
     assert.equal([...paper.querySelectorAll('col')].reduce((total, col) => total + parseFloat(col.style.width), 0), 768.1, 'specified column widths add to 768.1 pt');
     assert.equal(w.document.querySelectorAll('#varianceV4 .variance-summary thead th').length, 5, 'summary has exactly five columns');
-    assert.equal(w.document.querySelectorAll('#varianceV4 .variance-summary tbody tr').length, 5, 'the summary lists all five required groups');
+    assert.equal(w.document.querySelectorAll('#varianceV4 .variance-summary tbody tr').length, 2, 'the summary has one row for each major-account group');
+    assert.ok(paper.tBodies[0].rows[0].textContent.includes('هزینه‌های اداری'), 'group heading comes from the major account title');
+    assert.ok([...paper.tBodies[0].rows].some(row => row.classList.contains('variance-group-title') && row.textContent.includes('هزینه مالی')), 'a second major account becomes a separate group automatically');
     assert.equal(w.document.querySelectorAll('#varianceV4 [data-vnote]').length, 0, 'no AI or auditor note editor is mixed into source descriptions');
     const lines = [...paper.tBodies[0].rows];
     const dataRows = lines.filter(line => !line.classList.contains('variance-group-title') && !line.classList.contains('variance-workpaper-subtotal'));
-    assert.equal(dataRows.length, 3);
+    assert.equal(dataRows.length, 4);
     const first = dataRows.find(line => line.querySelector('td:nth-child(2)')?.textContent === '۰۰۶۱۰۱');
     assert.ok(first?.textContent.includes('۵۰٫۰۰٪'), 'percentage is calculated from current and prior amounts after unit conversion');
     assert.equal(first.querySelector('td:nth-child(4)').textContent, '۱٬۵۰۰٬۰۰۰٬۰۰۰', 'million-rial input is converted to rial before display and calculation');
@@ -102,7 +104,8 @@ function dispatchFile(input, file) {
     assert.ok(negative.querySelector('td:nth-child(4)').classList.contains('vnegative'), 'negative amount receives the dark-red print class');
     assert.equal(negative.querySelector('td:nth-child(4)').textContent, '(۴۰۰٬۰۰۰)', 'decimal million-rial amounts convert exactly to whole rial');
     assert.equal(negative.querySelector('td:nth-child(7)').classList.contains('vnegative'), false, 'negative percentages are not styled red');
-    assert.equal(lines.filter(line => line.classList.contains('variance-workpaper-subtotal')).length, 5, 'group subtotal is printed');
+    assert.equal(lines.filter(line => line.classList.contains('variance-group-title')).length, 2, 'one group is emitted per major account');
+    assert.equal(lines.filter(line => line.classList.contains('variance-workpaper-subtotal')).length, 2, 'major-account subtotals are printed');
     assert.ok(!paper.textContent.includes('کنترل‌های حسابرسی') && !paper.textContent.includes('یادداشت حسابرس'));
     let printed = null;
     w.print = () => { printed = [...w.document.querySelectorAll('#printHost .variance-print-page')].map(page => ({
@@ -117,12 +120,12 @@ function dispatchFile(input, file) {
       }
     };
     w.document.querySelector('#varianceV4 [data-vprint]').click();
-    assert.equal(printed.length, 2, 'data pagination contains a final page for the summary');
+    assert.equal(printed.length, 1, 'compact major-account data and summary fit on one page');
     assert.ok(printed.every(page => page.headers === 1), 'metadata header repeats on every page');
     assert.ok(printed.every(page => !/کنترل‌های حسابرسی|عطف|یادداشت حسابرس|حد نوسان|درصد سال|اقلام پرنوسان/.test(w.document.querySelector('#printHost').textContent)), 'removed audit-control fields and fluctuation-count text are absent from print');
-    assert.ok(printed.every(page => page.mainHead === 1), 'main table header repeats on every data page');
-    assert.equal(printed[1].summaryHead, 5, 'summary uses exactly five columns when it fits on the final page');
-    assert.ok(printed[1].pageNumber.includes('از ۲'), 'pagination reports total page count');
+    assert.equal(printed[0].mainHead, 1, 'main table header is present on the data page');
+    assert.equal(printed[0].summaryHead, 5, 'summary uses exactly five columns when it fits on the final page');
+    assert.ok(printed[0].pageNumber.includes('از ۱'), 'pagination reports total page count');
     if (typeof w.__activePrintRestore === 'function') w.__activePrintRestore();
 
     const stressTitle = w.document.createElement('tr');
@@ -152,14 +155,14 @@ function dispatchFile(input, file) {
     };
     w.document.querySelector('#varianceV4 [data-vai]').click();
     for (let n = 0; n < 40 && !w.document.querySelector('#varianceV4 #vAiStatus')?.textContent.includes('پیشنهاد دریافت شد'); n++) await sleep(25);
-    assert.equal(sent.length, 3);
+    assert.equal(sent.length, 4);
     assert.equal(sent.find(item => item.account.sub_code === '6103').prior_amount, null, 'AI receives missing-year as null, not a made-up zero');
-    assert.equal(sent.find(item => item.account.sub_code === '006101').current_amount, '1500000000', 'AI receives converted rial amounts');
+    assert.equal(sent.find(item => item.account.sub_code === '006101').current_amount, '1500000000', 'AI receives converted rial amounts from the already-loaded workbook');
     assert.ok(sent.every(item => !Object.hasOwn(item, 'description_evidence')), 'transaction descriptions are excluded unless the user opts in');
     assert.ok(w.document.querySelector('#varianceV4 #vAiStatus').textContent.includes('نیازمند بازبینی حسابرس'));
 
     if (errors.length) throw new Error('jsdom errors: ' + errors.join(' | '));
-    console.log('expense variance UI: passed (two-file mapping, units, category assignment, exact eight-column layout, computations, verbatim descriptions and explicit AI request)');
+    console.log('expense variance UI: passed (prior-year mapping, reuse of initial current-year data, account-grouping, units, exact table layout, computations, verbatim descriptions and explicit AI request)');
   } finally {
     dom.window.close();
   }
