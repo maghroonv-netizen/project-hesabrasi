@@ -80,6 +80,8 @@ function dispatchFile(input, file) {
     for (const input of w.document.querySelectorAll('#varianceV3 [data-vcategory]')) { input.value = 'هزینه مالی'; input.dispatchEvent(new w.Event('change', { bubbles: true })); }
     w.document.querySelector('#varianceV3 [data-vconfirm]').click();
 
+    assert.equal(w.document.querySelector('#metaSubject'), null, 'the case-information form does not request a redundant subject');
+    assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('بررسی نوسانات هزینه'), 'the module supplies its own workpaper subject');
     const paper = w.document.querySelector('#varianceV4 .variance-paper-table');
     assert.equal(paper.querySelectorAll('thead th').length, 8, 'main table has exactly eight columns');
     assert.equal([...paper.querySelectorAll('col')].reduce((total, col) => total + parseFloat(col.style.width), 0), 768.1, 'specified column widths add to 768.1 pt');
