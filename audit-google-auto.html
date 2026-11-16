@@ -8401,7 +8401,7 @@ function build(input){
   });
   files.forEach(f=>{
     if(!f.keyFields.length) exceptions.push({code:'NO_KEY_LEVEL',severity:'warn',fileId:f.id,detail:'هیچ ستون تفصیلی برای کلید انتخاب نشده؛ همهٔ محاسبات در سطح معین و با هشدار اختلاط اشخاص است'});
-    if(!f.hasOpening&&f===files[0]) exceptions.push({code:'FIRST_YEAR_NO_OPENING',severity:'warn',fileId:f.id,detail:'اولین فایل زنجیره سند افتتاحیه/مانده اول دوره ندارد؛ محاسبه از صفر آغاز می‌شود و مانده‌های قبل از شروع زنجیره قابل ردیابی نیستند؛ اقلام سنواتی و راکد ممکن است کمتر از واقع باشند'});
+    if(!f.hasOpening&&f===files[0]) exceptions.push({code:'FIRST_YEAR_NO_OPENING',severity:'warn',fileId:f.id,detail:'برای نخستین سال زنجیره، افتتاحیه ارائه نشده است؛ نبود داده به‌معنای صفر نیست. قدمت مانده‌های پایان دوره تا سقف ماندهٔ موجود نامشخص گزارش می‌شود.'});
     if(f.hasOpening&&!f.openingDocs.size) exceptions.push({code:'OPENING_NOT_SET',severity:'warn',fileId:f.id,detail:'سند افتتاحیه برای این فایل مشخص نشده است'});
   });
   for(let i=0;i<files.length;i++) for(let j=i+1;j<files.length;j++){
@@ -8813,6 +8813,17 @@ function analyze(model,settings){
       const sanFree=bmin(createdSide.filter(x=>x.early<=auditStartCut).reduce((s,x)=>s+x.size,0n),endAmt);
       k.sanavati.modelFreeMax=sanFree>k.sanavati.max?sanFree:k.sanavati.max;
       k.sanavati.risk=sanFree>k.sanavati.max?sanFree-k.sanavati.max:0n;
+      // No opening balance is not evidence of zero prior history. Conservatively retain
+      // an unquantified pre-period possibility up to the closing balance, separate from
+      // the ledger layers so the ledger reconciliation itself remains exact.
+      const firstEvidenceYear=chain[0];
+      if(firstEvidenceYear&&!firstEvidenceYear.hasOpening&&endAmt>0n){
+        if(k.unknown.max<endAmt) k.unknown.max=endAmt;
+        if(k.sanavati.max<endAmt) k.sanavati.max=endAmt;
+        if(k.sanavati.modelFreeMax<endAmt) k.sanavati.modelFreeMax=endAmt;
+        k.sanavati.risk=k.sanavati.modelFreeMax>k.sanavati.max?k.sanavati.modelFreeMax-k.sanavati.max:0n;
+        k.stale.forEach(s=>{if(s.max<endAmt)s.max=endAmt;if(s.modelFreeMax<endAmt)s.modelFreeMax=endAmt;s.risk=s.modelFreeMax>s.max?s.modelFreeMax-s.max:0n;});
+      }
       k.width=endAmt===0n?null:Number(k.sanavati.max-k.sanavati.min)/Number(endAmt);
       if(!(k.sanavati.min<=k.sanavati.max&&k.sanavati.max<=endAmt)) checks.push({detail:'کنترل کمینه ≤ بیشینه ≤ مانده نقض شد'});
       k.stale.forEach(s=>{ if(!(s.min<=s.max&&s.max<=endAmt)) checks.push({detail:'کنترل آستانه '+s.T+' ماه نقض شد'}); });
@@ -12271,6 +12282,11 @@ function srYearPlan(){
   const year=srCaseYear();
   return year?{audit:year,history:year-2,prior:year-1,next:year+1}:null;
 }
+function srRoleYear(role,plan){ return role==='audit'?plan?.audit:role==='prior'?plan?.prior:role==='history'?plan?.history:role==='next'?plan?.next:null; }
+function srFilesYearValid(plan){
+  if(!plan)return false;
+  return SR.files.every(f=>f.status==='ok'&&srFileYear(f)===srRoleYear(f.isMain?'audit':f.periodRole,plan));
+}
 const srYearText=year=>year==null?'سال مالی مشخص‌نشده':fa(year);
 const srFileYear=file=>{const day=file?.maxDay??file?.end;return day!=null?SRE.dayToJalali(day).jy:null;};
 window.srRefreshYearPlan=function(){
@@ -12298,8 +12314,8 @@ function invalidate(level){            // level: 'model' (ساختار داده 
   SR.result=null; SR.priorResult=null; SR.nextResult=null;
 }
 function srStepReady(n){
-  const plan=srYearPlan(), main=SR.files.find(f=>f.isMain), history=SR.files.find(f=>f.periodRole==='history'), next=SR.files.find(f=>f.periodRole==='next');
-  const periodsReady=!!plan&&!!main&&main.status==='ok'&&srFileYear(main)===plan.audit&&!!history&&history.status==='ok'&&srFileYear(history)===plan.history&&!!next&&next.status==='ok'&&srFileYear(next)===plan.next;
+  const plan=srYearPlan(), main=SR.files.find(f=>f.isMain);
+  const periodsReady=!!plan&&!!main&&main.status==='ok'&&srFileYear(main)===plan.audit&&srFilesYearValid(plan);
   if(n==='s1') return periodsReady;
   if(n==='s2') return periodsReady&&SR.files.filter(f=>f.status==='ok').length===SR.files.length;
   if(n==='s3') return SR.mapped;
@@ -12435,7 +12451,7 @@ function guessYear(f){
   f.label=fa(SRE.dayToJalali(f.end).jy);
 }
 async function addFiles(list,periodRole){
-  if(!['history','next'].includes(periodRole)){ alert('فقط فایل‌های اسناد دو سال قبل یا سال بعد در این مرحله درخواست می‌شوند.'); return; }
+  if(!['history','prior','next'].includes(periodRole)){ alert('فقط فایل‌های خام سال قبل، دو سال قبل یا سال بعد در این مرحله درخواست می‌شوند.'); return; }
   if(!list||!list.length) return;
   if(list.length>1){ alert('برای هر جایگاه فقط یک فایل سالانه انتخاب کنید.'); return; }
   if(SR.files.some(f=>f.periodRole===periodRole&&!f.isMain)){
@@ -12580,39 +12596,38 @@ function addMainFile(){
 /* ------------------------------------------------------- مرحلهٔ ۱: سال‌ها */
 function renderFiles(){
   const host=$('srS1'); if(!host) return;
-  const plan=srYearPlan(), main=SR.files.find(f=>f.isMain), history=SR.files.find(f=>f.periodRole==='history'), next=SR.files.find(f=>f.periodRole==='next'), wp=SR.priorWorkpaper;
-  const fileCard=(f,label)=>!f?`<div class="sr-year-empty"><b>${label}</b><span>هنوز بارگذاری نشده</span></div>`:`
+  const plan=srYearPlan(), main=SR.files.find(f=>f.isMain), wp=SR.priorWorkpaper;
+  const roleSpecs=[
+    {role:'history',year:plan?.history,title:'اسناد خام دو سال قبل',required:false},
+    {role:'prior',year:plan?.prior,title:'اسناد خام سال قبل',required:false},
+    {role:'next',year:plan?.next,title:'اسناد خام سال بعد برای پیگیری',required:false}
+  ];
+  const fileCard=(f,label)=>!f?`<div class="sr-year-empty"><b>${label}</b><span>ارائه نشده — اختیاری</span></div>`:`
     <div class="sr-file ${f.status}">
       <div class="sr-file-h"><b>${label}: ${e_(f.name)}</b>${!f.isMain?`<button type="button" class="btn ghost sr-x" data-del="${f.id}">حذف</button>`:'<span class="sr-tag">از فایل اصلی برنامه</span>'}</div>
       ${f.status==='reading'?'<div class="hint">در حال خواندن فایل…</div>':''}
       ${f.status==='error'?`<div class="err">${e_(f.error)}</div>`:''}
-      ${f.status==='ok'?`<div class="sr-file-b">${f.sheetNames&&f.sheetNames.length>1?`<label>برگه: <select data-sheet="${f.id}">${f.sheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${e_(n)}</option>`).join('')}</select></label>`:''}
-        <span>${fa(f.data.length.toLocaleString())} ردیف</span><span>${f.minDay!=null?`از ${fmtD(f.minDay)} تا ${fmtD(f.maxDay)}`:'تاریخ قابل تشخیص نیست'}</span>
-        ${srFileYear(f)!=null?`<span>سال تشخیص‌داده‌شده از تاریخ فایل: ${srYearText(srFileYear(f))}</span>`:''}</div>${plan&&srFileYear(f)!==plan[f.isMain?'audit':f.periodRole]?`<div class="err">سال این فایل ${srYearText(srFileYear(f))} است؛ سال مورد انتظار ${srYearText(plan[f.isMain?'audit':f.periodRole])} است.</div>`:''}`:''}
+      ${f.status==='ok'?`<div class="sr-file-b"><span>${fa(f.data.length.toLocaleString())} ردیف</span><span>${f.minDay!=null?`از ${fmtD(f.minDay)} تا ${fmtD(f.maxDay)}`:'تاریخ قابل تشخیص نیست'}</span>
+        ${srFileYear(f)!=null?`<span>سال تشخیص‌داده‌شده: ${srYearText(srFileYear(f))}</span>`:''}
+        ${f.sheetNames&&f.sheetNames.length>1?`<label>برگه: <select data-sheet="${f.id}">${f.sheetNames.map(n=>`<option ${n===f.sheet?'selected':''}>${e_(n)}</option>`).join('')}</select></label>`:''}</div>${plan&&srFileYear(f)!==srRoleYear(f.isMain?'audit':f.periodRole,plan)?`<div class="err">سال فایل با جایگاه انتخاب‌شده (${srYearText(srRoleYear(f.isMain?'audit':f.periodRole,plan))}) مطابقت ندارد و وارد محاسبه نمی‌شود.</div>`:''}`:''}
     </div>`;
-  const wpCard=!wp?`<div class="sr-year-empty"><b>کاربرگ اقلام راکد و سنواتی سال ${srYearText(plan?.prior)}</b><span>در صورت نیاز بارگذاری شود</span></div>`:`<div class="sr-file"><div class="sr-file-h"><b>کاربرگ قبلی: ${e_(wp.name)}</b><button type="button" class="btn ghost sr-x" id="srDelWp">حذف</button></div><div class="sr-file-b"><span>برگه: ${e_(wp.sheet)}</span><span>${fa(wp.rows.length)} ردیف مبلغ‌دار/حسابی</span><span>سال مبنا: ${srYearText(wp.fiscalYear)}</span><span class="sr-ok">مبالغ عددی دریافت شد</span></div></div>`;
+  const wpCard=!wp?`<div class="sr-year-empty"><b>کاربرگ قبلی ${srYearText(plan?.prior)}</b><span>جایگزین فایل خام سال قبل؛ اختیاری</span></div>`:`<div class="sr-file"><div class="sr-file-h"><b>کاربرگ قبلی: ${e_(wp.name)}</b><button type="button" class="btn ghost" id="srDelWp">حذف</button></div><div class="sr-file-b"><span>برگه: ${e_(wp.sheet)}</span><span>${fa(wp.rows.length)} ردیف</span><span>سال مبنا: ${srYearText(wp.fiscalYear)}</span></div></div>`;
   const mainYear=srFileYear(main);
-  const ready=!!plan&&!!main&&main.status==='ok'&&mainYear===plan.audit&&!!history&&history.status==='ok'&&srFileYear(history)===plan.history&&!!next&&next.status==='ok'&&srFileYear(next)===plan.next;
+  const optionalValid=SR.files.filter(f=>!f.isMain).every(f=>f.status==='ok'&&srFileYear(f)===srRoleYear(f.periodRole,plan));
+  const ready=!!plan&&!!main&&main.status==='ok'&&mainYear===plan.audit&&optionalValid;
   host.innerHTML=`
-    <h1>اقلام سنواتی و راکد — انتخاب خودکار فایل‌های سالانه</h1>
-    ${!plan?`<div class="card"><div class="err"><b>سال مالی پرونده مشخص نیست.</b> سال را در «مشخصات پرونده» به‌صورت سال شمسی یا تاریخ (مثلاً ۱۴۰۴/۱۲/۲۹ یا ۲۹ اسفند سال ۱۴۰۴) وارد کنید. برنامه برای جلوگیری از حدس‌زدن، سال فایل‌های درخواستی را از تاریخ فایل‌ها استخراج نمی‌کند.</div></div>`:''}
-    <p class="sub">سال رسیدگی از مشخصات پرونده می‌آید. فایل اصلیِ سال ${srYearText(plan?.audit)} از صفحهٔ اصلی برنامه گرفته می‌شود؛ فایل اسناد ${srYearText(plan?.history)} برای بازسازی قدمت و فایل اسناد ${srYearText(plan?.next)} برای پیگیری لازم است. کاربرگ قبلی ${srYearText(plan?.prior)} در صورت نیاز قابل بارگذاری است.</p>
-    <div class="card"><h2>فایل اصلی اسناد — سال رسیدگی ${srYearText(plan?.audit)}</h2>${main?fileCard(main,'سال مورد رسیدگی'):'<div class="err">فایل اصلی از برنامه دریافت نشد. ابتدا فایل و ستون‌های آن را در صفحهٔ اصلی بارگذاری و تأیید کنید.</div>'}</div>
-    <div class="sr-two">
-      <div class="card"><h2>اکسل اسناد سال ${srYearText(plan?.history)} <span class="sr-req">(لازم)</span></h2>${fileCard(history,'اسناد دو سال قبل')}
-        ${!history?`<input type="file" id="srHistoryFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn primary" id="srHistoryPick" ${!plan?'disabled':''}>بارگذاری اکسل اسناد ${srYearText(plan?.history)}</button>`:''}</div>
-      <div class="card"><h2>کاربرگ قبلی اقلام سنواتی و راکد — ${srYearText(plan?.prior)} <span class="hint">(در صورت نیاز)</span></h2>${wpCard}
-        ${!wp?`<input type="file" id="srPrevWpFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn" id="srPrevWpPick" ${!plan?'disabled':''}>بارگذاری کاربرگ ${srYearText(plan?.prior)}</button>`:''}</div>
-      <div class="card"><h2>اکسل اسناد سال بعد — ${srYearText(plan?.next)} <span class="sr-req">(برای تکمیل پیگیری لازم)</span></h2>${fileCard(next,'اسناد سال بعد')}
-        ${!next?`<input type="file" id="srNextFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn primary" id="srNextPick" ${!plan?'disabled':''}>بارگذاری اکسل اسناد ${srYearText(plan?.next)}</button>`:''}</div>
+    <h1>اقلام سنواتی و راکد — سال‌های پویا</h1>
+    ${!plan?`<div class="card"><div class="err"><b>سال مالی پرونده مشخص نیست.</b> سال رسیدگی را در «مشخصات پرونده» وارد کنید.</div></div>`:''}
+    <p class="sub">سال رسیدگی Y=${srYearText(plan?.audit)} از مشخصات پرونده تعیین می‌شود. فایل اصلی سال Y الزامی است. برای سابقهٔ Y−1، کاربرگ قبلی یا فایل خام اسناد (یا هر دو برای مقایسه) را ارائه کنید. فایل Y−2 برای ردیابی قدمت و Y+1 برای پیگیری اختیاری‌اند.</p>
+    <div class="card"><h2>فایل اصلی اسناد — سال رسیدگی ${srYearText(plan?.audit)}</h2>${main?fileCard(main,'سال مورد رسیدگی'):'<div class="err">فایل اصلی از برنامه دریافت نشد. ابتدا فایل صفحهٔ اصلی را بارگذاری و تأیید کنید.</div>'}</div>
+    <div class="sr-two">${roleSpecs.map(spec=>{const f=SR.files.find(x=>x.periodRole===spec.role);return `<div class="card"><h2>${spec.title} — ${srYearText(spec.year)}</h2>${fileCard(f,spec.title)}${!f?`<input type="file" id="srPick_${spec.role}" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn" data-pick-role="${spec.role}" ${!plan?'disabled':''}>بارگذاری اسناد ${srYearText(spec.year)}</button>`:''}</div>`;}).join('')}
+      <div class="card"><h2>کاربرگ قبلی — ${srYearText(plan?.prior)} <span class="hint">(اختیاری؛ به‌جای یا همراه فایل خام)</span></h2>${wpCard}${!wp?`<input type="file" id="srPrevWpFile" accept=".xlsx,.xls,.csv" hidden><button type="button" class="btn" id="srPrevWpPick" ${!plan?'disabled':''}>بارگذاری کاربرگ قبلی</button>`:''}</div>
     </div>
-    <p class="hint">فایل اصلی مربوط به سال رسیدگی، به‌همراه اسناد دو سال قبل و سال بعد درخواست می‌شود؛ کاربرگ سال بلافاصله قبل اختیاری است و فایل خام اسناد آن سال درخواست نمی‌شود. اگر کاربرگ قبلی ارائه نشود، ستون مقایسه‌ای خالی می‌ماند و برنامه آن را صفر فرض نمی‌کند. پیش از ادامه، سال‌های درج‌شده در تاریخ فایل‌ها را کنترل کنید.</p>
+    <p class="hint">اگر Y−1 و Y−2 ارائه نشوند، قدمت افتتاحیه نامشخص باقی می‌ماند؛ نبود فایل هیچ‌گاه صفر فرض نمی‌شود. در نبود Y+1 مبلغ نهایی تأییدنشده و ستون پیگیری خالی است. فایلی که سال آن با نقش انتخابی همخوانی نداشته باشد وارد محاسبه نمی‌شود.</p>
     ${nav(null,'s2','ادامه: بررسی ستون‌ها ←',!ready)}`;
-  if($('srHistoryPick')) $('srHistoryPick').onclick=()=>$('srHistoryFile').click();
-  if($('srNextPick')) $('srNextPick').onclick=()=>$('srNextFile').click();
+  host.querySelectorAll('[data-pick-role]').forEach(b=>b.onclick=()=>$('srPick_'+b.dataset.pickRole).click());
+  roleSpecs.forEach(spec=>{const input=$('srPick_'+spec.role);if(input)input.onchange=e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)addFiles([f],spec.role);};});
   if($('srPrevWpPick')) $('srPrevWpPick').onclick=()=>$('srPrevWpFile').click();
-  if($('srHistoryFile')) $('srHistoryFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) addFiles([f],'history'); };
-  if($('srNextFile')) $('srNextFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) addFiles([f],'next'); };
   if($('srPrevWpFile')) $('srPrevWpFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) addPriorWorkpaper(f); };
   if($('srDelWp')) $('srDelWp').onclick=()=>{ SR.priorWorkpaper=null; SR.mapped=false; invalidate('model'); renderFiles(); paint(); };
   host.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ SR.files=SR.files.filter(f=>f.id!==b.dataset.del); SR.mapped=false; invalidate('model'); renderFiles(); paint(); });
@@ -12629,7 +12644,7 @@ function renderMapping(){
   const main=SR.files.find(f=>f.isMain), mainFields=main?main.keyFields.slice():[];
   host.innerHTML=`
     <h1>بررسی ستون‌ها و دوره‌های مالی</h1>
-    <p class="sub">نگاشت فایل اصلی سال ${srYearText(plan?.audit)} از صفحهٔ اول برنامه گرفته شده است. فایل‌های اسناد ${srYearText(plan?.history)} و ${srYearText(plan?.next)} را کنترل کنید. سطح تفصیلیِ انتخاب‌شده در فایل اصلی، مبنای تطبیق همهٔ سال‌هاست.</p>
+    <p class="sub">نگاشت سال رسیدگی ${srYearText(plan?.audit)} از صفحهٔ اول برنامه گرفته شده است. فقط فایل‌های اختیاری ارائه‌شده برای Y−2، Y−1 و Y+1 نگاشت می‌شوند؛ سطح تفصیلی فایل اصلی مبنای تطبیق همهٔ سال‌هاست.</p>
     ${files.map(f=>`
     <div class="card sr-map" data-file="${f.id}">
       <h2>${e_(f.name)} ${f.isMain?'<span class="sr-tag">سال جاری · نگاشت اصلی</span>':''}</h2>
@@ -12668,10 +12683,9 @@ function renderMapping(){
     let okAll=true;
     const plan=srYearPlan(), mainFieldsNow=(SR.files.find(f=>f.isMain)||{}).keyFields||[];
     if(!plan){ alert('سال مالی را در مشخصات پرونده وارد کنید تا سال فایل‌های لازم به‌صورت خودکار مشخص شود.'); return; }
-    const historyFile=SR.files.find(f=>f.periodRole==='history'), nextFile=SR.files.find(f=>f.periodRole==='next');
-    if(!historyFile||!nextFile){ alert('فایل اسناد '+srYearText(plan.history)+' و '+srYearText(plan.next)+' لازم است.'); return; }
+    const historyFile=SR.files.find(f=>f.periodRole==='history'), priorFile=SR.files.find(f=>f.periodRole==='prior'), nextFile=SR.files.find(f=>f.periodRole==='next');
     if(SR.files.some(f=>f.status!=='ok')){ alert('ابتدا خطای خواندن فایل‌های سالانه را برطرف کنید.'); return; }
-    for(const [file,expected] of [[SR.files.find(f=>f.isMain),plan.audit],[historyFile,plan.history],[nextFile,plan.next]]){
+    for(const [file,expected] of [[SR.files.find(f=>f.isMain),plan.audit],[historyFile,plan.history],[priorFile,plan.prior],[nextFile,plan.next]].filter(x=>x[0])){
       if(!file||srFileYear(file)!==expected){ alert('سال تشخیص‌داده‌شده از تاریخ فایل «'+(file?.name||'')+'» با سال مورد انتظار '+srYearText(expected)+' یکسان نیست.'); return; }
     }
     host.querySelectorAll('.sr-map').forEach(card=>{
@@ -12687,9 +12701,11 @@ function renderMapping(){
       msg.innerHTML=errs.length?`<div class="err">${errs.map(e_).join('<br>')}</div>`:'';
       if(errs.length) okAll=false;
     });
-    const audit=SR.files.find(f=>f.isMain), history=SR.files.find(f=>f.periodRole==='history'), next=SR.files.find(f=>f.periodRole==='next');
-    if(history&&audit&&history.end>=audit.start){ okAll=false; alert('بازهٔ اسناد '+srYearText(plan.history)+' باید پیش از سال رسیدگی '+srYearText(plan.audit)+' باشد.'); }
-    if(audit&&next&&next.start<=audit.end){ okAll=false; alert('بازهٔ اسناد '+srYearText(plan.next)+' باید پس از سال رسیدگی '+srYearText(plan.audit)+' باشد.'); }
+    const audit=SR.files.find(f=>f.isMain), history=SR.files.find(f=>f.periodRole==='history'), prior=SR.files.find(f=>f.periodRole==='prior'), next=SR.files.find(f=>f.periodRole==='next');
+    if(history&&audit&&history.end>=audit.start){ okAll=false; alert('بازهٔ Y−2 باید پیش از سال رسیدگی '+srYearText(plan.audit)+' باشد.'); }
+    if(prior&&audit&&prior.end>=audit.start){ okAll=false; alert('بازهٔ Y−1 باید پیش از سال رسیدگی '+srYearText(plan.audit)+' باشد.'); }
+    if(history&&prior&&history.end>=prior.start){ okAll=false; alert('Y−2 نباید با Y−1 هم‌پوشانی داشته باشد.'); }
+    if(audit&&next&&next.start<=audit.end){ okAll=false; alert('بازهٔ Y+1 باید پس از سال رسیدگی '+srYearText(plan.audit)+' باشد.'); }
     const fs=SR.files.filter(f=>f.status==='ok'&&f.start!=null).sort((a,b)=>a.start-b.start);
     for(let i=1;i<fs.length;i++) if(fs[i].start<=fs[i-1].end){ okAll=false; alert('بازهٔ سال مالی «'+fs[i].label+'» با «'+fs[i-1].label+'» هم‌پوشانی دارد.'); break; }
     if(!okAll) return;
@@ -12761,10 +12777,10 @@ function buildModel(){
 /* ------------------------------------------------------ مرحلهٔ ۴: حساب‌ها */
 function partyNameMatchCandidates(){
   const groups=srTrialBalanceData();
-  const receive=/دریافتنی|بدهکاران|حساب\s*های\s*دریافت|مشتریان|طلبکاران/;
-  const pay=/پرداختنی|بستانکاران|حساب\s*های\s*پرداخت|فروشندگان|تامین\s*کنندگان|تأمین\s*کنندگان/;
+  const receive=/دریافتنی|بدهکاران|حساب\s*های\s*دریافت|مشتریان|طلبکاران|پیش\s*پرداخت|علی\s*الحساب\s*دریافت|ودیعه\s*پرداختی/;
+  const pay=/پرداختنی|بستانکاران|حساب\s*های\s*پرداخت|فروشندگان|تامین\s*کنندگان|تأمین\s*کنندگان|پیش\s*دریافت|علی\s*الحساب\s*پرداخت|سپرده\s*دریافتی/;
   const people={receivable:[],payable:[]};
-  const categoryWords=new Set(['حساب','حسابها','حسابهای','های','اشخاص','شخص','دریافتنی','پرداختنی','بدهکاران','بستانکاران','مشتریان','مشتری','فروشندگان','فروشنده','تامین','تأمین','کنندگان','کننده','طلبکاران']);
+  const categoryWords=new Set(['حساب','حسابها','حسابهای','های','اشخاص','شخص','دریافتنی','پرداختنی','بدهکاران','بستانکاران','مشتریان','مشتری','فروشندگان','فروشنده','تامین','تأمین','کنندگان','کننده','طلبکاران','پیش','پرداخت','دریافت','الحساب','ودیعه','سپرده']);
   for(const g of groups) for(const a of g.accounts){
     const context=SRE.normText(g.kolT+' '+a.moeinT);
     const side=receive.test(context)?'receivable':(pay.test(context)?'payable':'');
@@ -12889,14 +12905,31 @@ function runAnalysis(){
   const excluded=[...SR.model.accounts.values()].filter(a=>!options.accounts.has(a.id));
   SR.excludedAccounts=excluded.map(a=>({id:a.id,kolT:a.kolT,moeinT:a.moeinT}));
   SR.result=SRE.analyze(SR.model,options);
-  const next=SR.files.find(f=>f.periodRole==='next');
-  SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null;
-  // سال بلافاصله قبل فقط از کاربرگ قبلی (در صورت ارائه) وارد ستون مقایسه‌ای می‌شود؛
-  // فایل خام اسناد آن سال در زنجیرهٔ درخواستی نیست.
-  // پیگیری سال آتی از روی لایه‌های موجود در پایان سال رسیدگی محاسبه می‌شود؛ گردش جدید جایگزین لایه‌های قدیمی نمی‌شود.
+  const next=SR.files.find(f=>f.periodRole==='next'), prior=SR.files.find(f=>f.periodRole==='prior');
+  const history=SR.files.find(f=>f.periodRole==='history');
+  SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null; SR.priorComparison=null;
+  // بازسازی مستقل Y−1: فایل خام جایگزین کاربرگ است؛ Y−2 فقط در صورت ارائه زنجیره را عقب‌تر می‌برد.
+  if(prior){
+    const priorFiles=source.filter(f=>f.id===prior.id||(history&&f.id===history.id));
+    SR.priorModel=SRE.build({files:priorFiles,auditFileId:prior.id});
+    SR.priorResult=SRE.analyze(SR.priorModel,srSettingsFor(SR.priorModel));
+  }
+  // پیگیری Y+1 اختیاری است؛ فقط در حضور فایل محاسبه می‌شود و فقدان آن null می‌ماند.
   if(next){
-    SR.nextModel=SRE.build({files:source,auditFileId:next.id});
+    const followFiles=source.filter(f=>f.start<=next.start);
+    SR.nextModel=SRE.build({files:followFiles,auditFileId:next.id});
     SR.nextResult=SRE.analyze(SR.nextModel,srSettingsFor(SR.nextModel));
+  }
+  if(prior&&SR.priorWorkpaper){
+    const rawRows=workpaperRowsFor(SR.priorResult,SR.priorModel,false), unused=new Set(SR.priorWorkpaper.rows), stats={matched:0,different:0,unmatchedRaw:0,unmatchedWorksheet:0};
+    for(const row of rawRows){
+      const hit=[...unused].find(x=>x.groupKey&&x.groupKey===row.groupKey)||[...unused].find(x=>srNormMatch(x.sub)===srNormMatch(row.subPlain)&&srNormMatch(x.detail)===srNormMatch(row.detailPlain));
+      if(!hit){stats.unmatchedRaw++;continue;}
+      unused.delete(hit);stats.matched++;
+      const rawAmount=singleRangeAmount(signedRange(row.combinedFinal?{min:row.combinedFinal,max:row.combinedFinal}:null,row.combinedSide));
+      if(rawAmount!==hit.amount)stats.different++;
+    }
+    stats.unmatchedWorksheet=unused.size; SR.priorComparison={...stats};
   }
   SR.view.limit=200; SR.view.key=null; SR.view.T=0; SR.view.accountSelection=null; SR.view.tbSelection=new Set([...SR.roles.keys()]); SR.view.selectionConfirmed=false;
 }
@@ -12916,9 +12949,10 @@ function chips(k){
   return out.join(' ');
 }
 function headerHtml(){
-  const R=SR.result, cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{};
+  const R=SR.result, cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{}, plan=srYearPlan(), priorEvidence=!!SR.priorResult||!!SR.priorWorkpaper;
+  const priorLabel=priorEvidence?srYearText(plan?.prior)+' (مدرک ارائه شده)':srYearText(plan?.prior)+' (مدرک ارائه نشده)';
   return `<div class="sr-head"><div><b>${e_(cfg.company||'')}</b></div>
-    <div>سال رسیدگی: <b>${e_(R.audit.label)}</b> (${fmtD(R.audit.start)} تا ${fmtD(R.audit.end)}) — سال قبل: ${e_((R.chain.length>1?R.chain[R.chain.length-2].label:'—'))}${R.next?' — سال بعد: '+e_(R.next.label):' — فایل سال بعد ارائه نشده است'}</div>
+    <div>سال رسیدگی: <b>${e_(R.audit.label)}</b> (${fmtD(R.audit.start)} تا ${fmtD(R.audit.end)}) — سابقهٔ سال قبل: ${e_(priorLabel)}${R.next?' — سال بعد: '+e_(R.next.label):' — فایل سال بعد ارائه نشده است'}</div>
     <div class="hint">سطح گزارش: معین و تفصیلی | آستانهٔ رکود: ${fa(R.settings.thresholds[0]||12)} ماه | ارقام بر مبنای ریال</div></div>`;
 }
 
@@ -12929,6 +12963,8 @@ function renderReports(){
   const tab=SR.view.tab;
   host.innerHTML=`
     <h1>کاربرگ اقلام سنواتی و راکد</h1>
+    ${SR.priorComparison?`<div class="card ${SR.priorComparison.different||SR.priorComparison.unmatchedRaw||SR.priorComparison.unmatchedWorksheet?'sr-party-match-warning':''}"><b>مقایسهٔ Y−1: اسناد خام با کاربرگ قبلی</b><p class="hint">تطبیق‌شده: ${fa(SR.priorComparison.matched)}؛ اختلاف مبلغ: ${fa(SR.priorComparison.different)}؛ فقط در بازسازی خام: ${fa(SR.priorComparison.unmatchedRaw)}؛ فقط در کاربرگ: ${fa(SR.priorComparison.unmatchedWorksheet)}. محاسبهٔ سابقه از اسناد خام انجام شده و کاربرگ قبلی جداگانه مقایسه شده است؛ مبالغ دوباره‌شماری نشده‌اند.</p></div>`:''}
+    ${!SR.nextResult?`<div class="card sr-party-match-warning"><b>پیگیری Y+1 ارائه نشده است.</b><p class="hint">ستون پیگیری خالی است؛ ماندهٔ نهایی از نظر پیگیری سال بعد تأییدنشده تلقی می‌شود و نبود داده صفر فرض نمی‌شود.</p></div>`:''}
     ${R.checks.length?`<div class="card"><div class="err"><b>کنترل صحت محاسبات در ${fa(R.checks.length)} مورد ناموفق بود.</b> مبالغ کلیدهای دارای کنترل ناموفق نیازمند بررسی‌اند. ${R.checks.slice(0,5).map(c=>e_((c.key||'')+' — '+c.detail)).join('<br>')}</div></div>`:'<p class="sr-okbar">کنترل جمع لایه‌ها با ماندهٔ دفتر و استقلال محاسبهٔ سال بعد برقرار است.</p>'}
     <div class="sr-tabs">${TABS.map(([id,label])=>`<button type="button" class="${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('')}</div>
     <div class="sr-tools"><input class="sr-search" id="srQ" placeholder="جست‌وجوی کد یا عنوان معین و تفصیلی" value="${e_(SR.view.filter)}">
@@ -13207,26 +13243,26 @@ function finalWorkpaperRows(accountFilter=null){
     rows.push({groupKey:key,subPlain:base.subPlain,detailPlain:base.detailPlain,
       kolCode:base.kolCode,kolTitle:base.kolTitle,moeinCode:base.moeinCode,moeinTitle:base.moeinTitle,detailCode:base.detailCode,detailTitle:base.detailTitle,
       tafCode:base.tafCode||'',tafTitle:base.tafTitle||'',taf1Code:base.taf1Code||'',taf1Title:base.taf1Title||'',taf2Code:base.taf2Code||'',taf2Title:base.taf2Title||'',accountIds:base.accountIds||[],
-      amount1403Range:p?signedRange(p.combinedFinal,p.combinedSide):null,
-      amount1403:p?(p.combinedFinal?singleRangeAmount(signedRange(p.combinedFinal,p.combinedSide)):0n):null,
-      amount1404Range:c?signedRange(c.combinedBeforeOffset,c.combinedSide):zero,
-      amount1404:c?singleRangeAmount(signedRange(c.combinedBeforeOffset,c.combinedSide)):0n,
+      priorAmountRange:p?signedRange(p.combinedFinal,p.combinedSide):null,
+      priorAmount:p?(p.combinedFinal?singleRangeAmount(signedRange(p.combinedFinal,p.combinedSide)):0n):null,
+      auditAmountRange:c?signedRange(c.combinedBeforeOffset,c.combinedSide):zero,
+      auditAmount:c?singleRangeAmount(signedRange(c.combinedBeforeOffset,c.combinedSide)):0n,
       followUpRange:c?signedRange(c.followUpRemaining,c.combinedSide):null,
       followUp:c&&c.followUpRemaining?singleRangeAmount(signedRange(c.followUpRemaining,c.combinedSide)):null,
-      offset1404:c?c.offset:0n,
+      auditOffset:c?c.offset:0n,
       finalRange:c?signedRange(c.combinedFinal,c.combinedSide):null,
       finalAmount:c&&c.combinedFinal?singleRangeAmount(signedRange(c.combinedFinal,c.combinedSide)):null,
       sortSub:base.sortSub,sortDetail:base.sortDetail});
   }
-  if(SR.priorWorkpaper){
-    rows.forEach(r=>{ const found=importedPriorFor(r,usedImport); if(found){ r.amount1403Range={min:found.amount,max:found.amount}; r.amount1403=found.amount; r.importedPrior=true; } });
+  if(SR.priorWorkpaper&&!SR.priorResult){
+    rows.forEach(r=>{ const found=importedPriorFor(r,usedImport); if(found){ r.priorAmountRange={min:found.amount,max:found.amount}; r.priorAmount=found.amount; r.importedPrior=true; } });
     for(const x of SR.priorWorkpaper.rows){
       if(accountFilter) continue;
       if(usedImport.has(x)) continue;
       rows.push({groupKey:x.groupKey||'WP|'+srNormMatch(x.sub)+'|'+srNormMatch(x.detail),subPlain:x.sub,detailPlain:x.detail,
         kolCode:'',kolTitle:'',moeinCode:'',moeinTitle:x.sub,detailCode:'',detailTitle:x.detail,tafCode:'',tafTitle:'',taf1Code:'',taf1Title:'',taf2Code:'',taf2Title:'',accountIds:[],
-        amount1403Range:{min:x.amount,max:x.amount},amount1403:x.amount,amount1404Range:zero,amount1404:0n,
-        followUpRange:null,followUp:null,offset1404:0n,finalRange:null,finalAmount:null,
+        priorAmountRange:{min:x.amount,max:x.amount},priorAmount:x.amount,auditAmountRange:zero,auditAmount:0n,
+        followUpRange:null,followUp:null,auditOffset:0n,finalRange:null,finalAmount:null,
         sortSub:x.sub,sortDetail:x.detail,unmatchedPrior:true});
       usedImport.add(x);
     }
@@ -13251,7 +13287,7 @@ function workpaperSubtotalGroups(rows){
 }
 function workpaperColumnTotals(rows){
   const sumColumn=field=>rows.reduce((sum,row)=>sum+(typeof row[field]==='bigint'?row[field]:0n),0n);
-  return {amount1403:sumColumn('amount1403'),amount1404:sumColumn('amount1404'),followUp:sumColumn('followUp'),offset1404:sumColumn('offset1404'),finalAmount:sumColumn('finalAmount')};
+  return {priorAmount:sumColumn('priorAmount'),auditAmount:sumColumn('auditAmount'),followUp:sumColumn('followUp'),auditOffset:sumColumn('auditOffset'),finalAmount:sumColumn('finalAmount')};
 }
 function signedText(x){
   if(x===null||x===undefined) return '—';
@@ -13315,7 +13351,7 @@ function tabHtml(tab){
 }
 
 function workpaperHtml(){
-  const rows=srPreviewRows().filter(r=>[r.amount1403,r.amount1404,r.followUp,r.offset1404,r.finalAmount].some(v=>v!==null&&v!==undefined&&v!==0n&&v!==0)), cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{},yearPlan=srYearPlan(),caseDate=String(cfg.date??'').trim();
+  const rows=srPreviewRows().filter(r=>[r.priorAmount,r.auditAmount,r.followUp,r.auditOffset,r.finalAmount].some(v=>v!==null&&v!==undefined&&v!==0n&&v!==0)), cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{},yearPlan=srYearPlan(),caseDate=String(cfg.date??'').trim();
   const cell=v=>e_(String(v??'').split(' ؛ ').filter(Boolean).join('\n')).replace(/\n/g,'<br>');
   const priorEvidence=!!SR.priorResult||!!SR.priorWorkpaper, fiscalYear=String(cfg.year??'').trim();
   const widths=[40,104,44,150.1,86,86,86,86,86];
@@ -13328,16 +13364,16 @@ function workpaperHtml(){
   };
   let dataIndex=0;
   const dataRowHTML=r=>{
-    const zebra=(++dataIndex)%2===0?'sr-data-even':'sr-data-odd',rawAmounts=[r.amount1403,r.amount1404,r.followUp,r.offset1404,r.finalAmount].map(v=>v===null||v===undefined?'':String(v));
-    return `<tr class="sr-data-row ${zebra}" data-sr-amount0="${e_(rawAmounts[0])}" data-sr-amount1="${e_(rawAmounts[1])}" data-sr-amount2="${e_(rawAmounts[2])}" data-sr-amount3="${e_(rawAmounts[3])}" data-sr-amount4="${e_(rawAmounts[4])}" data-moein-code="${e_(r.moeinCode)}" data-moein-title="${e_(r.moeinTitle)}"><td class="sr-code">${cell(r.moeinCode)}</td><td class="sr-workpaper-account"><button type="button" class="sr-workpaper-exclude" data-sr-exclude="${e_(r.groupKey)}" title="حذف این قلم از کاربرگ بر اساس قضاوت حسابرس" aria-label="حذف ${e_(r.subPlain)} از کاربرگ">×</button>${cell(r.moeinTitle)}</td><td class="sr-code">${cell(r.tafCode||(r.unmatchedPrior?r.detailCode:''))}</td><td class="sr-account-title">${cell(r.tafTitle||(r.unmatchedPrior?r.detailTitle:''))}</td>${moneyCell(r.amount1403)}${moneyCell(r.amount1404)}${moneyCell(r.followUp)}${moneyCell(r.offset1404,{signed:false})}${moneyCell(r.finalAmount)}</tr>`;
+    const zebra=(++dataIndex)%2===0?'sr-data-even':'sr-data-odd',rawAmounts=[r.priorAmount,r.auditAmount,r.followUp,r.auditOffset,r.finalAmount].map(v=>v===null||v===undefined?'':String(v));
+    return `<tr class="sr-data-row ${zebra}" data-sr-amount0="${e_(rawAmounts[0])}" data-sr-amount1="${e_(rawAmounts[1])}" data-sr-amount2="${e_(rawAmounts[2])}" data-sr-amount3="${e_(rawAmounts[3])}" data-sr-amount4="${e_(rawAmounts[4])}" data-moein-code="${e_(r.moeinCode)}" data-moein-title="${e_(r.moeinTitle)}"><td class="sr-code">${cell(r.moeinCode)}</td><td class="sr-workpaper-account"><button type="button" class="sr-workpaper-exclude" data-sr-exclude="${e_(r.groupKey)}" title="حذف این قلم از کاربرگ بر اساس قضاوت حسابرس" aria-label="حذف ${e_(r.subPlain)} از کاربرگ">×</button>${cell(r.moeinTitle)}</td><td class="sr-code">${cell(r.tafCode||(r.unmatchedPrior?r.detailCode:''))}</td><td class="sr-account-title">${cell(r.tafTitle||(r.unmatchedPrior?r.detailTitle:''))}</td>${moneyCell(r.priorAmount)}${moneyCell(r.auditAmount)}${moneyCell(r.followUp)}${moneyCell(r.auditOffset,{signed:false})}${moneyCell(r.finalAmount)}</tr>`;
   };
   const subtotalGroups=workpaperSubtotalGroups(rows),columnTotals=workpaperColumnTotals(rows);
   const groupRowsHTML=subtotalGroups.map(group=>{
     const t=workpaperColumnTotals(group.rows),code=group.kolCode==='—'?'':fa(group.kolCode),title=fa(group.kolTitle);
     const label='جمع کل '+(code?code+' — ':'')+title;
-    return `<tr class="sr-major-title"><td colspan="9">${e_(code?code+' — '+title:title)}</td></tr>${group.rows.map(dataRowHTML).join('')}<tr class="sr-workpaper-subtotal" data-sr-total0="${t.amount1403}" data-sr-total1="${t.amount1404}" data-sr-total2="${t.followUp}" data-sr-total3="${t.offset1404}" data-sr-total4="${t.finalAmount}"><td colspan="4" class="sr-total-label">${e_(label)}</td>${moneyCell(priorEvidence?t.amount1403:null,{showZero:true})}${moneyCell(t.amount1404,{showZero:true})}${moneyCell(t.followUp,{showZero:true})}${moneyCell(t.offset1404,{signed:false,showZero:true})}${moneyCell(t.finalAmount,{showZero:true})}</tr>`;
+    return `<tr class="sr-major-title"><td colspan="9">${e_(code?code+' — '+title:title)}</td></tr>${group.rows.map(dataRowHTML).join('')}<tr class="sr-workpaper-subtotal" data-sr-total0="${t.priorAmount}" data-sr-total1="${t.auditAmount}" data-sr-total2="${t.followUp}" data-sr-total3="${t.auditOffset}" data-sr-total4="${t.finalAmount}"><td colspan="4" class="sr-total-label">${e_(label)}</td>${moneyCell(priorEvidence?t.priorAmount:null,{showZero:true})}${moneyCell(t.auditAmount,{showZero:true})}${moneyCell(t.followUp,{showZero:true})}${moneyCell(t.auditOffset,{signed:false,showZero:true})}${moneyCell(t.finalAmount,{showZero:true})}</tr>`;
   }).join('');
-  const grandTotal=rows.length?`<tr class="sr-workpaper-total" data-sr-total0="${columnTotals.amount1403}" data-sr-total1="${columnTotals.amount1404}" data-sr-total2="${columnTotals.followUp}" data-sr-total3="${columnTotals.offset1404}" data-sr-total4="${columnTotals.finalAmount}"><td colspan="4" class="sr-total-label">جمع کل کاربرگ</td>${moneyCell(priorEvidence?columnTotals.amount1403:null,{showZero:true})}${moneyCell(columnTotals.amount1404,{showZero:true})}${moneyCell(columnTotals.followUp,{showZero:true})}${moneyCell(columnTotals.offset1404,{signed:false,showZero:true})}${moneyCell(columnTotals.finalAmount,{showZero:true})}</tr>`:'';
+  const grandTotal=rows.length?`<tr class="sr-workpaper-total" data-sr-total0="${columnTotals.priorAmount}" data-sr-total1="${columnTotals.auditAmount}" data-sr-total2="${columnTotals.followUp}" data-sr-total3="${columnTotals.auditOffset}" data-sr-total4="${columnTotals.finalAmount}"><td colspan="4" class="sr-total-label">جمع کل کاربرگ</td>${moneyCell(priorEvidence?columnTotals.priorAmount:null,{showZero:true})}${moneyCell(columnTotals.auditAmount,{showZero:true})}${moneyCell(columnTotals.followUp,{showZero:true})}${moneyCell(columnTotals.auditOffset,{signed:false,showZero:true})}${moneyCell(columnTotals.finalAmount,{showZero:true})}</tr>`:'';
   const excludedCount=SR.view.excludedWorkpaperRows instanceof Set?SR.view.excludedWorkpaperRows.size:0;
   const reviewTools=`<div class="sr-workpaper-review-tools"><span>اقلام پیشنهادی را حسابرس بازبینی کند؛ با × هر قلم فقط از کاربرگ نهایی و جمع‌های آن حذف می‌شود.</span>${excludedCount?`<b>${fa(excludedCount)} قلم حذف‌شده</b><button type="button" class="btn ghost" data-sr-restore-excluded>بازگرداندن اقلام حذف‌شده</button>`:''}</div>`;
   const amountHead=(title,year)=>`<th>${e_(title)}${year?` ${e_(srYearText(year))}`:''}<br><span class="sr-unit-label">(ریال)</span></th>`;
@@ -13374,7 +13410,7 @@ function workpaperHtml(){
             </div></th></tr>
             <tr class="cols sr-group-head">
               <th>کد معین</th><th>عنوان معین</th><th>کد تفصیلی</th><th>عنوان تفصیلی</th>
-              ${amountHead('ماندهٔ سال قبل',yearPlan?.prior)}${amountHead('ماندهٔ سال رسیدگی',yearPlan?.audit)}${amountHead('پیگیری',yearPlan?.next)}${amountHead('تهاتر در',yearPlan?.audit)}${amountHead('راکد و سنواتی',yearPlan?.audit)}
+              ${amountHead('ماندهٔ سال قبل',yearPlan?.prior)}${amountHead('ماندهٔ سال رسیدگی',yearPlan?.audit)}${amountHead('پیگیری',yearPlan?.next)}${amountHead('تهاتر در',yearPlan?.audit)}${amountHead(SR.nextResult?'راکد و سنواتی':'مبلغ نهایی — پیگیری تأییدنشده',yearPlan?.audit)}
             </tr>
           </thead>
           <tbody>${groupRowsHTML||'<tr><td colspan="9">ردیفی برای نمایش وجود ندارد.</td></tr>'}${grandTotal}</tbody>
@@ -13490,7 +13526,7 @@ function exportXlsx(){
   };
   const cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{},caseDate=String(cfg.date??'').trim();
   const yearPlan=srYearPlan(),priorEvidence=!!SR.priorResult||!!SR.priorWorkpaper;
-  const topHeaders=['کد کل','عنوان کل','کد معین','عنوان معین','کد تفصیلی','عنوان تفصیلی','کد تفصیلی یک','عنوان تفصیلی یک','کد تفصیلی دو','عنوان تفصیلی دو',yearPlan?srYearText(yearPlan.prior):'—',yearPlan?srYearText(yearPlan.audit):'—','پیگیری '+(yearPlan?srYearText(yearPlan.next):'سال آتی'),'تهاتر با حسابهای دیگر '+(yearPlan?srYearText(yearPlan.audit):''),'راکد و سنواتی '+(yearPlan?srYearText(yearPlan.audit):''),'کلید تطبیق'];
+  const topHeaders=['کد کل','عنوان کل','کد معین','عنوان معین','کد تفصیلی','عنوان تفصیلی','کد تفصیلی یک','عنوان تفصیلی یک','کد تفصیلی دو','عنوان تفصیلی دو',yearPlan?srYearText(yearPlan.prior):'—',yearPlan?srYearText(yearPlan.audit):'—','پیگیری '+(yearPlan?srYearText(yearPlan.next):'سال آتی'),'تهاتر با حسابهای دیگر '+(yearPlan?srYearText(yearPlan.audit):''),(SR.nextResult?'راکد و سنواتی ':'مبلغ نهایی — پیگیری تأییدنشده ')+(yearPlan?srYearText(yearPlan.audit):''),'کلید تطبیق'];
   const fiscalYear=String(cfg.year??'').trim(),subtotalGroups=workpaperSubtotalGroups(rows),columnTotals=workpaperColumnTotals(rows);
   const data=[
     ['نام واحد مورد رسیدگی',cfg.company||'—'],
@@ -13502,10 +13538,10 @@ function exportXlsx(){
     [],topHeaders,
     ...subtotalGroups.flatMap(group=>{
       const t=workpaperColumnTotals(group.rows);
-      return [...group.rows.map(r=>[r.kolCode,r.kolTitle,r.moeinCode,r.moeinTitle,r.tafCode||r.detailCode,r.tafTitle||r.detailTitle,r.taf1Code,r.taf1Title,r.taf2Code,r.taf2Title,xval(r.amount1403),xval(r.amount1404),xval(r.followUp),xval(r.offset1404),xval(r.finalAmount),r.groupKey]),
-        [group.kolCode,'جمع کل '+group.kolTitle,'','','','','','','','',priorEvidence?xval(t.amount1403):'',xval(t.amount1404),xval(t.followUp),xval(t.offset1404),xval(t.finalAmount),'']];
+      return [...group.rows.map(r=>[r.kolCode,r.kolTitle,r.moeinCode,r.moeinTitle,r.tafCode||r.detailCode,r.tafTitle||r.detailTitle,r.taf1Code,r.taf1Title,r.taf2Code,r.taf2Title,xval(r.priorAmount),xval(r.auditAmount),xval(r.followUp),xval(r.auditOffset),xval(r.finalAmount),r.groupKey]),
+        [group.kolCode,'جمع کل '+group.kolTitle,'','','','','','','','',priorEvidence?xval(t.priorAmount):'',xval(t.auditAmount),xval(t.followUp),xval(t.auditOffset),xval(t.finalAmount),'']];
     }),
-    ['جمع کل کاربرگ','','','','','','','','','',priorEvidence?xval(columnTotals.amount1403):'',xval(columnTotals.amount1404),xval(columnTotals.followUp),xval(columnTotals.offset1404),xval(columnTotals.finalAmount),'']
+    ['جمع کل کاربرگ','','','','','','','','','',priorEvidence?xval(columnTotals.priorAmount):'',xval(columnTotals.auditAmount),xval(columnTotals.followUp),xval(columnTotals.auditOffset),xval(columnTotals.finalAmount),'']
   ];
   const ws=XLSX.utils.aoa_to_sheet(data);
   // مانده‌های بستانکار در خروجی اکسل داخل پرانتز نمایش داده شوند؛ بدهکارها عادی‌اند.

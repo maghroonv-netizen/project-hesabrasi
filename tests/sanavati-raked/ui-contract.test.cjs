@@ -135,12 +135,20 @@ yearSandbox.SHEET_CFG.year='۱۴۰۴';
 assert.equal(yearSandbox.srCaseYear(), 1404, 'a year-only value is not mistaken for an Excel date serial');
 yearSandbox.SHEET_CFG.year='';
 assert.equal(yearSandbox.srCaseYear(), null, 'an empty case year is never inferred from ledger dates');
-assert.doesNotMatch(html, /id="srPriorFile"|بارگذاری اکسل اسناد ۱۴۰۳/,
-  'the raw prior-year ledger upload is no longer requested');
-assert.match(html, /id="srHistoryPick"[\s\S]*?srYearText\(plan\?\.history\)/,
-  'the required two-years-prior ledger upload prompt is generated from the case year');
-assert.match(html, /id="srNextPick"[\s\S]*?srYearText\(plan\?\.next\)/,
-  'the following-year ledger upload prompt is generated from the case year');
+assert.match(html, /role:'prior',year:plan\?\.prior,title:'اسناد خام سال قبل'/,
+  'raw Y−1 ledger upload is available as an alternative to the prior workpaper');
+assert.match(html, /role:'history',year:plan\?\.history,title:'اسناد خام دو سال قبل',required:false/,
+  'raw Y−2 ledger is optional');
+assert.match(html, /role:'next',year:plan\?\.next,title:'اسناد خام سال بعد برای پیگیری',required:false/,
+  'Y+1 follow-up ledger is optional');
+assert.match(html, /id="srPick_\$\{spec\.role\}"/,
+  'year-role file input ids are generated dynamically from the selected fiscal year roles');
+assert.match(html, /if\(prior\)\{[\s\S]*?SR\.priorResult=SRE\.analyze/,
+  'Y−1 is independently rebuilt from raw ledger evidence when available');
+assert.match(html, /SR\.priorWorkpaper&&!SR\.priorResult/,
+  'prior workpaper import is not added again when raw Y−1 analysis exists');
+assert.match(html, /SR\.priorComparison=\{\.\.\.stats\}/,
+  'the raw Y−1 calculation and prior workpaper are compared without double counting');
 assert.match(html, /if\(!SHEET_CFG\.company\.trim\(\)\)\{[\s\S]*?سال مالی اختیاری است/,
   'the case may continue with an empty fiscal-year field');
 assert.match(exportCode, /x\.code==='TRANSFER_REVIEW'&&x\.fileId===currentFileId/);
@@ -179,7 +187,7 @@ assert.match(workpaperMarkup, /class="sr-workpaper-total"/,
   'the aged workpaper includes a grand-total row');
 assert.match(workpaperMarkup, /subtotalGroups\.map\(group=>/,
   'kol subtotals are emitted even when a group has only one detail row');
-assert.match(workpaperMarkup, /columnTotals\.amount1403[\s\S]*columnTotals\.finalAmount/,
+assert.match(workpaperMarkup, /columnTotals\.priorAmount[\s\S]*columnTotals\.finalAmount/,
   'the grand total aggregates all five numeric columns');
 assert.match(exportCode, /subtotalGroups\.flatMap\(group=>/,
   'the XLSX workpaper also inserts kol-level subtotals');
@@ -189,17 +197,17 @@ const subtotalSandbox = {};
 vm.createContext(subtotalSandbox);
 vm.runInContext(html.slice(subtotalHelpersStart, subtotalHelpersEnd), subtotalSandbox);
 const groupedRows = subtotalSandbox.workpaperSubtotalGroups([
-  {kolCode:'100',kolTitle:'دریافتنی',amount1403:2n,amount1404:3n,followUp:2n,offset1404:1n,finalAmount:1n},
-  {kolCode:'100',kolTitle:'دریافتنی',amount1403:4n,amount1404:5n,followUp:4n,offset1404:2n,finalAmount:2n},
-  {kolCode:'200',kolTitle:'پرداختنی',amount1403:7n,amount1404:8n,followUp:7n,offset1404:0n,finalAmount:7n}
+  {kolCode:'100',kolTitle:'دریافتنی',priorAmount:2n,auditAmount:3n,followUp:2n,auditOffset:1n,finalAmount:1n},
+  {kolCode:'100',kolTitle:'دریافتنی',priorAmount:4n,auditAmount:5n,followUp:4n,auditOffset:2n,finalAmount:2n},
+  {kolCode:'200',kolTitle:'پرداختنی',priorAmount:7n,auditAmount:8n,followUp:7n,auditOffset:0n,finalAmount:7n}
 ]);
 assert.equal(groupedRows.length,2);
 assert.equal(groupedRows[0].rows.length,2);
 const firstKolTotals = subtotalSandbox.workpaperColumnTotals(groupedRows[0].rows);
-assert.equal(firstKolTotals.amount1403,6n);
-assert.equal(firstKolTotals.amount1404,8n);
+assert.equal(firstKolTotals.priorAmount,6n);
+assert.equal(firstKolTotals.auditAmount,8n);
 assert.equal(firstKolTotals.followUp,6n);
-assert.equal(firstKolTotals.offset1404,3n);
+assert.equal(firstKolTotals.auditOffset,3n);
 assert.equal(firstKolTotals.finalAmount,3n);
 assert.equal(groupedRows[1].rows.length,1,'single-item kol groups still receive their own subtotal');
 assert.match(exportCode, /\['جمع کل کاربرگ'[\s\S]*xval\(columnTotals\.finalAmount\)/,
