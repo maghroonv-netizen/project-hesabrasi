@@ -108,7 +108,8 @@ function dispatchFile(input, file) {
     assert.ok(first?.textContent.includes('۵۰٫۰٪'), 'percentage is calculated from current and prior rial balances with one decimal place');
     assert.equal(first.querySelector('td:nth-child(4)').textContent, '۱٬۵۰۰٬۰۰۰٬۰۰۰', 'source rial amounts are displayed and calculated without scaling');
     assert.equal(first.querySelector('td:nth-child(6)').textContent, '۵۰۰٬۰۰۰٬۰۰۰', 'change is calculated as current minus prior in rials');
-    assert.equal(first.querySelector('td:nth-child(8)').textContent, '  پرداخت-123  ', 'source explanation is printed verbatim');
+    assert.ok(first.querySelector('td:nth-child(8)').textContent.includes('افزایش در حقوق و مزایا'), 'the workpaper shows a concise locally classified explanation before AI writing');
+    assert.ok(first.querySelector('td:nth-child(8)').textContent.length <= 55, 'explanations remain short enough for a half-line cell');
     const currentOnly = dataRows.find(line => line.querySelector('td:nth-child(2)')?.textContent === '۶۱۰۳');
     assert.equal(currentOnly?.querySelector('td:nth-child(5)').textContent, '۰', 'a missing prior-year amount is shown as zero');
     assert.equal(currentOnly?.querySelector('td:nth-child(6)').textContent, '۵۰۰٬۰۰۰٬۰۰۰', 'change is always calculated when the prior amount is missing');
@@ -157,14 +158,21 @@ function dispatchFile(input, file) {
 
     const stressTitle = w.document.createElement('tr');
     stressTitle.className = 'variance-group-title';
-    stressTitle.innerHTML = '<td colspan="8">stress</td>';
-    const stressRow = first.cloneNode(true);
-    stressRow.querySelector('td:nth-child(8)').textContent = 'x'.repeat(2000);
+    stressTitle.innerHTML = '<td colspan="8">گروه آزمایشی</td>';
+    const stressRows = Array.from({ length: 30 }, (_, i) => {
+      const row = first.cloneNode(true);
+      row.querySelector('td:nth-child(1)').textContent = String(i + 1);
+      row.querySelector('td:nth-child(2)').textContent = String(8000 + i);
+      row.querySelector('td:nth-child(3)').textContent = 'شرح کوتاه آزمایشی';
+      row.querySelector('td:nth-child(8)').textContent = 'افزایش در هزینه؛ بررسی سند لازم است.';
+      return row;
+    });
     const stressSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal')).cloneNode(true);
-    w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-paper-table tbody').append(stressTitle, stressRow, stressSubtotal);
+    w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-paper-table tbody').append(stressTitle, ...stressRows, stressSubtotal);
     printed = null;
     w.document.querySelector('#varianceV4 [data-vprint]').click();
-    assert.ok(printed.length >= 2, 'long wrapped descriptions cause pagination');
+    assert.ok(printed.length >= 2, 'additional account rows paginate across pages');
+    assert.ok(w.document.querySelector('#printHost .variance-paper-table tbody').rows.length >= 18, 'each measured page uses its available height for more account rows');
     const summaryPage = printed.at(-1);
     assert.equal(summaryPage.mainHead, 1, 'the main-table header repeats on continuation pages');
     assert.equal(summaryPage.summaryHead, 6, 'the continuation retains the six-column summary');
@@ -172,24 +180,28 @@ function dispatchFile(input, file) {
     if (typeof w.__activePrintRestore === 'function') w.__activePrintRestore();
 
     w.anaAISaveKey('test-only');
-    let sent = null;
+    let sent = null, requests = 0;
     w.routerRequest = async messages => {
+      requests++;
       sent = JSON.parse(messages[1].content.split('\n').slice(1).join('\n'));
       return { ok: true, text: JSON.stringify({ items: sent.map(item => ({
-        id: item.id,
-        explanation: 'دادهٔ مبلغی به‌تنهایی علت را اثبات نمی‌کند؛ بررسی مستندات لازم است.'
+        g: item.g,
+        t: item.c === 'حقوق و مزایا' ? 'افزایش حقوق و مزایا؛ تطبیق فهرست حقوق لازم است.' : `${item.d} در ${item.c}؛ بررسی اسناد مرتبط لازم است.`
       })) }) };
     };
     w.document.querySelector('#varianceV4 [data-vai]').click();
-    for (let n = 0; n < 40 && !w.document.querySelector('#varianceV4 #vAiStatus')?.textContent.includes('پیشنهاد دریافت شد'); n++) await sleep(25);
-    assert.equal(sent.length, 5);
-    assert.equal(sent.find(item => item.account.sub_code === '6103').prior_amount, null, 'AI receives missing-year as null, not a made-up zero');
-    assert.equal(sent.find(item => item.account.sub_code === '006101').current_amount, '1500000000', 'AI receives unscaled rial amounts from the already-loaded workbook');
-    assert.ok(sent.every(item => !Object.hasOwn(item, 'description_evidence')), 'transaction descriptions are excluded unless the user opts in');
-    assert.ok(w.document.querySelector('#varianceV4 #vAiStatus').textContent.includes('نیازمند بازبینی حسابرس'));
-
+    for (let n = 0; n < 40 && !w.document.querySelector('#varianceV4 #vAiStatus')?.textContent.includes('توضیح کوتاه برای'); n++) await sleep(25);
+    assert.equal(requests, 1, 'similar accounts are classified locally and analyzed in one compact AI request');
+    assert.equal(sent.length, 4, 'AI receives one item per grouped expense pattern, not one per account');
+    assert.ok(sent.every(item => item.g && item.c && item.d && item.p && !Object.hasOwn(item, 'id') && !Object.hasOwn(item, 'account') && !Object.hasOwn(item, 'amount')), 'the AI payload contains only local categories, direction, pattern and short evidence');
+    assert.ok(sent.some(item => item.c === 'حقوق و مزایا' && item.d === 'افزایش'), 'classification is performed by code before AI writing');
+    assert.ok(sent.some(item => item.c === 'حقوق و مزایا' && item.e.some(text => text.includes('پرداخت'))), 'the AI receives only a short sanitized description hint for writing');
+    const aiExplanation = w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-paper-table tbody tr:not(.variance-group-title):not(.variance-workpaper-subtotal) td:nth-child(8)');
+    assert.equal(aiExplanation.textContent, 'افزایش حقوق و مزایا؛ تطبیق فهرست حقوق لازم است.', 'AI-written text replaces the local fallback in the explanation cell');
+    assert.ok(aiExplanation.textContent.length <= 55, 'AI explanations are limited to a brief half-line');
+    assert.ok(w.document.querySelector('#varianceV4 #vAiStatus').textContent.includes('مبالغ و کد حسابی برای AI ارسال نشد'));
     if (errors.length) throw new Error('jsdom errors: ' + errors.join(' | '));
-    console.log('expense variance UI: passed (prior-year mapping, reuse of initial current-year data, account-grouping, units, exact table layout, computations, verbatim descriptions and explicit AI request)');
+    console.log('expense variance UI: passed (automatic years, rial-only amounts, local account classification, short AI explanations, zero handling, page frames and pagination)');
   } finally {
     dom.window.close();
   }
