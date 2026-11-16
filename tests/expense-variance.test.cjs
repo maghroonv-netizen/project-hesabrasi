@@ -60,7 +60,7 @@ function dispatchFile(input, file) {
       headers,
       ['61', 'هزینه‌های اداری', '', '', 90000000000, 0, 'جمع کل تکراری', '', '۱۴۰۳/۰۱/۰۱'],
       ['61', 'هزینه‌های اداری', '006101', 'حقوق', 1000000000, 0, 'پرداخت حقوق', '', '۱۴۰۳/۰۲/۰۱'],
-      ['61', 'هزینه‌های اداری', '6102', 'هزینه بدون مبنا', 0, 0, 'شرح سال قبل', '', '۱۴۰۳/۰۳/۰۱'],
+      ['61', 'هزینه‌های اداری', '6102', 'هزینه بدون مبنا', 600000, 0, 'شرح سال قبل', '', '۱۴۰۳/۰۳/۰۱'],
       ['61', 'هزینه‌های اداری', '6105', 'حساب بدون گردش', 0, 0, '', '', '۱۴۰۳/۰۳/۱۵'],
       ['62', 'هزینه مالی', '', '', 300000000, 0, 'جمع کل دوم', '', '۱۴۰۳/۰۴/۰۱'],
       ['62', 'هزینه مالی', '6201', 'هزینه تأمین مالی', 200000000, 0, 'شرح قبلی هزینه مالی', '', '۱۴۰۳/۰۵/۰۱'],
@@ -84,10 +84,13 @@ function dispatchFile(input, file) {
     assert.equal(accountScroll.scrollTop, 240, 'selecting accounts does not reset the balance list scroll position');
     assert.equal(w.document.querySelectorAll('#varianceV3 [data-vaccount]:checked').length, 5);
     assert.equal(w.document.querySelectorAll('#varianceV3 [data-vcategory]').length, 0, 'accounts are grouped by their major account without manual category selection');
+    w.eval("SHEET_CFG.date='ابان 1405'");
     w.document.querySelector('#varianceV3 [data-vconfirm]').click();
 
     assert.equal(w.document.querySelector('#metaSubject'), null, 'the case-information form does not request a redundant subject');
     assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('بررسی نوسانات هزینه'), 'the module supplies its own workpaper subject');
+    assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('آبان ۱۴۰۵'), 'preparation month uses the hamza spelling and Persian digits');
+    assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('سال مالی منتهی به ۲۹ اسفند ۱۴۰۴'), 'the audit year-end is stated explicitly in the header');
     assert.equal(w.document.querySelector('#varianceV4 [data-vthreshold]'), null, 'the user-configurable fluctuation threshold is removed');
     assert.equal(w.document.querySelector('#varianceV4 .variance-threshold-control'), null, 'there is no threshold selector in the workpaper controls');
     const paper = w.document.querySelector('#varianceV4 .variance-paper-table');
@@ -110,6 +113,7 @@ function dispatchFile(input, file) {
     assert.ok(first.querySelector('td:nth-child(8)').textContent.length <= 55, 'explanations remain concise');
     const printCss = [...w.document.querySelectorAll('style')].map(style => style.textContent).join('\n');
     assert.match(printCss, /td\.vdesc\{[^}]*white-space:normal!important[^}]*overflow-wrap:anywhere!important/, 'long explanation text wraps inside its own cell');
+    assert.match(printCss, /variance-page-full \.variance-outer\{height:541\.7pt!important/, 'filled variance pages retain the full 541.7-point frame height');
     assert.match(printCss, /td\.vaccount\{[^}]*white-space:normal!important[^}]*overflow-wrap:anywhere!important/, 'long account names wrap instead of spilling into adjacent cells');
     const currentOnly = dataRows.find(line => line.querySelector('td:nth-child(2)')?.textContent === '۶۱۰۳');
     assert.equal(currentOnly?.querySelector('td:nth-child(5)').textContent, '۰', 'a missing prior-year amount is shown as zero');
@@ -118,13 +122,15 @@ function dispatchFile(input, file) {
     const negative = dataRows.find(line => line.querySelector('td:nth-child(2)')?.textContent === '۶۱۰۲');
     assert.ok(negative.querySelector('td:nth-child(4)').classList.contains('vnegative'), 'negative amount receives the dark-red print class');
     assert.equal(negative.querySelector('td:nth-child(4)').textContent, '(۴۰۰٬۰۰۰)', 'decimal million-rial amounts convert exactly to whole rial');
-    assert.equal(negative.querySelector('td:nth-child(7)').textContent, '—', 'percentage is unavailable only when the prior-year amount is zero');
+    assert.equal(negative.querySelector('td:nth-child(7)').textContent, '(۱۶۶٫۷٪)', 'negative percentage is shown in parentheses with Persian digits');
+    assert.ok(negative.querySelector('td:nth-child(7)').classList.contains('variance-negative'), 'negative percentages use dark-red emphasis');
+    assert.ok(negative.querySelector('td:nth-child(7)').classList.contains('variance-over-threshold'), 'absolute percentage changes above twenty percent use the dark-red emphasis class');
     const zeroLine = dataRows.find(line => line.querySelector('td:nth-child(2)')?.textContent === '۶۱۰۵');
     assert.deepEqual([...zeroLine.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۰', '۰', '۰', '—'], 'an account with zero in both years displays zero amounts and a dash percentage');
     assert.equal(lines.filter(line => line.classList.contains('variance-group-title')).length, 2, 'one group is emitted per major account');
     assert.equal(lines.filter(line => line.classList.contains('variance-workpaper-subtotal')).length, 2, 'major-account subtotals are printed');
     const adminSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal') && line.querySelector('td:nth-child(2)')?.textContent === '۶۱');
-    assert.deepEqual([...adminSubtotal.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۰۰۰٬۰۰۰', '۹۹۹٬۶۰۰٬۰۰۰', '۱۰۰٫۰٪'], 'subtotal sums amount columns and computes percent from group totals');
+    assert.deepEqual([...adminSubtotal.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۶۰۰٬۰۰۰', '۹۹۹٬۰۰۰٬۰۰۰', '۹۹٫۸٪'], 'subtotal sums amount columns and computes percent from group totals');
     const summaryRows = [...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')];
     assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5], 'each summary row contains no fluctuation count');
     assert.ok(!paper.textContent.includes('کنترل‌های حسابرسی') && !paper.textContent.includes('یادداشت حسابرس'));
@@ -133,6 +139,9 @@ function dispatchFile(input, file) {
       headers: page.querySelectorAll('.variance-meta').length,
       mainHead: page.querySelectorAll('.variance-paper-table thead').length,
       summaryHead: page.querySelectorAll('.variance-summary-table thead th').length,
+      carryOut: [...page.querySelectorAll('tr.variance-page-carry')].map(row => [...row.querySelectorAll('td')].slice(1, 4).map(cell => cell.textContent)),
+      carryIn: [...page.querySelectorAll('tr.variance-page-transfer')].map(row => [...row.querySelectorAll('td')].slice(1, 4).map(cell => cell.textContent)),
+      fullFrame: page.classList.contains('variance-page-full'),
       pageNumber: page.querySelector('.variance-page-number')?.textContent || ''
     }));
       if (process.env.SAVE_VARIANCE_PRINT_FIXTURE) {
@@ -165,13 +174,21 @@ function dispatchFile(input, file) {
       row.querySelector('td:nth-child(2)').textContent = String(8000 + i);
       row.querySelector('td:nth-child(3)').textContent = 'شرح کوتاه آزمایشی';
       row.querySelector('td:nth-child(8)').textContent = 'افزایش در هزینه؛ بررسی سند لازم است.';
+      row.dataset.vcurrent = '0'; row.dataset.vprior = '0'; row.dataset.vdelta = '0';
+      row.querySelectorAll('td.vamount').forEach(cell => { cell.textContent = '۰'; });
       return row;
     });
     const stressSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal')).cloneNode(true);
+    stressSubtotal.dataset.vsubtotalcurrent = '0'; stressSubtotal.dataset.vsubtotalprior = '0';
+    stressSubtotal.querySelectorAll('td.vamount').forEach(cell => { cell.textContent = '۰'; });
+    stressSubtotal.querySelector('td.vpct').textContent = '—';
     w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-paper-table tbody').append(stressTitle, ...stressRows, stressSubtotal);
     printed = null;
     w.document.querySelector('#varianceV4 [data-vprint]').click();
     assert.ok(printed.length >= 2, 'additional account rows paginate across pages');
+    assert.ok(printed.slice(0, -1).every(page => page.carryOut.length === 1 && page.fullFrame), 'every non-final page has the full 541.7pt frame and ends with a cumulative page total');
+    assert.ok(printed.slice(1).every((page, i) => page.carryIn.length === 1 && JSON.stringify(page.carryIn[0]) === JSON.stringify(printed[i].carryOut[0])), 'each continuation starts with the exact carry-forward values from the preceding page');
+    assert.equal(printed.at(-1).carryOut.length, 0, 'the final page has no page-total row');
     assert.ok(w.document.querySelector('#printHost .variance-paper-table tbody').rows.length >= 20, 'each measured page uses its available height for more account rows');
     const summaryPage = printed.at(-1);
     const lastPrintPage = w.document.querySelectorAll('#printHost .variance-print-page').item(printed.length - 1);

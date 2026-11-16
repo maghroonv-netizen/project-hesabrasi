@@ -70,11 +70,11 @@ const workpaperMarkup = html.slice(workpaperStart, workpaperEnd);
 assert.match(workpaperMarkup, /نام واحد مورد رسیدگی/);
 assert.match(workpaperMarkup, /موضوع :/);
 assert.match(workpaperMarkup, /سال مالی مورد رسیدگی/);
-assert.match(workpaperMarkup, /yearPlan\?srYearText\(yearPlan\.prior\)/,
+assert.match(workpaperMarkup, /amountHead\('ماندهٔ سال قبل',yearPlan\?\.prior\)/,
   'the comparative column label is calculated from the configured case year');
 assert.doesNotMatch(workpaperMarkup, /<th>۱۴۰۳<\/th>|<th>۱۴۰۴<\/th>/,
   'the printed worksheet does not hard-code annual column headings');
-assert.match(workpaperMarkup, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
+assert.match(workpaperMarkup, /fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
 assert.doesNotMatch(workpaperMarkup, /تاریخ ترازنامه|periodEnd|SR\.result\?\.audit\?\.label/,
   'the aged worksheet does not invent a balance-sheet date or fall back to the uploaded file year');
 assert.match(html, /سال مالی مورد رسیدگی :<\/span> <span class="v">\$\{esc\(sampleDisplayDigits\(c\.year\)\)\}/,
@@ -204,14 +204,51 @@ assert.equal(firstKolTotals.finalAmount,3n);
 assert.equal(groupedRows[1].rows.length,1,'single-item kol groups still receive their own subtotal');
 assert.match(exportCode, /\['جمع کل کاربرگ'[\s\S]*xval\(columnTotals\.finalAmount\)/,
   'the XLSX worksheet also includes totals for all numeric columns');
-assert.match(html, /sr-paper-table\{border:1\.2px solid #475569/,
-  'the whole worksheet table has a visible perimeter border');
-assert.match(html, /const capacity=Math\.max\(0,available-fixedHeight-18\)/,
-  'manual print pagination reserves a cross-browser layout safety margin');
-assert.match(html, /\.sr-aged-page-sheet\{[^}]*padding:2mm!important[^}]*border:1\.5px solid/,
-  'outer worksheet frame is separated from the inner frame');
-assert.match(html, /\.sr-aged-page-sheet \.sr-rows-box\{padding:1\.5mm!important/,
-  'rounded table frame has an inset so the corner strokes remain visible');
+assert.match(workpaperMarkup, /const widths=\[40,104,44,150\.1,86,86,86,86,86\]/,
+  'the worksheet uses the nine fixed right-to-left widths totaling 768.1pt');
+assert.match(workpaperMarkup, /class=\"sr-major-title\"/,
+  'every kol group starts with a merged major-account title row');
+assert.match(workpaperMarkup, /sr-data-even|sr-data-odd/,
+  'zebra striping is counted only on actual data rows');
+assert.match(html, /function paginateMeasuredWorkpaperGroups\(/,
+  'both workpaper modules share measured row-based pagination with group titles and subtotals');
+assert.match(html, /first\.cells\[0\]\.rowSpan=span/,
+  'consecutive identical moein codes and titles are vertically merged');
+assert.match(html, /maxBodyHeight:Math\.max\(0,available-fixedHeight-1\)/,
+  'pagination measures available body height after the frame and headers');
+assert.match(html, /max-height:541\.7pt!important/,
+  'the outer worksheet frame is capped at 541.7 points');
+assert.match(html, /sr-aged-page-sheet\.sr-aged-page-full\{height:541\.7pt!important\}/,
+  'every non-final aged-workpaper page uses the full 541.7-point outer frame');
+assert.match(html, /width:768\.1pt!important/,
+  'the printable table spans exactly 768.1 points');
+assert.match(html, /#fbe3a0!important/,
+  'kol and grand total rows use the specified amber fill');
+assert.match(html, /sr-page-carry[\s\S]*sr-page-transfer/ ,
+  'non-final pages end in a cumulative total and following pages start with its carry-forward');
+assert.match(html, /expectedTotals&&totals\.some\(\(v,i\)=>v!==BigInt\(expectedTotals\[i\]\?\?0\)\)/,
+  'the shared page engine refuses to produce output when carried totals do not equal the worksheet total');
+assert.match(html, /#0b4f8a!important[\s\S]*#9e0000!important/,
+  'positive amounts are blue and negative amounts red');
+assert.doesNotMatch(workpaperMarkup, /class=\"frame sr-rows-box\"/,
+  'the obsolete nested fourth frame is removed');
+const pagerStart=html.indexOf('function paginateMeasuredWorkpaperGroups('),pagerEnd=html.indexOf('\nwindow.paginateMeasuredWorkpaperGroups=',pagerStart);
+const pagerContext={window:{}};vm.createContext(pagerContext);vm.runInContext(html.slice(pagerStart,pagerEnd),pagerContext);
+const mockRow=(kind,values={})=>({kind,dataset:values,cloneNode(){return mockRow(kind,{...values});}});
+const pagesTest=pagerContext.paginateMeasuredWorkpaperGroups({groups:[
+  {title:mockRow('title'),details:[mockRow('detail',{a:'3',b:'4'}),mockRow('detail',{a:'5',b:'6'})],subtotal:mockRow('subtotal')},
+  {title:mockRow('title'),details:[mockRow('detail',{a:'7',b:'8'}),mockRow('detail',{a:'9',b:'10'})],subtotal:mockRow('subtotal')}
+],maxBodyHeight:35,carryHeight:8,rowHeight:row=>row.kind==='title'||row.kind==='subtotal'?5:10,readValues:row=>[row.dataset.a||0,row.dataset.b||0],expectedTotals:[24n,28n]});
+assert.ok(pagesTest.pages.length>1,'row-by-row measured packing creates continuation pages');
+assert.equal(pagesTest.pages[0].details.length,1,'a group can continue to another page rather than forcing large blank space');
+assert.deepEqual(pagesTest.pages[1].carryInTotals,[3n,4n],'carry-forward totals contain data rows only');
+assert.deepEqual(pagesTest.pages[1].carryInTotals,pagesTest.pages[0].carryOutTotals,'the next page receives the exact previous-page cumulative totals');
+assert.throws(()=>pagerContext.paginateMeasuredWorkpaperGroups({groups:[{title:mockRow('title'),details:[mockRow('detail',{a:'2'})],subtotal:mockRow('subtotal')}],maxBodyHeight:100,carryHeight:8,rowHeight:()=>1,readValues:row=>[row.dataset.a||0],expectedTotals:[3n]}),/جمع انتقالی/,'the pagination engine blocks inconsistent control totals');
+assert.match(html, /tr\.sr-page-carry td\{background:#fbe3a0!important/,
+  'the aged workpaper styles page-end cumulative rows in amber');
+assert.match(html, /tr\.sr-page-transfer td\{background:#fff2cc!important/,
+  'the aged workpaper styles next-page carry-forward rows in pale yellow');
+assert.match(html, /انتقال از صفحات قبل/);
 assert.match(html, /انتقال‌های حساب سال مورد رسیدگی نیازمند بررسی/);
 assert.match(html, /هشدارهای نیازمند بررسی:<\/b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر/);
 const bindingStart = html.indexOf('function bindReport(){');
