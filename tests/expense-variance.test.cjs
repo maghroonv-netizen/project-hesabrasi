@@ -88,15 +88,13 @@ function dispatchFile(input, file) {
 
     assert.equal(w.document.querySelector('#metaSubject'), null, 'the case-information form does not request a redundant subject');
     assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('بررسی نوسانات هزینه'), 'the module supplies its own workpaper subject');
-    const thresholdInput = w.document.querySelector('#varianceV4 [data-vthreshold]');
-    thresholdInput.value = '30'; thresholdInput.dispatchEvent(new w.Event('change', { bubbles: true }));
-    assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')[1].lastElementChild.textContent, '۰ از ۱', 'the user-configurable fluctuation threshold controls summary counts');
-    w.document.querySelector('#varianceV4 [data-vthreshold]').value = '20';
-    w.document.querySelector('#varianceV4 [data-vthreshold]').dispatchEvent(new w.Event('change', { bubbles: true }));
+    assert.equal(w.document.querySelector('#varianceV4 [data-vthreshold]'), null, 'the user-configurable fluctuation threshold is removed');
+    assert.equal(w.document.querySelector('#varianceV4 .variance-threshold-control'), null, 'there is no threshold selector in the workpaper controls');
     const paper = w.document.querySelector('#varianceV4 .variance-paper-table');
     assert.equal(paper.querySelectorAll('thead th').length, 8, 'main table has exactly eight columns');
     assert.equal([...paper.querySelectorAll('col')].reduce((total, col) => total + parseFloat(col.style.width), 0), 768.1, 'specified column widths add to 768.1 pt');
-    assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary thead th').length, 6, 'summary has six columns, including fluctuation counts');
+    assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary thead th').length, 5, 'summary contains only major account and year/change totals');
+    assert.ok(!w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-summary').textContent.includes('نوسان بیش از حد'), 'the fluctuation-count metric is removed from the summary');
     assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr').length, 2, 'the summary has one row for each major-account group');
     assert.ok(paper.tBodies[0].rows[0].textContent.includes('هزینه‌های اداری'), 'group heading comes from the major account title');
     assert.ok([...paper.tBodies[0].rows].some(row => row.classList.contains('variance-group-title') && row.textContent.includes('هزینه مالی')), 'a second major account becomes a separate group automatically');
@@ -123,13 +121,12 @@ function dispatchFile(input, file) {
     assert.equal(negative.querySelector('td:nth-child(7)').textContent, '—', 'percentage is unavailable only when the prior-year amount is zero');
     const zeroLine = dataRows.find(line => line.querySelector('td:nth-child(2)')?.textContent === '۶۱۰۵');
     assert.deepEqual([...zeroLine.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۰', '۰', '۰', '—'], 'an account with zero in both years displays zero amounts and a dash percentage');
-    assert.ok(first.querySelector('td:nth-child(7)').classList.contains('variance-high-fluctuation'), 'an absolute fluctuation above 20 percent is highlighted');
     assert.equal(lines.filter(line => line.classList.contains('variance-group-title')).length, 2, 'one group is emitted per major account');
     assert.equal(lines.filter(line => line.classList.contains('variance-workpaper-subtotal')).length, 2, 'major-account subtotals are printed');
     const adminSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal') && line.querySelector('td:nth-child(2)')?.textContent === '۶۱');
     assert.deepEqual([...adminSubtotal.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۰۰۰٬۰۰۰', '۹۹۹٬۶۰۰٬۰۰۰', '۱۰۰٫۰٪'], 'subtotal sums amount columns and computes percent from group totals');
     const summaryRows = [...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')];
-    assert.deepEqual(summaryRows.map(row => row.querySelector('td:last-child').textContent), ['۱ از ۴', '۱ از ۱'], 'summary counts accounts with absolute changes over twenty percent');
+    assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5], 'each summary row contains no fluctuation count');
     assert.ok(!paper.textContent.includes('کنترل‌های حسابرسی') && !paper.textContent.includes('یادداشت حسابرس'));
     let printed = null;
     w.print = () => { printed = [...w.document.querySelectorAll('#printHost .variance-print-page')].map(page => ({
@@ -146,9 +143,9 @@ function dispatchFile(input, file) {
     w.document.querySelector('#varianceV4 [data-vprint]').click();
     assert.equal(printed.length, 1, 'compact major-account data and summary fit on one page');
     assert.ok(printed.every(page => page.headers === 1), 'metadata header repeats on every page');
-    assert.ok(!/کنترل‌های حسابرسی|عطف|یادداشت حسابرس|حد نوسان|درصد سال/.test(w.document.querySelector('#printHost').textContent), 'removed audit-control fields remain absent while the summary fluctuation count is present');
+    assert.ok(!/کنترل‌های حسابرسی|عطف|یادداشت حسابرس|حد نوسان|درصد سال|نوسان بیش از حد|تعداد اقلام/.test(w.document.querySelector('#printHost').textContent), 'threshold selector and over-threshold counts are absent from print');
     assert.equal(printed[0].mainHead, 1, 'main table header is present on the data page');
-    assert.equal(printed[0].summaryHead, 6, 'summary uses six columns when it fits on the final page');
+    assert.equal(printed[0].summaryHead, 5, 'summary uses five columns when it fits on the final page');
     const printPage = w.document.querySelector('#printHost .variance-print-page');
     assert.ok(printPage.querySelector('.variance-outer > .variance-mid > .variance-inner'), 'print page has three nested rounded frames');
     assert.ok(printPage.querySelector('.variance-mid > .variance-page-number'), 'page number sits inside the middle frame below the inner frame');
@@ -175,10 +172,12 @@ function dispatchFile(input, file) {
     printed = null;
     w.document.querySelector('#varianceV4 [data-vprint]').click();
     assert.ok(printed.length >= 2, 'additional account rows paginate across pages');
-    assert.ok(w.document.querySelector('#printHost .variance-paper-table tbody').rows.length >= 18, 'each measured page uses its available height for more account rows');
+    assert.ok(w.document.querySelector('#printHost .variance-paper-table tbody').rows.length >= 20, 'each measured page uses its available height for more account rows');
     const summaryPage = printed.at(-1);
+    const lastPrintPage = w.document.querySelectorAll('#printHost .variance-print-page').item(printed.length - 1);
+    assert.ok(lastPrintPage.querySelectorAll('.variance-paper-table tbody tr:not(.variance-group-title):not(.variance-workpaper-subtotal)').length > 0, 'the summary shares remaining page space with continuation account rows instead of being stranded alone');
     assert.equal(summaryPage.mainHead, 1, 'the main-table header repeats on continuation pages');
-    assert.equal(summaryPage.summaryHead, 6, 'the continuation retains the six-column summary');
+    assert.equal(summaryPage.summaryHead, 5, 'the continuation retains the five-column summary');
     assert.equal(summaryPage.headers, 1, 'every page repeats the metadata header');
     if (typeof w.__activePrintRestore === 'function') w.__activePrintRestore();
 

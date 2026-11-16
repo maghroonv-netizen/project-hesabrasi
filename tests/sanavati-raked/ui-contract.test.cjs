@@ -82,6 +82,14 @@ assert.match(html, /سال مالی مورد رسیدگی :<\/span> <span class=
 assert.match(workpaperMarkup, /تهیه‌کننده :/);
 assert.match(workpaperMarkup, /بررسی‌کننده :/);
 assert.doesNotMatch(workpaperMarkup, /sr-report-title|sr-print-title/);
+assert.match(workpaperMarkup, /data-sr-exclude/,
+  'the auditor can exclude a suggested aged/stale item from the workpaper preview');
+assert.match(workpaperMarkup, /قضاوت حسابرس/,
+  'a manual exclusion is explicitly presented as auditor judgment, not an automatic classification');
+assert.match(workpaperMarkup, /بازگرداندن اقلام حذف‌شده/,
+  'excluded workpaper items can be restored');
+assert.match(html, /function withoutWorkpaperExclusions\(rows\)/,
+  'manual exclusions are applied to the output rows without changing the underlying aging calculations');
 assert.match(workpaperMarkup, /sr-refbox/);
 
 const printStart = html.indexOf('function printReport(){');
@@ -92,7 +100,11 @@ const printCode = html.slice(printStart, exportStart);
 const exportCode = html.slice(exportStart, exportEnd);
 assert.match(printCode, /selectionConfirmed/);
 assert.match(printCode, /window\.print\(\)/);
+assert.match(printCode, /sr-workpaper-exclude.*\.remove\(\)/,
+  'auditor review buttons are excluded from the printed copy');
 assert.match(exportCode, /selectionConfirmed/);
+assert.match(exportCode, /withoutWorkpaperExclusions/,
+  'manual auditor exclusions are honored by the XLSX workpaper too');
 assert.match(exportCode, /XLSX\.utils\.book_new\(\)/);
 assert.match(exportCode, /XLSX\.writeFile\(/);
 assert.match(exportCode, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
