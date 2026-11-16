@@ -109,7 +109,10 @@ function dispatchFile(input, file) {
     assert.equal(first.querySelector('td:nth-child(4)').textContent, '۱٬۵۰۰٬۰۰۰٬۰۰۰', 'source rial amounts are displayed and calculated without scaling');
     assert.equal(first.querySelector('td:nth-child(6)').textContent, '۵۰۰٬۰۰۰٬۰۰۰', 'change is calculated as current minus prior in rials');
     assert.ok(first.querySelector('td:nth-child(8)').textContent.includes('افزایش در حقوق و مزایا'), 'the workpaper shows a concise locally classified explanation before AI writing');
-    assert.ok(first.querySelector('td:nth-child(8)').textContent.length <= 55, 'explanations remain short enough for a half-line cell');
+    assert.ok(first.querySelector('td:nth-child(8)').textContent.length <= 55, 'explanations remain concise');
+    const printCss = [...w.document.querySelectorAll('style')].map(style => style.textContent).join('\n');
+    assert.match(printCss, /td\.vdesc\{[^}]*white-space:normal!important[^}]*overflow-wrap:anywhere!important/, 'long explanation text wraps inside its own cell');
+    assert.match(printCss, /td\.vaccount\{[^}]*white-space:normal!important[^}]*overflow-wrap:anywhere!important/, 'long account names wrap instead of spilling into adjacent cells');
     const currentOnly = dataRows.find(line => line.querySelector('td:nth-child(2)')?.textContent === '۶۱۰۳');
     assert.equal(currentOnly?.querySelector('td:nth-child(5)').textContent, '۰', 'a missing prior-year amount is shown as zero');
     assert.equal(currentOnly?.querySelector('td:nth-child(6)').textContent, '۵۰۰٬۰۰۰٬۰۰۰', 'change is always calculated when the prior amount is missing');
