@@ -1,0 +1,39 @@
+{
+  "sample_notice": "اقلام و مبالغ این فایل صرفاً نمایشی و فرضی‌اند و به هیچ پروندهٔ واقعی تعلق ندارند؛ مشخصات پرونده عمداً خالی است.",
+  "company_name": "",
+  "subject": "",
+  "fiscal_year_end": "",
+  "prepared_date": "",
+  "preparer": "",
+  "reviewer": "",
+  "year_current": "",
+  "year_previous": "",
+  "kol_accounts": [
+    {
+      "kol_code": "۷۱۰",
+      "kol_title": "هزینه حقوق و مزایای کارکنان",
+      "moin_items": [
+        {"moin_code": "۷۱۰۰۲", "title": "حقوق و دستمزد کارکنان دائمی", "amount_current": 12400000000, "amount_previous": 9800000000, "explanation": "افزایش ناشی از اعمال مصوبه افزایش حقوق و تعدیل کارکنان"},
+        {"moin_code": "۷۱۰۱۸", "title": "حق بن", "amount_current": 1250000000, "amount_previous": 1100000000, "explanation": ""},
+        {"moin_code": "۷۱۰۲۰", "title": "حق مسکن و خواربار", "amount_current": 2100000000, "amount_previous": 1650000000, "explanation": "مطابق مصوبهٔ شورای عالی کار"},
+        {"moin_code": "۷۱۰۲۲", "title": "حق اولاد", "amount_current": 310000000, "amount_previous": 325000000, "explanation": "کاهش تعداد افراد مشمول"},
+        {"moin_code": "۷۱۰۳۰", "title": "حق ماموریت", "amount_current": 438500000, "amount_previous": 0, "explanation": "فاقد مبلغ در سال قبل"},
+        {"moin_code": "۷۱۰۳۸", "title": "هزینه مزایای پایان خدمت کارکنان", "amount_current": 1560000000, "amount_previous": 1240000000, "explanation": ""},
+        {"moin_code": "۷۱۰۴۰", "title": "هزینه عیدی کارکنان", "amount_current": 980000000, "amount_previous": 760000000, "explanation": ""},
+        {"moin_code": "۷۱۰۴۸", "title": "هزینه بیمه تامین اجتماعی سهم کارفرما", "amount_current": 3150000000, "amount_previous": 2480000000, "explanation": "متناسب با افزایش حقوق و دستمزد مشمول بیمه"},
+        {"moin_code": "۷۱۰۴۹", "title": "هزینه بیمه بیکاری", "amount_current": 440000000, "amount_previous": 350000000, "explanation": ""},
+        {"moin_code": "۷۱۰۵۴", "title": "حق تاهل", "amount_current": 95000000, "amount_previous": 92000000, "explanation": ""}
+      ]
+    },
+    {
+      "kol_code": "۷۹۰",
+      "kol_title": "هزینه‌های اداری و عمومی",
+      "moin_items": [
+        {"moin_code": "۷۹۰۰۳", "title": "هزینه اقامت و هتل کارکنان شرکت", "amount_current": 718000000, "amount_previous": 905000000, "explanation": "کاهش تعداد ماموریت‌های خارج از شهر"},
+        {"moin_code": "۷۹۰۱۰", "title": "هزینه ملزومات مصرفی", "amount_current": 264000000, "amount_previous": 251000000, "explanation": ""},
+        {"moin_code": "۷۹۰۱۵", "title": "هزینه آب و برق و گاز", "amount_current": 385000000, "amount_previous": 342000000, "explanation": "افزایش تعرفه‌ها"},
+        {"moin_code": "۷۹۰۲۰", "title": "هزینه پذیرایی و تشریفات", "amount_current": 128000000, "amount_previous": 156000000, "explanation": ""}
+      ]
+    }
+  ]
+}
