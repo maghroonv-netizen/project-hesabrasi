@@ -70,7 +70,7 @@ const workpaperMarkup = html.slice(workpaperStart, workpaperEnd);
 assert.match(workpaperMarkup, /نام واحد مورد رسیدگی/);
 assert.match(workpaperMarkup, /موضوع :/);
 assert.match(workpaperMarkup, /سال مالی مورد رسیدگی/);
-assert.match(workpaperMarkup, /amountHead\('ماندهٔ سال قبل',yearPlan\?\.prior\)/,
+assert.match(workpaperMarkup, /amountHead\('سال',yearPlan\?\.prior\)/,
   'the comparative column label is calculated from the configured case year');
 assert.doesNotMatch(workpaperMarkup, /<th>۱۴۰۳<\/th>|<th>۱۴۰۴<\/th>/,
   'the printed worksheet does not hard-code annual column headings');
@@ -157,8 +157,12 @@ const finalRowsStart = html.indexOf('function finalWorkpaperRows(');
 const finalRowsEnd = html.indexOf('\nfunction signedText(', finalRowsStart);
 assert(finalRowsStart >= 0 && finalRowsEnd > finalRowsStart);
 const finalRowsCode = html.slice(finalRowsStart, finalRowsEnd);
-assert.match(finalRowsCode, /const visible=rows\.filter\(r=>rangeHasNonZero\(r\.finalRange\)\)/,
-  'final worksheet filters by its final aged/stale balance, not intermediate activity columns');
+assert.match(finalRowsCode, /const visible=rows\.filter\(r=>rangeHasNonZero\(r\.finalRange\)\|\|\(!r\.finalRange&&r\.priorAmount!==null&&r\.priorAmount!==undefined&&r\.priorAmount!==0n\)\)/,
+  'final worksheet shows nonzero final balances and historical-only prior-year items whose current-year result is unavailable');
+assert.match(workpaperMarkup, /amountHead\('سال',yearPlan\?\.prior\)\}\$\{amountHead\('سال',yearPlan\?\.audit\)/,
+  'workpaper headings identify the prior and audit fiscal years directly');
+assert.match(workpaperMarkup, /amountHead\('پیگیری سال مالی بعد',yearPlan\?\.next\)\}\$\{amountHead\('تهاتر',yearPlan\?\.audit\)/,
+  'workpaper headings clearly name next-year follow-up and offset columns');
 assert.match(html, /Array\.from\(\{length:n\},\(\)=>'<td class="ctl"><\/td>'\)/,
   'sampling audit-control cells remain while their checkbox marks are omitted');
 assert.doesNotMatch(html, /\.sampling-template \.box\{display:inline-block/,
@@ -228,6 +232,12 @@ assert.match(html, /max-height:541\.7pt!important/,
   'the outer worksheet frame is capped at 541.7 points');
 assert.match(html, /sr-aged-page-sheet\.sr-aged-page-full\{height:541\.7pt!important\}/,
   'every non-final aged-workpaper page uses the full 541.7-point outer frame');
+assert.match(html, /padding:1\.6pt 2pt!important;line-height:1\.2!important/,
+  'aged-workpaper rows have a little extra vertical breathing room');
+assert.match(html, /td\.sr-account-title\{text-align:right!important;font-size:8pt!important\}/,
+  'aged-workpaper account text is slightly larger for readability');
+assert.match(html, /font-size:8pt!important;padding:1mm \.6mm!important;line-height:1\.22!important/,
+  'printed aged-workpaper rows use the same slightly roomier typography');
 assert.match(html, /width:768\.1pt!important/,
   'the printable table spans exactly 768.1 points');
 assert.match(html, /#fbe3a0!important/,
