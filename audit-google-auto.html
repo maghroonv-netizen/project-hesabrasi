@@ -10880,6 +10880,10 @@ el('routerForget').onclick=()=>{
         next.order = ['open_router'].concat(next.order.filter(function (x) { return x !== 'open_router'; }));
       }
       state = next;
+      if (global.HESABRASI_ONEXAI_LOCAL_PROXY === true && state.slots.one_x_ai) {
+        state.slots.one_x_ai.key = 'local';
+        save();
+      }
     } catch (e) { /* keep defaults */ }
   }
 

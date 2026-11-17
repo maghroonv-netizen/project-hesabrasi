@@ -10,6 +10,8 @@ assert.match(html,/\{ id: 'one_x_ai', name: '1xAi', base: 'https:\/\/1xai\.ir\/v
 assert.match(html,/شناسهٔ مدل در 1xAi/);
 assert.match(html,/مدل را با نام دقیق پنل 1xAi وارد کنید/);
 assert.match(html,/کلید در حافظهٔ محلی این مرورگر ذخیره می‌شود/);
+assert.match(html,/if \(global\.HESABRASI_ONEXAI_LOCAL_PROXY === true && state\.slots\.one_x_ai\) \{\s*state\.slots\.one_x_ai\.key = 'local';\s*save\(\);/,
+  'enabling local proxy mode replaces any previously saved browser key with a non-secret marker');
 const slotBase=html.slice(html.indexOf('function slotBase(spec, slot) {'),html.indexOf('\n  function isGemini',html.indexOf('function slotBase(spec, slot) {')));
 const chatUrl=html.slice(html.indexOf('function chatUrl(s) {'),html.indexOf('\n  function chatHeaders',html.indexOf('function chatUrl(s) {')));
 const chatHeaders=html.slice(html.indexOf('function chatHeaders(s) {'),html.indexOf('\n  function modelsUrl',html.indexOf('function chatHeaders(s) {')));
