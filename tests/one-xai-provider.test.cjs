@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+const html=fs.readFileSync(path.join(__dirname,'..','audit-google-auto.html'),'utf8');
+const spec={id:'one_x_ai',name:'1xAi',base:'https://1xai.ir/v1',kind:'openai',model:'gpt-4o-mini'};
+assert.match(html,/\{ id: 'one_x_ai', name: '1xAi', base: 'https:\/\/1xai\.ir\/v1', kind: 'openai', site: 'https:\/\/1xai\.ir\/', model: 'gpt-4o-mini', featured: true \}/);
+assert.match(html,/شناسهٔ مدل در 1xAi/);
+assert.match(html,/مدل را با نام دقیق پنل 1xAi وارد کنید/);
+assert.match(html,/کلید فقط در همین مرورگر ذخیره می‌شود/);
+const slotBase=html.slice(html.indexOf('function slotBase(spec, slot) {'),html.indexOf('\n  function isGemini',html.indexOf('function slotBase(spec, slot) {')));
+const chatUrl=html.slice(html.indexOf('function chatUrl(s) {'),html.indexOf('\n  function chatHeaders',html.indexOf('function chatUrl(s) {')));
+const chatHeaders=html.slice(html.indexOf('function chatHeaders(s) {'),html.indexOf('\n  function modelsUrl',html.indexOf('function chatHeaders(s) {')));
+const context={BY_ID:{one_x_ai:spec},state:{slots:{one_x_ai:{}}},cleanAsciiToken:value=>String(value||'').replace(/^Bearer\s+/i,'').trim(),iranChat:()=>''};
+context.trimSlash=u=>String(u||'').replace(/\/+$/,'');
+context.joinUrl=(base,path)=>context.trimSlash(base)+(path.startsWith('/')?path:'/'+path);
+context.resolveSpec=s=>s&&s.slotId&&context.BY_ID[s.slotId]?context.BY_ID[s.slotId]:s&&context.BY_ID[s.provider]||null;
+vm.createContext(context);
+vm.runInContext(slotBase+'\n'+chatUrl+'\n'+chatHeaders,context);
+assert.equal(context.chatUrl({slotId:'one_x_ai',provider:'one_x_ai',model:'gpt-4o-mini'}),'https://1xai.ir/v1/chat/completions');
+assert.deepEqual({...context.chatHeaders({slotId:'one_x_ai',provider:'one_x_ai',key:'test-rotated-key'})},{'Content-Type':'application/json',Authorization:'Bearer test-rotated-key'});
+assert.equal(context.chatUrl({slotId:'one_x_ai',provider:'one_x_ai',model:'claude-sonnet-4-5'}),'https://1xai.ir/v1/chat/completions','the service receives model names unchanged for its own provider routing');
+console.log('1xAi provider checks: endpoint, bearer auth, and model passthrough PASS');

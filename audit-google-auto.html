@@ -10599,7 +10599,7 @@ el('routerForget').onclick=()=>{
 <script>
 /* Hesabrasi AI Core — FCC/OpenClaw-aligned multi-provider gateway + Live OpenRouter Text-Model Catalog.
    Browser-direct: OpenAI-compatible POST {base}/chat/completions,
-   Gemini native generateContent, Anthropic /v1/messages, Azure api-key.
+   1xAi OpenAI-compatible endpoint, Gemini native generateContent, Anthropic /v1/messages, Azure api-key.
    Keys live in localStorage (hesabrasi.aicore.v1) — never in the HTML source. */
 (function (global) {
   'use strict';
@@ -10615,9 +10615,10 @@ el('routerForget').onclick=()=>{
       : 'https://iranrouter.net/api/v1/chat/completions';
   }
 
-  /* OpenRouter shows the complete live text/chat catalog; IranRouter retains its own model default. */
+  /* OpenRouter shows its live text/chat catalog; 1xAi and IranRouter use their own compatible endpoints. */
   var CATALOG = [
     { id: 'open_router', name: 'OpenRouter (کاتالوگ کامل مدل‌ها)', base: 'https://openrouter.ai/api/v1', kind: 'openai', site: 'https://openrouter.ai/', keys: 'https://openrouter.ai/keys', model: 'inclusionai/ling-3.0-flash', featured: true, hdr: 'openrouter', dynamicModels: true },
+    { id: 'one_x_ai', name: '1xAi', base: 'https://1xai.ir/v1', kind: 'openai', site: 'https://1xai.ir/', model: 'gpt-4o-mini', featured: true },
     { id: 'iranrouter', name: 'ایران‌روتر', base: '', kind: 'iranrouter', site: 'https://iranrouter.net/', keys: 'https://iranrouter.net/', model: 'openai/gpt-4o-mini', featured: true }
   ];
 
@@ -11685,12 +11686,15 @@ el('routerForget').onclick=()=>{
     if (spec.extra === 'account') {
       extra = '<label>Cloudflare Account ID<input data-f="account" dir="ltr" value="' + esc(sl.extra && sl.extra.account || '') + '"></label>';
     }
-    var keyPh = spec.local ? 'اختیاری — اگر سرور محلی کلید نمی‌خواهد خالی بگذارید' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : 'کلید API');
+    var keyPh = spec.local ? 'اختیاری — اگر سرور محلی کلید نمی‌خواهد خالی بگذارید' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'کلید جدید API از پنل 1xAi' : 'کلید API'));
     var links = '';
     if (spec.keys) links += '<a href="' + esc(spec.keys) + '" target="_blank" rel="noopener">دریافت کلید</a>';
     if (spec.site) links += (links ? ' · ' : '') + '<a href="' + esc(spec.site) + '" target="_blank" rel="noopener">سایت</a>';
 
     var localTookenProxy = spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true;
+    var providerNote = spec.id === 'one_x_ai'
+      ? '<small class="aihub-provider-note">پایهٔ API: https://1xai.ir/v1 · مدل را با نام دقیق پنل 1xAi وارد کنید؛ نمونه: gpt-4o-mini، claude-* یا gemini-*. کلید فقط در همین مرورگر ذخیره می‌شود.</small>'
+      : '';
     var bodyFields = spec.id === 'open_router'
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
       : spec.dynamicModels
@@ -11698,7 +11702,7 @@ el('routerForget').onclick=()=>{
           '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div>' + (localTookenProxy ? '<small>کلید فقط در فرایند محلی Node.js نگهداری می‌شود؛ مرورگر آن را دریافت یا ذخیره نمی‌کند.</small>' : '') + '<label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل از پنل Tooken (دستی؛ تأیید زنده نشده)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
         : ('<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
-          '<label>مدل<input data-f="model" dir="ltr" value="' + esc(sl.model) + '"></label>' +
+          '<label>' + (spec.id === 'one_x_ai' ? 'شناسهٔ مدل در 1xAi' : 'مدل') + '<input data-f="model" dir="ltr" value="' + esc(sl.model) + '" placeholder="' + (spec.id === 'one_x_ai' ? 'gpt-4o-mini یا شناسهٔ مدل از پنل' : '') + '"></label>' +
         '</div>');
 
     return (
@@ -11709,7 +11713,7 @@ el('routerForget').onclick=()=>{
           '<span class="aihub-name">' + esc(spec.name) + '</span>' +
           '<span class="aihub-mark">' + (sl.lastOk ? '✓ متصل' : '') + '</span>' +
         '</div>' +
-        bodyFields + extra +
+        bodyFields + extra + providerNote +
         '<div class="aihub-links">' + links + '</div>' +
         '<div class="aihub-actions">' +
           '<button type="button" data-act="save">ذخیره</button>' +
@@ -11889,6 +11893,7 @@ el('routerForget').onclick=()=>{
       '#hesabrasiAiHub{margin:0 0 12px;text-align:right}' +
       '#hesabrasiAiHub h3{margin:0 0 4px;font-size:14px}' +
       '.aihub-note{font-size:11px;color:var(--muted);line-height:1.7;margin:0 0 10px}' +
+      '.aihub-provider-note{display:block;margin-top:6px;color:var(--muted);font-size:11px;line-height:1.6}' +
       '.aihub-card{border:1px solid var(--line);border-radius:10px;padding:10px;margin:0 0 8px;background:var(--bg,#f7f7f5)}' +
       '.aihub-card-primary{border-width:1.5px;border-color:var(--brand,#1d4ed8);background:var(--panel,#fff)}' +
       '.aihub-card.ok{border-color:#1a7f37}' +
@@ -11924,8 +11929,8 @@ el('routerForget').onclick=()=>{
     var box = document.createElement('div');
     box.id = 'hesabrasiAiHub';
     box.innerHTML =
-      '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال OpenRouter و ایران‌روتر</h3>' +
-      '<p class="aihub-note">در این بخش فقط OpenRouter و ایران‌روتر فعال‌اند. پس از دریافت کاتالوگ زنده، همهٔ مدل‌های متنی و گفت‌وگویی قابل استفاده از OpenRouter نمایش داده می‌شوند؛ قیمت، رایگان‌بودن یا گران‌بودن باعث پنهان‌کردن یا دسته‌بندی مدل‌ها نمی‌شود. کیفیت فارسی و حسابرسی هر مدل را با نمونه‌کار واقعی بسنجید.</p>' +
+      '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال OpenRouter، 1xAi و ایران‌روتر</h3>' +
+      '<p class="aihub-note">برای 1xAi از نشانی سازگار با OpenAI استفاده می‌شود؛ کلید و شناسهٔ مدل را در کارت همان سرویس وارد کنید و با «آزمایش اتصال» بررسی کنید. مدل‌های متنی و گفت‌وگویی OpenRouter نیز بدون فیلتر قیمت نمایش داده می‌شوند. اگر 1xAi درخواست مرورگر را به‌دلیل CORS رد کند، به پراکسی سمت‌سرور نیاز است.</p>' +
       '<div id="aihubFeatured"></div>' +
       '<div id="aihubRest" hidden></div>' +
       '<div class="aihub-toolbar">' +
