@@ -5,11 +5,12 @@ const path=require('node:path');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const html=fs.readFileSync(path.join(__dirname,'..','audit-google-auto.html'),'utf8');
-const spec={id:'one_x_ai',name:'1xAi',base:'https://1xai.ir/v1',kind:'openai',model:'gpt-4o-mini'};
-assert.match(html,/\{ id: 'one_x_ai', name: '1xAi', base: 'https:\/\/1xai\.ir\/v1', kind: 'openai', site: 'https:\/\/1xai\.ir\/', model: 'gpt-4o-mini', featured: true \}/);
+const spec={id:'one_x_ai',name:'1xAi',base:'https://1xai.ir/v1',kind:'openai',model:'gpt-4o-mini',extra:'base'};
+assert.match(html,/\{ id: 'one_x_ai', name: '1xAi', base: 'https:\/\/1xai\.ir\/v1', kind: 'openai', site: 'https:\/\/1xai\.ir\/', model: 'gpt-4o-mini', featured: true, extra: 'base' \}/);
 assert.match(html,/شناسهٔ مدل در 1xAi/);
-assert.match(html,/مدل را با نام دقیق پنل 1xAi وارد کنید/);
-assert.match(html,/کلید در حافظهٔ محلی این مرورگر ذخیره می‌شود/);
+assert.match(html,/نشانی پایهٔ 1xAi یا پراکسی/);
+assert.match(html,/برای پراکسی ابری، نشانی پایه را به نشانی Worker/);
+assert.match(html,/کلید اصلی 1xAi باید فقط در Secretهای Worker بماند/);
 assert.match(html,/if \(global\.HESABRASI_ONEXAI_LOCAL_PROXY === true && state\.slots\.one_x_ai\) \{\s*state\.slots\.one_x_ai\.key = 'local';\s*save\(\);/,
   'enabling local proxy mode replaces any previously saved browser key with a non-secret marker');
 const slotBase=html.slice(html.indexOf('function slotBase(spec, slot) {'),html.indexOf('\n  function isGemini',html.indexOf('function slotBase(spec, slot) {')));
@@ -26,6 +27,8 @@ assert.equal(context.chatUrl({slotId:'one_x_ai',provider:'one_x_ai',model:'gpt-4
 assert.deepEqual({...context.chatHeaders({slotId:'one_x_ai',provider:'one_x_ai',key:'test-rotated-key'})},{'Content-Type':'application/json',Authorization:'Bearer test-rotated-key'});
 assert.deepEqual({...context.chatHeaders({slotId:'one_x_ai',provider:'one_x_ai',key:'local'})},{'Content-Type':'application/json'},'local proxy mode must not send the placeholder marker as a browser API key');
 assert.equal(context.chatUrl({slotId:'one_x_ai',provider:'one_x_ai',model:'claude-sonnet-4-5'}),'https://1xai.ir/v1/chat/completions','the service receives model names unchanged for its own provider routing');
+context.state.slots.one_x_ai.extra={base:'https://proxy.example.workers.dev/v1'};
+assert.equal(context.chatUrl({slotId:'one_x_ai',provider:'one_x_ai',model:'gpt-4o-mini'}),'https://proxy.example.workers.dev/v1/chat/completions','a custom Cloudflare Worker base URL is supported');
 context.HESABRASI_ONEXAI_LOCAL_PROXY=true;
 assert.equal(context.chatUrl({slotId:'one_x_ai',provider:'one_x_ai',model:'gpt-4o-mini'}),'/api/one-xai/chat/completions','local proxy mode uses a same-origin path to avoid browser CORS');
 console.log('1xAi provider checks: endpoint, bearer auth, and model passthrough PASS');

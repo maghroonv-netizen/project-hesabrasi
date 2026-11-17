@@ -10618,7 +10618,7 @@ el('routerForget').onclick=()=>{
   /* OpenRouter shows its live text/chat catalog; 1xAi and IranRouter use their own compatible endpoints. */
   var CATALOG = [
     { id: 'open_router', name: 'OpenRouter (کاتالوگ کامل مدل‌ها)', base: 'https://openrouter.ai/api/v1', kind: 'openai', site: 'https://openrouter.ai/', keys: 'https://openrouter.ai/keys', model: 'inclusionai/ling-3.0-flash', featured: true, hdr: 'openrouter', dynamicModels: true },
-    { id: 'one_x_ai', name: '1xAi', base: 'https://1xai.ir/v1', kind: 'openai', site: 'https://1xai.ir/', model: 'gpt-4o-mini', featured: true },
+    { id: 'one_x_ai', name: '1xAi', base: 'https://1xai.ir/v1', kind: 'openai', site: 'https://1xai.ir/', model: 'gpt-4o-mini', featured: true, extra: 'base' },
     { id: 'iranrouter', name: 'ایران‌روتر', base: '', kind: 'iranrouter', site: 'https://iranrouter.net/', keys: 'https://iranrouter.net/', model: 'openai/gpt-4o-mini', featured: true }
   ];
 
@@ -11687,14 +11687,15 @@ el('routerForget').onclick=()=>{
     var sl = state.slots[spec.id] || emptySlot(spec.id);
     var extra = '';
     if (spec.extra === 'base') {
-      extra = '<label>نشانی پایه Azure (deployments/… )<input data-f="base" dir="ltr" placeholder="https://RESOURCE.openai.azure.com/openai/deployments/DEPLOYMENT" value="' + esc(sl.extra && sl.extra.base || '') + '"></label>';
+      var oneXaiBaseField = spec.id === 'one_x_ai';
+      extra = '<label>' + (oneXaiBaseField ? 'نشانی پایهٔ 1xAi یا پراکسی' : 'نشانی پایه Azure (deployments/… )') + '<input data-f="base" dir="ltr" placeholder="' + (oneXaiBaseField ? 'https://YOUR-WORKER.workers.dev/v1' : 'https://RESOURCE.openai.azure.com/openai/deployments/DEPLOYMENT') + '" value="' + esc(sl.extra && sl.extra.base || spec.base || '') + '"></label>';
     }
     if (spec.extra === 'account') {
       extra = '<label>Cloudflare Account ID<input data-f="account" dir="ltr" value="' + esc(sl.extra && sl.extra.account || '') + '"></label>';
     }
     var localTookenProxy = spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true;
     var localOneXaiProxy = spec.id === 'one_x_ai' && global.HESABRASI_ONEXAI_LOCAL_PROXY === true;
-    var keyPh = spec.local || localOneXaiProxy ? 'کلید فقط روی سرور محلی نگهداری می‌شود' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'کلید جدید API از پنل 1xAi' : 'کلید API'));
+    var keyPh = spec.local || localOneXaiProxy ? 'کلید فقط روی سرور محلی نگهداری می‌شود' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'مستقیم: کلید 1xAi · پراکسی: APP_ACCESS_TOKEN' : 'کلید API'));
     var links = '';
     if (spec.keys) links += '<a href="' + esc(spec.keys) + '" target="_blank" rel="noopener">دریافت کلید</a>';
     if (spec.site) links += (links ? ' · ' : '') + '<a href="' + esc(spec.site) + '" target="_blank" rel="noopener">سایت</a>';
@@ -11702,7 +11703,7 @@ el('routerForget').onclick=()=>{
     var providerNote = spec.id === 'one_x_ai'
       ? (localOneXaiProxy
         ? '<small class="aihub-provider-note">اتصال از پراکسی هم‌مبدأ روی همین رایانه انجام می‌شود؛ کلید API فقط در فرایند Node.js نگهداری می‌شود.</small>'
-        : '<small class="aihub-provider-note">پایهٔ API: https://1xai.ir/v1 · مدل را با نام دقیق پنل 1xAi وارد کنید؛ نمونه: gpt-4o-mini، claude-* یا gemini-*. کلید در حافظهٔ محلی این مرورگر ذخیره می‌شود.</small>')
+        : '<small class="aihub-provider-note">برای پراکسی ابری، نشانی پایه را به نشانی Worker + ‎/v1 تغییر بده و در فیلد کلید، APP_ACCESS_TOKEN را وارد کن؛ کلید اصلی 1xAi باید فقط در Secretهای Worker بماند. بدون پراکسی، مقدار پایهٔ پیش‌فرض مستقیم به 1xAi وصل می‌شود.</small>')
       : '';
     var bodyFields = spec.id === 'open_router'
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
