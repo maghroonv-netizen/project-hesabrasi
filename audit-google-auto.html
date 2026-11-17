@@ -10916,6 +10916,7 @@ el('routerForget').onclick=()=>{
 
   function slotBase(spec, slot) {
     if (spec && spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true) return '/api/tooken';
+    if (spec && spec.id === 'one_x_ai' && global.HESABRASI_ONEXAI_LOCAL_PROXY === true) return '/api/one-xai';
     if (slot && slot.extra && slot.extra.base) return trimSlash(slot.extra.base);
     if (spec.kind === 'iranrouter') return iranChat();
     if (spec.id === 'cloudflare') {
@@ -11519,8 +11520,9 @@ el('routerForget').onclick=()=>{
     readCard(id);
     var spec = BY_ID[id];
     var sl = state.slots[id];
-    if (!sl.key && spec.local) sl.key = 'local';
-    if (!sl.key && !spec.local) {
+    var localProxyMode = id === 'one_x_ai' && global.HESABRASI_ONEXAI_LOCAL_PROXY === true;
+    if (!sl.key && (spec.local || localProxyMode)) sl.key = 'local';
+    if (!sl.key && !spec.local && !localProxyMode) {
       sl.lastOk = false;
       sl.lastError = 'کلید API وارد نشده است.';
       save(); paintStatus();
@@ -11686,14 +11688,17 @@ el('routerForget').onclick=()=>{
     if (spec.extra === 'account') {
       extra = '<label>Cloudflare Account ID<input data-f="account" dir="ltr" value="' + esc(sl.extra && sl.extra.account || '') + '"></label>';
     }
-    var keyPh = spec.local ? 'اختیاری — اگر سرور محلی کلید نمی‌خواهد خالی بگذارید' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'کلید جدید API از پنل 1xAi' : 'کلید API'));
+    var localTookenProxy = spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true;
+    var localOneXaiProxy = spec.id === 'one_x_ai' && global.HESABRASI_ONEXAI_LOCAL_PROXY === true;
+    var keyPh = spec.local || localOneXaiProxy ? 'کلید فقط روی سرور محلی نگهداری می‌شود' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'کلید جدید API از پنل 1xAi' : 'کلید API'));
     var links = '';
     if (spec.keys) links += '<a href="' + esc(spec.keys) + '" target="_blank" rel="noopener">دریافت کلید</a>';
     if (spec.site) links += (links ? ' · ' : '') + '<a href="' + esc(spec.site) + '" target="_blank" rel="noopener">سایت</a>';
 
-    var localTookenProxy = spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true;
     var providerNote = spec.id === 'one_x_ai'
-      ? '<small class="aihub-provider-note">پایهٔ API: https://1xai.ir/v1 · مدل را با نام دقیق پنل 1xAi وارد کنید؛ نمونه: gpt-4o-mini، claude-* یا gemini-*. کلید فقط در همین مرورگر ذخیره می‌شود.</small>'
+      ? (localOneXaiProxy
+        ? '<small class="aihub-provider-note">اتصال از پراکسی هم‌مبدأ روی همین رایانه انجام می‌شود؛ کلید API فقط در فرایند Node.js نگهداری می‌شود.</small>'
+        : '<small class="aihub-provider-note">پایهٔ API: https://1xai.ir/v1 · مدل را با نام دقیق پنل 1xAi وارد کنید؛ نمونه: gpt-4o-mini، claude-* یا gemini-*. کلید در حافظهٔ محلی این مرورگر ذخیره می‌شود.</small>')
       : '';
     var bodyFields = spec.id === 'open_router'
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
@@ -11701,7 +11706,7 @@ el('routerForget').onclick=()=>{
         ? ('<div class="aihub-grid"><label>' + (localTookenProxy ? 'کلید Tooken (فقط روی سرور محلی)' : 'کلید API') + '<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API Tooken Club" value="' + esc(localTookenProxy ? 'local' : sl.key) + '"' + (localTookenProxy ? ' disabled' : '') + '></label>' +
           '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div>' + (localTookenProxy ? '<small>کلید فقط در فرایند محلی Node.js نگهداری می‌شود؛ مرورگر آن را دریافت یا ذخیره نمی‌کند.</small>' : '') + '<label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل از پنل Tooken (دستی؛ تأیید زنده نشده)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
         : ('<div class="aihub-grid">' +
-          '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
+          '<label>' + (localOneXaiProxy ? 'کلید 1xAi (روی سرور محلی)' : 'کلید API') + '<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(localOneXaiProxy ? 'local' : sl.key) + '"' + (localOneXaiProxy ? ' disabled' : '') + '></label>' +
           '<label>' + (spec.id === 'one_x_ai' ? 'شناسهٔ مدل در 1xAi' : 'مدل') + '<input data-f="model" dir="ltr" value="' + esc(sl.model) + '" placeholder="' + (spec.id === 'one_x_ai' ? 'gpt-4o-mini یا شناسهٔ مدل از پنل' : '') + '"></label>' +
         '</div>');
 
@@ -11930,7 +11935,7 @@ el('routerForget').onclick=()=>{
     box.id = 'hesabrasiAiHub';
     box.innerHTML =
       '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال OpenRouter، 1xAi و ایران‌روتر</h3>' +
-      '<p class="aihub-note">برای 1xAi از نشانی سازگار با OpenAI استفاده می‌شود؛ کلید و شناسهٔ مدل را در کارت همان سرویس وارد کنید و با «آزمایش اتصال» بررسی کنید. مدل‌های متنی و گفت‌وگویی OpenRouter نیز بدون فیلتر قیمت نمایش داده می‌شوند. اگر 1xAi درخواست مرورگر را به‌دلیل CORS رد کند، به پراکسی سمت‌سرور نیاز است.</p>' +
+      '<p class="aihub-note">برای 1xAi از نشانی سازگار با OpenAI استفاده می‌شود؛ کلید و شناسهٔ مدل را در کارت همان سرویس وارد کنید و با «آزمایش اتصال» بررسی کنید. اگر مرورگر به‌دلیل CORS خطای Failed to fetch داد، واسط محلی پروژه را طبق فایل ONEXAI_LOCAL_PROXY.md اجرا کنید؛ در آن حالت کلید در مرورگر ذخیره نمی‌شود.</p>' +
       '<div id="aihubFeatured"></div>' +
       '<div id="aihubRest" hidden></div>' +
       '<div class="aihub-toolbar">' +
