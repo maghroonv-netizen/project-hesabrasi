@@ -10618,7 +10618,7 @@ el('routerForget').onclick=()=>{
   /* OpenRouter shows its live text/chat catalog; 1xAi and IranRouter use their own compatible endpoints. */
   var CATALOG = [
     { id: 'open_router', name: 'OpenRouter (کاتالوگ کامل مدل‌ها)', base: 'https://openrouter.ai/api/v1', kind: 'openai', site: 'https://openrouter.ai/', keys: 'https://openrouter.ai/keys', model: 'inclusionai/ling-3.0-flash', featured: true, hdr: 'openrouter', dynamicModels: true },
-    { id: 'one_x_ai', name: '1xAi', base: 'https://1xai.ir/v1', kind: 'openai', site: 'https://1xai.ir/', model: 'gpt-4o-mini', featured: true, extra: 'base' },
+    { id: 'one_x_ai', name: '1xAi', base: 'https://1xai.ir/v1', kind: 'openai', site: 'https://1xai.ir/', model: 'gpt-4o-mini', featured: true },
     { id: 'iranrouter', name: 'ایران‌روتر', base: '', kind: 'iranrouter', site: 'https://iranrouter.net/', keys: 'https://iranrouter.net/', model: 'openai/gpt-4o-mini', featured: true }
   ];
 
@@ -10880,10 +10880,6 @@ el('routerForget').onclick=()=>{
         next.order = ['open_router'].concat(next.order.filter(function (x) { return x !== 'open_router'; }));
       }
       state = next;
-      if (global.HESABRASI_ONEXAI_LOCAL_PROXY === true && state.slots.one_x_ai) {
-        state.slots.one_x_ai.key = 'local';
-        save();
-      }
     } catch (e) { /* keep defaults */ }
   }
 
@@ -10920,7 +10916,8 @@ el('routerForget').onclick=()=>{
 
   function slotBase(spec, slot) {
     if (spec && spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true) return '/api/tooken';
-    if (spec && spec.id === 'one_x_ai' && global.HESABRASI_ONEXAI_LOCAL_PROXY === true) return '/api/one-xai';
+    /* 1xAi is deliberately direct in this build; ignore any legacy saved proxy URL. */
+    if (spec && spec.id === 'one_x_ai') return 'https://1xai.ir/v1';
     if (slot && slot.extra && slot.extra.base) return trimSlash(slot.extra.base);
     if (spec.kind === 'iranrouter') return iranChat();
     if (spec.id === 'cloudflare') {
@@ -11524,9 +11521,8 @@ el('routerForget').onclick=()=>{
     readCard(id);
     var spec = BY_ID[id];
     var sl = state.slots[id];
-    var localProxyMode = id === 'one_x_ai' && global.HESABRASI_ONEXAI_LOCAL_PROXY === true;
-    if (!sl.key && (spec.local || localProxyMode)) sl.key = 'local';
-    if (!sl.key && !spec.local && !localProxyMode) {
+    if (!sl.key && spec.local) sl.key = 'local';
+    if (!sl.key && !spec.local) {
       sl.lastOk = false;
       sl.lastError = 'کلید API وارد نشده است.';
       save(); paintStatus();
@@ -11618,8 +11614,31 @@ el('routerForget').onclick=()=>{
     } catch (err) {
       usageStatus=err&&err.name==='AbortError'?'timeout_usage_unknown':'network_usage_unknown';if(err&&err.usageId)global.usageDecision(err.usageId,false);
       sl.lastOk = false;
-      sl.lastError = err && err.name === 'AbortError' ? 'مهلت آزمایش تمام شد (VPN یا سرعت شبکه را بررسی کنید).' : ('خطای شبکه/VPN: ' + (err && err.message ? err.message : err));
-      if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_network_error', { provider: id, model: sx.model, error: spec.name + ': ' + sl.lastError });
+      var errName = err && err.name ? String(err.name) : 'UnknownError';
+      var errMessage = err && err.message ? String(err.message) : String(err || 'Unknown error');
+      if (id === 'one_x_ai' && errName !== 'AbortError') {
+        var failedFetch = errName === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(errMessage);
+        var endpointForDiag = chatUrl(sx);
+        var pageOriginForDiag = (global.location && global.location.origin) ? global.location.origin : 'نامشخص';
+        sl.lastError = (failedFetch
+          ? 'مرورگر نتوانست پاسخ API را دریافت کند؛ علت دقیق از داخل Chrome قابل تشخیص نیست. احتمال‌ها: محدودیت CORS در پاسخ API، اختلال شبکه/VPN، DNS یا TLS.'
+          : 'خطای ارتباط با API: ' + errMessage)
+          + ' | نشانی درخواست: ' + endpointForDiag
+          + ' | مبدأ صفحه: ' + pageOriginForDiag
+          + ' | نام خطا: ' + errName
+          + ' | اعتبار کلید و مدل با این خطا هنوز بررسی نشده است.';
+      } else {
+        sl.lastError = errName === 'AbortError'
+          ? 'مهلت آزمایش تمام شد (۳۰ ثانیه). شبکه، VPN یا پاسخ‌گویی سرویس را بررسی کنید.'
+          : ('خطای شبکه/VPN: ' + errMessage);
+      }
+      if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_network_error', {
+        provider: id, model: sx.model, error: spec.name + ': ' + sl.lastError,
+        endpoint: id === 'one_x_ai' ? chatUrl(sx) : undefined,
+        pageOrigin: id === 'one_x_ai' && global.location ? global.location.origin : undefined,
+        errorName: errName, errorMessage: errMessage,
+        diagnosticNote: id === 'one_x_ai' ? 'Browser fetch errors do not reveal whether the cause is CORS, DNS, TLS, VPN, or connectivity.' : undefined
+      });
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
     } finally {
@@ -11690,23 +11709,19 @@ el('routerForget').onclick=()=>{
     var sl = state.slots[spec.id] || emptySlot(spec.id);
     var extra = '';
     if (spec.extra === 'base') {
-      var oneXaiBaseField = spec.id === 'one_x_ai';
-      extra = '<label>' + (oneXaiBaseField ? 'نشانی پایهٔ 1xAi یا پراکسی' : 'نشانی پایه Azure (deployments/… )') + '<input data-f="base" dir="ltr" placeholder="' + (oneXaiBaseField ? 'https://YOUR-WORKER.workers.dev/v1' : 'https://RESOURCE.openai.azure.com/openai/deployments/DEPLOYMENT') + '" value="' + esc(sl.extra && sl.extra.base || spec.base || '') + '"></label>';
+      extra = '<label>نشانی پایه Azure (deployments/… )<input data-f="base" dir="ltr" placeholder="https://RESOURCE.openai.azure.com/openai/deployments/DEPLOYMENT" value="' + esc(sl.extra && sl.extra.base || spec.base || '') + '"></label>';
     }
     if (spec.extra === 'account') {
       extra = '<label>Cloudflare Account ID<input data-f="account" dir="ltr" value="' + esc(sl.extra && sl.extra.account || '') + '"></label>';
     }
     var localTookenProxy = spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true;
-    var localOneXaiProxy = spec.id === 'one_x_ai' && global.HESABRASI_ONEXAI_LOCAL_PROXY === true;
-    var keyPh = spec.local || localOneXaiProxy ? 'کلید فقط روی سرور محلی نگهداری می‌شود' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'مستقیم: کلید 1xAi · پراکسی: APP_ACCESS_TOKEN' : 'کلید API'));
+    var keyPh = spec.local ? 'کلید فقط روی سرور محلی نگهداری می‌شود' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'کلید API با پیشوند 1xai-' : 'کلید API'));
     var links = '';
     if (spec.keys) links += '<a href="' + esc(spec.keys) + '" target="_blank" rel="noopener">دریافت کلید</a>';
     if (spec.site) links += (links ? ' · ' : '') + '<a href="' + esc(spec.site) + '" target="_blank" rel="noopener">سایت</a>';
 
     var providerNote = spec.id === 'one_x_ai'
-      ? (localOneXaiProxy
-        ? '<small class="aihub-provider-note">اتصال از پراکسی هم‌مبدأ روی همین رایانه انجام می‌شود؛ کلید API فقط در فرایند Node.js نگهداری می‌شود.</small>'
-        : '<small class="aihub-provider-note">برای پراکسی ابری، نشانی پایه را به نشانی Worker + ‎/v1 تغییر بده و در فیلد کلید، APP_ACCESS_TOKEN را وارد کن؛ کلید اصلی 1xAi باید فقط در Secretهای Worker بماند. بدون پراکسی، مقدار پایهٔ پیش‌فرض مستقیم به 1xAi وصل می‌شود.</small>')
+      ? '<small class="aihub-provider-note">اتصال مستقیم به سرور 1xAi انجام می‌شود. نشانی پایه ثابت است: https://1xai.ir/v1</small>'
       : '';
     var bodyFields = spec.id === 'open_router'
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
@@ -11714,7 +11729,7 @@ el('routerForget').onclick=()=>{
         ? ('<div class="aihub-grid"><label>' + (localTookenProxy ? 'کلید Tooken (فقط روی سرور محلی)' : 'کلید API') + '<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API Tooken Club" value="' + esc(localTookenProxy ? 'local' : sl.key) + '"' + (localTookenProxy ? ' disabled' : '') + '></label>' +
           '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div>' + (localTookenProxy ? '<small>کلید فقط در فرایند محلی Node.js نگهداری می‌شود؛ مرورگر آن را دریافت یا ذخیره نمی‌کند.</small>' : '') + '<label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل از پنل Tooken (دستی؛ تأیید زنده نشده)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
         : ('<div class="aihub-grid">' +
-          '<label>' + (localOneXaiProxy ? 'کلید 1xAi (روی سرور محلی)' : 'کلید API') + '<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(localOneXaiProxy ? 'local' : sl.key) + '"' + (localOneXaiProxy ? ' disabled' : '') + '></label>' +
+          '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
           '<label>' + (spec.id === 'one_x_ai' ? 'شناسهٔ مدل در 1xAi' : 'مدل') + '<input data-f="model" dir="ltr" value="' + esc(sl.model) + '" placeholder="' + (spec.id === 'one_x_ai' ? 'gpt-4o-mini یا شناسهٔ مدل از پنل' : '') + '"></label>' +
         '</div>');
 
@@ -11943,7 +11958,7 @@ el('routerForget').onclick=()=>{
     box.id = 'hesabrasiAiHub';
     box.innerHTML =
       '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال OpenRouter، 1xAi و ایران‌روتر</h3>' +
-      '<p class="aihub-note">برای 1xAi از نشانی سازگار با OpenAI استفاده می‌شود؛ کلید و شناسهٔ مدل را در کارت همان سرویس وارد کنید و با «آزمایش اتصال» بررسی کنید. اگر مرورگر به‌دلیل CORS خطای Failed to fetch داد، واسط محلی پروژه را طبق فایل ONEXAI_LOCAL_PROXY.md اجرا کنید؛ در آن حالت کلید در مرورگر ذخیره نمی‌شود.</p>' +
+      '<p class="aihub-note">برای 1xAi اتصال مستقیماً از مرورگر به https://1xai.ir/v1 برقرار می‌شود. کلید API و شناسهٔ مدل را در کارت 1xAi وارد کنید و «آزمایش اتصال» را بزنید. در این نسخه هیچ Worker یا پراکسی واسطی استفاده نمی‌شود.</p>' +
       '<div id="aihubFeatured"></div>' +
       '<div id="aihubRest" hidden></div>' +
       '<div class="aihub-toolbar">' +
