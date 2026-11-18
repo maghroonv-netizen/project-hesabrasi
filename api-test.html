@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>آزمایش تشخیصی API</title>
+  <style>
+    :root{color-scheme:light dark;--bg:#f3f5f7;--panel:#fff;--ink:#17212b;--muted:#596775;--line:#d5dde5;--accent:#155eef;--good:#087443;--warn:#925400;--bad:#b42318;--soft:#eef4ff;--shadow:0 8px 24px #10182812;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+    :root[data-theme="dark"]{color-scheme:dark;--bg:#111820;--panel:#1b2632;--ink:#edf2f7;--muted:#a9b7c5;--line:#344454;--accent:#8ab4ff;--good:#75d6a5;--warn:#ffd17c;--bad:#ff9b91;--soft:#26384e;--shadow:0 8px 24px #0004}
+    @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#111820;--panel:#1b2632;--ink:#edf2f7;--muted:#a9b7c5;--line:#344454;--accent:#8ab4ff;--good:#75d6a5;--warn:#ffd17c;--bad:#ff9b91;--soft:#26384e;--shadow:0 8px 24px #0004}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);line-height:1.7}main{width:min(100% - 24px,900px);margin:18px auto 40px}header,.panel,.service{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}header{padding:18px;margin-bottom:14px}h1{font-size:1.35rem;margin:0 0 6px}h2{font-size:1.08rem;margin:0 0 12px}p{margin:6px 0}.muted{color:var(--muted);font-size:.9rem}.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:9px 13px;min-height:44px;cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}button:disabled{opacity:.55;cursor:wait}.panel{padding:16px;margin:14px 0}.notice{border-inline-start:4px solid var(--warn);background:var(--soft);padding:10px 12px;border-radius:8px;margin-top:12px}.origin{direction:ltr;text-align:left;overflow-wrap:anywhere;font-family:ui-monospace,monospace}.warning{color:var(--bad);font-weight:700}.ok{color:var(--good);font-weight:700}.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:5px}label{font-weight:650}input,select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--panel);color:var(--ink);font:inherit}input[type=number]{direction:ltr;text-align:left}.service{padding:16px;margin:14px 0}.service-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.service-title{font-size:1.08rem;font-weight:750}.service-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.tests{display:grid;gap:9px;margin-top:14px}.test{border:1px solid var(--line);border-radius:11px;padding:11px;background:color-mix(in srgb,var(--panel),var(--bg) 35%)}.test-name{font-weight:700}.test-pending{color:var(--muted)}.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin-top:5px;font-size:.92rem}.result-grid b{font-weight:650}.test-detail{margin-top:6px;direction:ltr;text-align:left;overflow-wrap:anywhere;font-family:ui-monospace,monospace;font-size:.82rem;color:var(--muted);white-space:pre-wrap}.report{width:100%;min-height:210px;direction:ltr;text-align:left;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.82rem}.small{font-size:.82rem}.footer-note{border-top:1px solid var(--line);margin-top:20px;padding-top:14px;color:var(--muted)}
+    @media(max-width:560px){main{width:min(100% - 16px,900px);margin-top:8px}.controls,.service-controls,.result-grid{grid-template-columns:1fr}header,.panel,.service{padding:13px}.service-head{align-items:flex-start}.toolbar button{flex:1 1 auto}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="service-head"><h1>آزمایش تشخیصی API</h1><button id="themeButton" type="button" aria-label="تغییر حالت رنگ">حالت روشن/تیره</button></div>
+    <p class="muted">این صفحه فقط درخواست‌های آزمایشی می‌فرستد؛ هیچ فیلد کلید API ندارد و فقط در T3 و T4 مقدار ساختگی <code>Bearer test</code> می‌فرستد.</p>
+    <div id="origin" class="origin" aria-live="polite"></div>
+    <div id="originWarning" class="warning" role="alert"></div>
+    <div class="controls" style="margin-top:12px">
+      <div class="field"><label for="vpn">وضعیت VPN هنگام آزمایش</label><select id="vpn"><option value="نامشخص">نامشخص</option><option value="خاموش">خاموش</option><option value="روشن">روشن</option></select></div>
+      <div class="field"><label for="timeout">مهلت هر درخواست (ثانیه)</label><input id="timeout" type="number" min="1" max="120" step="1" value="15" inputmode="numeric"></div>
+    </div>
+    <div class="notice small">T2 یک POST بدون احراز هویت می‌فرستد تا رفتار پاسخِ سادهٔ مرورگر بررسی شود. بدنه حداکثر یک توکن خروجی می‌خواهد؛ اگر سرویس‌دهنده درخواست ناشناس را بپذیرد، ممکن است مصرف اندکی ایجاد شود.</div>
+    <div class="toolbar"><button id="runAll" class="primary" type="button">اجرای همهٔ آزمایش‌ها</button><button id="clear" type="button">پاک‌کردن نتایج</button></div>
+  </header>
+
+  <section id="services" aria-live="polite"></section>
+
+  <section class="panel">
+    <h2>گزارش</h2>
+    <p class="muted">گزارش شامل کلید نیست. پیش از اشتراک‌گذاری، فقط مطمئن شو اطلاعات دیگری که نمی‌خواهی منتشر شود در گزارش نیست.</p>
+    <textarea id="report" class="report" readonly placeholder="پس از اجرای آزمایش‌ها، گزارش اینجا ساخته می‌شود."></textarea>
+    <div class="toolbar"><button id="copyReport" class="primary" type="button">کپی گزارش</button></div>
+    <p id="copyStatus" class="muted" role="status" aria-live="polite"></p>
+    <div class="footer-note">یادآوری: `Failed to fetch` به‌تنهایی علت را مشخص نمی‌کند. تفکیک قطعی ممکن است به لاگ سرور یا ابزار شبکهٔ مرورگر نیاز داشته باشد.</div>
+  </section>
+</main>
+<script>
+(function(){
+  'use strict';
+  var TESTS=[
+    {id:'T1',name:'GET /models بدون هدر',method:'GET',path:'/models',headers:null,body:null},
+    {id:'T2',name:'POST /chat/completions با text/plain، بدون هدر سفارشی',method:'POST',path:'/chat/completions',headers:{'Content-Type':'text/plain'},body:function(s){return JSON.stringify({model:s.model,messages:[{role:'user',content:'Reply with exactly OK.'}],max_tokens:1});}},
+    {id:'T3',name:'GET /models با Authorization ساختگی',method:'GET',path:'/models',headers:{Authorization:'Bearer test'},body:null},
+    {id:'T4',name:'POST JSON با Authorization ساختگی',method:'POST',path:'/chat/completions',headers:{'Content-Type':'application/json',Authorization:'Bearer test'},body:function(s){return JSON.stringify({model:s.model,messages:[{role:'user',content:'Reply with exactly OK.'}],max_tokens:1});}}
+  ];
+  var SERVICES=[
+    {id:'one-x-ai',name:'1xAi',base:'https://1xai.ir/v1',model:'gpt-4o-mini'},
+    {id:'iranrouter',name:'ایران‌روتر',base:'https://iranrouter.net/api/v1',model:'gpt-4o-mini'},
+    {id:'openrouter',name:'OpenRouter',base:'https://openrouter.ai/api/v1',model:'openai/gpt-4o-mini'}
+  ];
+  var state={running:false,results:{}};
+  var byId=function(id){return document.getElementById(id);};
+  var safe=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+  var originText;
+  try{originText=window.location.origin||'null';}catch(e){originText='null';}
+  byId('origin').textContent='Origin: '+originText;
+  var isSecure=false;
+  try{isSecure=window.location.protocol==='https:';}catch(e){isSecure=false;}
+  if(originText==='null'||!isSecure){byId('originWarning').textContent='هشدار: Origin برابر null است یا صفحه با HTTPS باز نشده؛ نتیجه‌ها برای سایت GitHub Pages معتبر نیستند.';}
+
+  function render(){
+    var host=byId('services');
+    host.innerHTML=SERVICES.map(function(s){
+      var cards=TESTS.map(function(t){var r=state.results[s.id+'-'+t.id];
+        if(!r)return '<div class="test" id="result-'+s.id+'-'+t.id+'"><div class="test-name">'+safe(t.id+' — '+t.name)+'</div><div class="test-pending">هنوز اجرا نشده</div></div>';
+        var readable=r.readable?'بله':'خیر';
+        var api=r.readable?(r.ok?'بله (HTTP '+r.status+')':'خیر (HTTP '+r.status+(r.expected?'؛ پاسخ غیر 2xx با توکن ساختگی طبیعی است':'')+')'):'قابل ارزیابی نیست';
+        var detail=r.readable?('HTTP '+r.status+(r.statusText?' '+r.statusText:'')+(r.body?'\n'+r.body:'')):(r.errorName+': '+r.errorMessage);
+        return '<div class="test" id="result-'+s.id+'-'+t.id+'"><div class="test-name">'+safe(t.id+' — '+t.name)+'</div><div class="result-grid"><span>پاسخ HTTP قابل‌خواندن بود؟</span><b class="'+(r.readable?'ok':'warning')+'">'+safe(readable)+'</b><span>خودِ API موفق بود؟ (فقط 2xx)</span><b class="'+(r.ok?'ok':(r.readable?'muted':'warning'))+'">'+safe(api)+'</b></div><div class="test-detail">'+safe(detail)+'</div></div>';
+      }).join('');
+      return '<article class="service"><div class="service-head"><div><div class="service-title">'+safe(s.name)+'</div><div class="muted small">مدل: <span dir="ltr">'+safe(s.model)+'</span></div></div><button type="button" data-run="'+safe(s.id)+'" '+(state.running?'disabled':'')+'>اجرای چهار آزمایش</button></div><div class="service-controls"><div class="field"><label for="base-'+safe(s.id)+'">نشانی پایه</label><input id="base-'+safe(s.id)+'" data-base="'+safe(s.id)+'" type="url" inputmode="url" dir="ltr" value="'+safe(s.base)+'" autocomplete="off" spellcheck="false"></div><div class="field"><label>مسیرهای مورد آزمایش</label><div class="muted small" dir="ltr">GET /models · POST /chat/completions</div></div></div><div class="tests">'+cards+'</div></article>';
+    }).join('');
+    Array.prototype.forEach.call(host.querySelectorAll('[data-run]'),function(button){button.addEventListener('click',function(){runService(button.getAttribute('data-run'));});});
+  }
+  function getTimeout(){var n=Number(byId('timeout').value);if(!Number.isFinite(n)||n<1||n>120){byId('timeout').value='15';return 15000;}return Math.round(n*1000);}
+  function trimBase(value){return String(value||'').trim().replace(/\/+$/,'');}
+  function runOne(service,test){
+    var base=trimBase(byId('base-'+service.id).value);
+    var url=base+test.path;
+    var init={method:test.method,cache:'no-store',credentials:'omit'};
+    if(test.headers)init.headers=test.headers;
+    if(test.body)init.body=test.body(service);
+    var timeoutMs=getTimeout();
+    var timeoutId;
+    var fetchPromise;
+    try{fetchPromise=fetch(url,init).then(function(response){
+      return response.text().then(function(text){return {readable:true,ok:response.status>=200&&response.status<300,status:response.status,statusText:response.statusText||'',body:String(text||'').trim().slice(0,320),expected:(response.status===401||response.status===403)};},function(){return {readable:true,ok:response.status>=200&&response.status<300,status:response.status,statusText:response.statusText||'',body:'(بدنهٔ پاسخ خوانده نشد)',expected:(response.status===401||response.status===403)};});
+    }).catch(function(error){return {readable:false,ok:false,errorName:error&&error.name?String(error.name):'Error',errorMessage:error&&error.message?String(error.message):String(error||'خطای نامشخص')};});}
+    catch(error){fetchPromise=Promise.resolve({readable:false,ok:false,errorName:error&&error.name?String(error.name):'Error',errorMessage:error&&error.message?String(error.message):String(error||'خطای نامشخص')});}
+    var timeoutPromise=new Promise(function(resolve){timeoutId=setTimeout(function(){resolve({readable:false,ok:false,errorName:'TimeoutError',errorMessage:'مهلت تنظیم‌شده تمام شد ('+Math.round(timeoutMs/1000)+' ثانیه)'});},timeoutMs);});
+    return Promise.race([fetchPromise,timeoutPromise]).then(function(result){clearTimeout(timeoutId);state.results[service.id+'-'+test.id]=result;render();updateReport();return result;});
+  }
+  function runService(id){
+    if(state.running)return;
+    var service=SERVICES.find(function(s){return s.id===id;});if(!service)return;
+    state.running=true;render();
+    var sequence=Promise.resolve();
+    TESTS.forEach(function(test){sequence=sequence.then(function(){return runOne(service,test);});});
+    sequence.finally(function(){state.running=false;render();updateReport();});
+  }
+  function runAll(){
+    if(state.running)return;
+    state.running=true;render();
+    var sequence=Promise.resolve();
+    SERVICES.forEach(function(service){TESTS.forEach(function(test){sequence=sequence.then(function(){return runOne(service,test);});});});
+    sequence.finally(function(){state.running=false;render();updateReport();});
+  }
+  function updateReport(){
+    var lines=['گزارش تشخیصی API','Origin: '+originText,'وضعیت VPN: '+byId('vpn').value,'مرورگر: '+(navigator.userAgent||'نامشخص'),'مهلت هر درخواست: '+byId('timeout').value+' ثانیه',''];
+    SERVICES.forEach(function(s){
+      lines.push(s.name+' — پایه: '+trimBase(byId('base-'+s.id).value));
+      TESTS.forEach(function(t){var r=state.results[s.id+'-'+t.id];if(!r){lines.push(t.id+': هنوز اجرا نشده');return;}
+        if(r.readable){lines.push(t.id+': پاسخ HTTP قابل‌خواندن=بله؛ HTTP '+r.status+(r.statusText?' '+r.statusText:'')+'؛ API موفق (2xx)='+(r.ok?'بله':'خیر')+(r.expected?' (401/403 با توکن ساختگی، پاسخ مورد انتظار است)':''));if(r.body)lines.push('  خلاصهٔ بدنه: '+r.body.replace(/\s+/g,' ').slice(0,220));}
+        else{lines.push(t.id+': پاسخ HTTP قابل‌خواندن=خیر؛ API موفق=قابل ارزیابی نیست؛ '+r.errorName+': '+r.errorMessage);}
+      });
+      lines.push('');
+    });
+    lines.push('یادآوری: Failed to fetch به‌تنهایی علت را مشخص نمی‌کند؛ تفکیک قطعی ممکن است به لاگ سرور یا ابزار شبکهٔ مرورگر نیاز داشته باشد.');
+    byId('report').value=lines.join('\n');
+  }
+  byId('runAll').addEventListener('click',runAll);
+  byId('clear').addEventListener('click',function(){state.results={};render();updateReport();});
+  byId('copyReport').addEventListener('click',function(){var text=byId('report').value||'';var status=byId('copyStatus');
+    function copied(){status.textContent='گزارش کپی شد.';}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(copied,function(){fallbackCopy(text,status,copied);});}else fallbackCopy(text,status,copied);
+  });
+  function fallbackCopy(text,status,onSuccess){var area=byId('report');area.focus();area.select();try{if(document.execCommand('copy'))onSuccess();else status.textContent='کپی خودکار ممکن نشد؛ متن گزارش را انتخاب و کپی کن.';}catch(e){status.textContent='کپی خودکار ممکن نشد؛ متن گزارش را انتخاب و کپی کن.';}}
+  byId('themeButton').addEventListener('click',function(){var root=document.documentElement;var next=root.getAttribute('data-theme')==='dark'?'light':'dark';root.setAttribute('data-theme',next);});
+  byId('services').addEventListener('input',function(event){if(event.target&&event.target.matches('[data-base]'))updateReport();});
+  byId('vpn').addEventListener('change',updateReport);byId('timeout').addEventListener('change',updateReport);
+  render();updateReport();
+})();
+</script>
+</body>
+</html>
