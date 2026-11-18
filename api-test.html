@@ -53,7 +53,8 @@
     {id:'iranrouter',name:'ایران‌روتر',base:'https://iranrouter.net/api/v1',model:'gpt-4o-mini'},
     {id:'openrouter',name:'OpenRouter',base:'https://openrouter.ai/api/v1',model:'openai/gpt-4o-mini'}
   ];
-  var state={running:false,results:{}};
+  var state={running:false,results:{},bases:{}};
+  SERVICES.forEach(function(service){state.bases[service.id]=service.base;});
   var byId=function(id){return document.getElementById(id);};
   var safe=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
   var originText;
@@ -69,11 +70,12 @@
       var cards=TESTS.map(function(t){var r=state.results[s.id+'-'+t.id];
         if(!r)return '<div class="test" id="result-'+s.id+'-'+t.id+'"><div class="test-name">'+safe(t.id+' — '+t.name)+'</div><div class="test-pending">هنوز اجرا نشده</div></div>';
         var readable=r.readable?'بله':'خیر';
-        var api=r.readable?(r.ok?'بله (HTTP '+r.status+')':'خیر (HTTP '+r.status+(r.expected?'؛ پاسخ غیر 2xx با توکن ساختگی طبیعی است':'')+')'):'قابل ارزیابی نیست';
+        var expectedNote=r.expected?(t.id==='T3'||t.id==='T4'?'؛ 401/403 با توکن ساختگی طبیعی است':'؛ 401/403 بدون احراز هویت طبیعی است'):'';
+        var api=r.readable?(r.ok?'بله (HTTP '+r.status+')':'خیر (HTTP '+r.status+expectedNote+')'):'قابل ارزیابی نیست';
         var detail=r.readable?('HTTP '+r.status+(r.statusText?' '+r.statusText:'')+(r.body?'\n'+r.body:'')):(r.errorName+': '+r.errorMessage);
         return '<div class="test" id="result-'+s.id+'-'+t.id+'"><div class="test-name">'+safe(t.id+' — '+t.name)+'</div><div class="result-grid"><span>پاسخ HTTP قابل‌خواندن بود؟</span><b class="'+(r.readable?'ok':'warning')+'">'+safe(readable)+'</b><span>خودِ API موفق بود؟ (فقط 2xx)</span><b class="'+(r.ok?'ok':(r.readable?'muted':'warning'))+'">'+safe(api)+'</b></div><div class="test-detail">'+safe(detail)+'</div></div>';
       }).join('');
-      return '<article class="service"><div class="service-head"><div><div class="service-title">'+safe(s.name)+'</div><div class="muted small">مدل: <span dir="ltr">'+safe(s.model)+'</span></div></div><button type="button" data-run="'+safe(s.id)+'" '+(state.running?'disabled':'')+'>اجرای چهار آزمایش</button></div><div class="service-controls"><div class="field"><label for="base-'+safe(s.id)+'">نشانی پایه</label><input id="base-'+safe(s.id)+'" data-base="'+safe(s.id)+'" type="url" inputmode="url" dir="ltr" value="'+safe(s.base)+'" autocomplete="off" spellcheck="false"></div><div class="field"><label>مسیرهای مورد آزمایش</label><div class="muted small" dir="ltr">GET /models · POST /chat/completions</div></div></div><div class="tests">'+cards+'</div></article>';
+      return '<article class="service"><div class="service-head"><div><div class="service-title">'+safe(s.name)+'</div><div class="muted small">مدل: <span dir="ltr">'+safe(s.model)+'</span></div></div><button type="button" data-run="'+safe(s.id)+'" '+(state.running?'disabled':'')+'>اجرای چهار آزمایش</button></div><div class="service-controls"><div class="field"><label for="base-'+safe(s.id)+'">نشانی پایه</label><input id="base-'+safe(s.id)+'" data-base="'+safe(s.id)+'" type="url" inputmode="url" dir="ltr" value="'+safe(state.bases[s.id]||s.base)+'" autocomplete="off" spellcheck="false"></div><div class="field"><label>مسیرهای مورد آزمایش</label><div class="muted small" dir="ltr">GET /models · POST /chat/completions</div></div></div><div class="tests">'+cards+'</div></article>';
     }).join('');
     Array.prototype.forEach.call(host.querySelectorAll('[data-run]'),function(button){button.addEventListener('click',function(){runService(button.getAttribute('data-run'));});});
   }
@@ -115,7 +117,7 @@
     SERVICES.forEach(function(s){
       lines.push(s.name+' — پایه: '+trimBase(byId('base-'+s.id).value));
       TESTS.forEach(function(t){var r=state.results[s.id+'-'+t.id];if(!r){lines.push(t.id+': هنوز اجرا نشده');return;}
-        if(r.readable){lines.push(t.id+': پاسخ HTTP قابل‌خواندن=بله؛ HTTP '+r.status+(r.statusText?' '+r.statusText:'')+'؛ API موفق (2xx)='+(r.ok?'بله':'خیر')+(r.expected?' (401/403 با توکن ساختگی، پاسخ مورد انتظار است)':''));if(r.body)lines.push('  خلاصهٔ بدنه: '+r.body.replace(/\s+/g,' ').slice(0,220));}
+        if(r.readable){var expectedReport=r.expected?(t.id==='T3'||t.id==='T4'?' (401/403 با توکن ساختگی، پاسخ مورد انتظار است)':' (401/403 بدون احراز هویت، پاسخ مورد انتظار است)'):'';lines.push(t.id+': پاسخ HTTP قابل‌خواندن=بله؛ HTTP '+r.status+(r.statusText?' '+r.statusText:'')+'؛ API موفق (2xx)='+(r.ok?'بله':'خیر')+expectedReport);if(r.body)lines.push('  خلاصهٔ بدنه: '+r.body.replace(/\s+/g,' ').slice(0,220));}
         else{lines.push(t.id+': پاسخ HTTP قابل‌خواندن=خیر؛ API موفق=قابل ارزیابی نیست؛ '+r.errorName+': '+r.errorMessage);}
       });
       lines.push('');
@@ -130,8 +132,8 @@
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(copied,function(){fallbackCopy(text,status,copied);});}else fallbackCopy(text,status,copied);
   });
   function fallbackCopy(text,status,onSuccess){var area=byId('report');area.focus();area.select();try{if(document.execCommand('copy'))onSuccess();else status.textContent='کپی خودکار ممکن نشد؛ متن گزارش را انتخاب و کپی کن.';}catch(e){status.textContent='کپی خودکار ممکن نشد؛ متن گزارش را انتخاب و کپی کن.';}}
-  byId('themeButton').addEventListener('click',function(){var root=document.documentElement;var next=root.getAttribute('data-theme')==='dark'?'light':'dark';root.setAttribute('data-theme',next);});
-  byId('services').addEventListener('input',function(event){if(event.target&&event.target.matches('[data-base]'))updateReport();});
+  byId('themeButton').addEventListener('click',function(){var root=document.documentElement;var active=root.getAttribute('data-theme');if(!active)active=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';root.setAttribute('data-theme',active==='dark'?'light':'dark');});
+  byId('services').addEventListener('input',function(event){if(event.target&&event.target.matches('[data-base]')){state.bases[event.target.getAttribute('data-base')]=event.target.value;updateReport();}});
   byId('vpn').addEventListener('change',updateReport);byId('timeout').addEventListener('change',updateReport);
   render();updateReport();
 })();
