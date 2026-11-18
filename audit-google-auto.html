@@ -11532,7 +11532,7 @@ el('routerForget').onclick=()=>{
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
     }
-    if (spec.extra === 'base' && !(sl.extra && sl.extra.base)) {
+    if (spec.extra === 'base' && spec.id !== 'one_x_ai' && !(sl.extra && sl.extra.base)) {
       sl.lastOk = false; sl.lastError = 'نشانی پایهٔ Azure لازم است.';
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
