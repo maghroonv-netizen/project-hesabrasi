@@ -11574,6 +11574,9 @@ el('routerForget').onclick=()=>{
         payload.max_completion_tokens = 256;
         payload.reasoning_effort = 'low';
       }
+    } else if (id === 'one_x_ai') {
+      /* Match 1xAi's documented minimal curl body for a clean connection check. */
+      payload = { model: sx.model, messages: [{ role: 'user', content: TEST_PROMPT }] };
     } else {
       payload = { model: sx.model, messages: [{ role: 'user', content: TEST_PROMPT }], max_tokens: 32, temperature: 0 };
     }

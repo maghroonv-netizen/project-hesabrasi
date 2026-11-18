@@ -11,6 +11,7 @@ assert.match(html,/شناسهٔ مدل در 1xAi/);
 assert.match(html,/نشانی پایهٔ 1xAi یا پراکسی/);
 assert.match(html,/برای پراکسی ابری، نشانی پایه را به نشانی Worker/);
 assert.match(html,/کلید اصلی 1xAi باید فقط در Secretهای Worker بماند/);
+assert.match(html,/else if \(id === 'one_x_ai'\) \{\s*\/\* Match 1xAi's documented minimal curl body for a clean connection check\. \*\/\s*payload = \{ model: sx\.model, messages: \[\{ role: 'user', content: TEST_PROMPT \}\] \};/, '1xAi connection check uses the documented minimal chat payload');
 assert.match(html,/if \(global\.HESABRASI_ONEXAI_LOCAL_PROXY === true && state\.slots\.one_x_ai\) \{\s*state\.slots\.one_x_ai\.key = 'local';\s*save\(\);/,
   'enabling local proxy mode replaces any previously saved browser key with a non-secret marker');
 const slotBase=html.slice(html.indexOf('function slotBase(spec, slot) {'),html.indexOf('\n  function isGemini',html.indexOf('function slotBase(spec, slot) {')));
