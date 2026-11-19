@@ -112,6 +112,7 @@ function dispatchFile(input, file) {
     const paper = w.document.querySelector('#varianceV4 .variance-paper-table');
     assert.equal(paper.querySelectorAll('thead th').length, 8, 'main table has exactly eight columns');
     assert.equal([...paper.querySelectorAll('col')].reduce((total, col) => total + parseFloat(col.style.width), 0), 100, 'responsive column percentages fill the printable width exactly');
+    assert.deepEqual([...paper.querySelectorAll('col')].map(col => parseFloat(col.style.width)), [3, 6, 17, 13, 13, 13, 8, 27], 'subtotal label span uses the slightly narrower row/code/account columns');
     assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary thead th').length, 5, 'summary contains only major account and year/change totals');
     assert.ok(!w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-summary').textContent.includes('نوسان بیش از حد'), 'the fluctuation-count metric is removed from the summary');
     assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr').length, 2, 'the summary has one row for each major-account group');
@@ -151,6 +152,7 @@ function dispatchFile(input, file) {
     assert.deepEqual([...adminSubtotal.querySelectorAll('td.vamount')].map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۶۰۰٬۰۰۰', '۹۹۹٬۰۰۰٬۰۰۰'], 'subtotal sums amount columns without separating the label cell');
     assert.equal(adminSubtotal.querySelector('td.vpct').textContent, '۹۹٫۸٪', 'subtotal percentage is calculated from group totals');
     const summaryRows = [...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')];
+    assert.deepEqual([...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary-table col')].map(col => parseFloat(col.style.width)), [30, 17.5, 17.5, 17.5, 17.5], 'the summary account-information column is narrower and numeric columns remain balanced');
     assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5], 'each summary row contains no fluctuation count');
     assert.ok(!paper.textContent.includes('کنترل‌های حسابرسی') && !paper.textContent.includes('یادداشت حسابرس'));
     let printed = null;
