@@ -53,6 +53,7 @@ function dispatchFile(input, file) {
     assert.equal(packedSplit.pages[0].details.length, 2, 'a detail row from the next page moves upward when it fits, even when its subtotal must follow');
     assert.equal(packedSplit.pages[0].rows.map(row => row.kind).join(','), 'title,detail,detail', 'the upper page is filled with real workpaper rows, not decorative lines');
     assert.equal(packedSplit.pages[1].rows.map(row => row.kind).join(','), 'title,subtotal,title,detail,subtotal', 'the split subtotal stays with its heading while following account details still fill that page');
+
     // Reveal the app's module picker as if the existing shared import has completed.
     w.eval(`ENTRY.phase='ready'; FULL_ROWS=[
       {'کد حساب کل':'61','عنوان حساب کل':'هزینه‌های اداری','کد حساب معین':'006101','عنوان حساب معین':'حقوق','بدهکار':1500000000,'بستانکار':0,'شرح ردیف':'  پرداخت-123  ','شرح سند':'','تاریخ':'۱۴۰۴/۰۱/۰۲'},

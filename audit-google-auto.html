@@ -13976,8 +13976,9 @@ function vCreatePrintPage(source,root){
  return {page,outer,mid,inner,table,body,number};
 }
 function vPrintPageHeight(page){
- // The absolutely positioned frame grows with its rendered table. Measure that full frame so the page packs to its actual printable bottom.
- const height=node=>{const measured=node?.getBoundingClientRect?.().height||0;return measured>0?measured:null;};
+ // getBoundingClientRect reports CSS pixels while A4 and pagination limits are in points (72 pt per inch vs 96 CSS px).
+ // Convert the measured frame to points before comparing it with the printable page height.
+ const height=node=>{const measured=node?.getBoundingClientRect?.().height||0;return measured>0?measured*.75:null;};
  const frame=height(page.outer);if(frame!==null)return frame;
  const meta=height(page.inner.querySelector('.variance-meta'))||62,head=height(page.table.tHead)||30;
  let total=meta+head+18.8+16.1;for(const row of page.body.rows)total+=height(row)||vPrintRowEstimate(row);
