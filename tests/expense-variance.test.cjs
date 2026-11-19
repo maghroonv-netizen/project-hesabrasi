@@ -38,6 +38,21 @@ function dispatchFile(input, file) {
 (async () => {
   try {
     await sleep(100);
+    const packRow = (kind, h, value) => ({ kind, h, value, cloneNode() { return { ...this }; } });
+    const packTitle = packRow('title', 20);
+    const packDetails = [packRow('detail', 20, 1), packRow('detail', 20, 2)];
+    const packSubtotal = packRow('subtotal', 35);
+    const packedSplit = w.paginateMeasuredWorkpaperGroups({
+      groups: [
+        { title: packTitle, details: packDetails, subtotal: packSubtotal },
+        { title: packRow('title', 10), details: [packRow('detail', 10, 4)], subtotal: packRow('subtotal', 10) }
+      ],
+      maxBodyHeight: 100, carryHeight: 10, carryInHeight: 0, finalHeight: 10, allowSubtotalSplit: true,
+      rowHeight: row => row.h, readValues: row => [row.value], expectedTotals: [7]
+    });
+    assert.equal(packedSplit.pages[0].details.length, 2, 'a detail row from the next page moves upward when it fits, even when its subtotal must follow');
+    assert.equal(packedSplit.pages[0].rows.map(row => row.kind).join(','), 'title,detail,detail', 'the upper page is filled with real workpaper rows, not decorative lines');
+    assert.equal(packedSplit.pages[1].rows.map(row => row.kind).join(','), 'title,subtotal,title,detail,subtotal', 'the split subtotal stays with its heading while following account details still fill that page');
     // Reveal the app's module picker as if the existing shared import has completed.
     w.eval(`ENTRY.phase='ready'; FULL_ROWS=[
       {'کد حساب کل':'61','عنوان حساب کل':'هزینه‌های اداری','کد حساب معین':'006101','عنوان حساب معین':'حقوق','بدهکار':1500000000,'بستانکار':0,'شرح ردیف':'  پرداخت-123  ','شرح سند':'','تاریخ':'۱۴۰۴/۰۱/۰۲'},
@@ -160,7 +175,7 @@ function dispatchFile(input, file) {
     assert.ok(printPage.querySelector('.variance-outer > .variance-mid > .variance-inner'), 'print page has three nested rounded frames');
     assert.ok(printPage.querySelector('.variance-mid > .variance-page-number'), 'page number sits inside the middle frame below the inner frame');
     assert.ok(printPage.querySelector('.variance-mid > .variance-summary'), 'summary is in a separate inner frame');
-    assert.ok(printPage.querySelector('.variance-summary + .variance-workpaper-filler'), 'ruled filler occupies the lower page area after the summary');
+    assert.equal(printPage.querySelector('.variance-workpaper-filler'), null, 'no decorative lines are inserted in place of account rows');
     assert.equal(printPage.querySelectorAll('textarea[data-vnote]').length, 0, 'editable description controls are not printed');
     assert.equal(printPage.querySelectorAll('tr.variance-page-transfer').length, 0, 'the transfer-from-previous-page bar is removed from printed output');
     assert.equal(printPage.querySelectorAll('.variance-note-print-text').length, 5, 'description text remains visible in the printed workpaper');
