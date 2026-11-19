@@ -33,15 +33,18 @@ async function readRequestBody(req) {
   return Buffer.concat(chunks);
 }
 
-export function createTookenProxyServer({
+export function createHesabrasiLocalProxyServer({
   apiKey,
+  tookenApiKey = apiKey,
+  oneXAiApiKey,
   host = DEFAULT_HOST,
   port = DEFAULT_PORT,
   appFile = APP_FILE,
   fetchImpl = globalThis.fetch
 } = {}) {
-  const secret = String(apiKey || '').trim();
-  if (!secret) throw new Error('TOOKEN_API_KEY is required');
+  const tookenSecret = String(tookenApiKey || '').trim();
+  const oneXaiSecret = String(oneXAiApiKey || '').trim();
+  if (!tookenSecret && !oneXaiSecret) throw new Error('TOOKEN_API_KEY or ONEXAI_API_KEY is required');
   if (typeof fetchImpl !== 'function') throw new Error('Node.js fetch is required (Node 20 or newer)');
 
   const server = createServer(async (req, res) => {
@@ -61,7 +64,7 @@ export function createTookenProxyServer({
       const pathname = new URL(req.url || '/', appOrigin).pathname;
       if (req.method === 'GET' && pathname === '/') {
         let html = await readFile(appFile, 'utf8');
-        const bootstrap = '<script>window.HESABRASI_TOOKEN_LOCAL_PROXY = true;</script>';
+        const bootstrap = `<script>window.HESABRASI_TOOKEN_LOCAL_PROXY = ${tookenSecret ? 'true' : 'false'};window.HESABRASI_ONEXAI_LOCAL_PROXY = ${oneXaiSecret ? 'true' : 'false'};</script>`;
         if (/<head\b[^>]*>/i.test(html)) html = html.replace(/<head\b[^>]*>/i, match => `${match}${bootstrap}`);
         else return replyJson(res, 500, { error: 'Application HTML has no head element' });
         res.writeHead(200, {
@@ -72,9 +75,13 @@ export function createTookenProxyServer({
         return res.end(html);
       }
 
-      const isModels = req.method === 'GET' && pathname === '/api/tooken/models';
-      const isChat = req.method === 'POST' && pathname === '/api/tooken/chat/completions';
-      if (!isModels && !isChat) return replyJson(res, 404, { error: 'Not found' });
+      const isTookenModels = req.method === 'GET' && pathname === '/api/tooken/models';
+      const isTookenChat = req.method === 'POST' && pathname === '/api/tooken/chat/completions';
+      const isOneXaiChat = req.method === 'POST' && pathname === '/api/one-xai/chat/completions';
+      if (!isTookenModels && !isTookenChat && !isOneXaiChat) return replyJson(res, 404, { error: 'Not found' });
+      if ((isTookenModels || isTookenChat) && !tookenSecret || isOneXaiChat && !oneXaiSecret) return replyJson(res, 404, { error: 'Provider is not configured' });
+      const isChat = isTookenChat || isOneXaiChat;
+      const providerSecret = isOneXaiChat ? oneXaiSecret : tookenSecret;
 
       let body;
       if (isChat) {
@@ -89,9 +96,11 @@ export function createTookenProxyServer({
         }
       }
 
-      const upstreamUrl = isModels
+      const upstreamUrl = isTookenModels
         ? 'https://tooken.club/v1/models'
-        : 'https://tooken.club/v1/chat/completions';
+        : isOneXaiChat
+          ? 'https://1xai.ir/v1/chat/completions'
+          : 'https://tooken.club/v1/chat/completions';
       const controller = new AbortController();
       const deadline = setTimeout(() => controller.abort(new Error('Upstream request timed out')), 120000);
       let clientGone = false;
@@ -104,9 +113,9 @@ export function createTookenProxyServer({
       res.once('close', cancelUpstream);
       try {
         const upstream = await fetchImpl(upstreamUrl, {
-          method: isModels ? 'GET' : 'POST',
+          method: isTookenModels ? 'GET' : 'POST',
           headers: {
-            Authorization: `Bearer ${secret}`,
+            Authorization: `Bearer ${providerSecret}`,
             Accept: req.headers.accept || 'application/json',
             ...(isChat ? { 'Content-Type': 'application/json' } : {})
           },
@@ -144,8 +153,9 @@ export function createTookenProxyServer({
     } catch (error) {
       if (res.destroyed) return;
       const status = Number(error && error.statusCode) || 502;
-      if (status === 502) console.error('Tooken proxy upstream/network failure:', String(error && error.message || 'unknown error'));
-      replyJson(res, status, { error: status === 413 ? 'Request body too large' : 'Could not reach Tooken API' });
+      const providerLabel = String(req.url || '').startsWith('/api/one-xai/') ? '1xAi' : 'Tooken';
+      if (status === 502) console.error(providerLabel + ' proxy upstream/network failure:', String(error && error.message || 'unknown error'));
+      replyJson(res, status, { error: status === 413 ? 'Request body too large' : 'Could not reach ' + providerLabel + ' API' });
     }
   });
 
@@ -153,16 +163,24 @@ export function createTookenProxyServer({
   return server;
 }
 
+// Backward-compatible Tooken-only factory for existing integrations.
+export function createTookenProxyServer(options = {}) {
+  const apiKey = String(options.apiKey || options.tookenApiKey || '').trim();
+  if (!apiKey) throw new Error('TOOKEN_API_KEY is required');
+  return createHesabrasiLocalProxyServer({ ...options, tookenApiKey: apiKey, oneXAiApiKey: '' });
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const apiKey = process.env.TOOKEN_API_KEY;
-  if (!apiKey) {
-    console.error('Set TOOKEN_API_KEY in this PowerShell session, then run this file again.');
+  const tookenApiKey = process.env.TOOKEN_API_KEY;
+  const oneXAiApiKey = process.env.ONEXAI_API_KEY;
+  if (!tookenApiKey && !oneXAiApiKey) {
+    console.error('Set TOOKEN_API_KEY or ONEXAI_API_KEY in this PowerShell session, then run this file again.');
     process.exitCode = 1;
   } else {
     const port = Number(process.env.HESABRASI_PORT || DEFAULT_PORT);
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('HESABRASI_PORT must be between 1 and 65535');
-    const server = createTookenProxyServer({ apiKey, port });
-    server.on('listening', () => console.log(`Hesabrasi local proxy: http://${DEFAULT_HOST}:${port}/`));
+    const server = createHesabrasiLocalProxyServer({ tookenApiKey, oneXAiApiKey, port });
+    server.on('listening', () => console.log(`Hesabrasi local proxy (${[tookenApiKey && 'Tooken', oneXAiApiKey && '1xAi'].filter(Boolean).join(' + ')}): http://${DEFAULT_HOST}:${port}/`));
     process.on('SIGINT', () => server.close(() => process.exit(0)));
   }
 }

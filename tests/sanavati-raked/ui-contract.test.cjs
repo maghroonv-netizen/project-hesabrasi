@@ -70,11 +70,11 @@ const workpaperMarkup = html.slice(workpaperStart, workpaperEnd);
 assert.match(workpaperMarkup, /نام واحد مورد رسیدگی/);
 assert.match(workpaperMarkup, /موضوع :/);
 assert.match(workpaperMarkup, /سال مالی مورد رسیدگی/);
-assert.match(workpaperMarkup, /yearPlan\?srYearText\(yearPlan\.prior\)/,
+assert.match(workpaperMarkup, /amountHead\('سال',yearPlan\?\.prior\)/,
   'the comparative column label is calculated from the configured case year');
 assert.doesNotMatch(workpaperMarkup, /<th>۱۴۰۳<\/th>|<th>۱۴۰۴<\/th>/,
   'the printed worksheet does not hard-code annual column headings');
-assert.match(workpaperMarkup, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
+assert.match(workpaperMarkup, /fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
 assert.doesNotMatch(workpaperMarkup, /تاریخ ترازنامه|periodEnd|SR\.result\?\.audit\?\.label/,
   'the aged worksheet does not invent a balance-sheet date or fall back to the uploaded file year');
 assert.match(html, /سال مالی مورد رسیدگی :<\/span> <span class="v">\$\{esc\(sampleDisplayDigits\(c\.year\)\)\}/,
@@ -82,6 +82,14 @@ assert.match(html, /سال مالی مورد رسیدگی :<\/span> <span class=
 assert.match(workpaperMarkup, /تهیه‌کننده :/);
 assert.match(workpaperMarkup, /بررسی‌کننده :/);
 assert.doesNotMatch(workpaperMarkup, /sr-report-title|sr-print-title/);
+assert.match(workpaperMarkup, /data-sr-exclude/,
+  'the auditor can exclude a suggested aged/stale item from the workpaper preview');
+assert.match(workpaperMarkup, /قضاوت حسابرس/,
+  'a manual exclusion is explicitly presented as auditor judgment, not an automatic classification');
+assert.match(workpaperMarkup, /بازگرداندن اقلام حذف‌شده/,
+  'excluded workpaper items can be restored');
+assert.match(html, /function withoutWorkpaperExclusions\(rows\)/,
+  'manual exclusions are applied to the output rows without changing the underlying aging calculations');
 assert.match(workpaperMarkup, /sr-refbox/);
 
 const printStart = html.indexOf('function printReport(){');
@@ -92,7 +100,11 @@ const printCode = html.slice(printStart, exportStart);
 const exportCode = html.slice(exportStart, exportEnd);
 assert.match(printCode, /selectionConfirmed/);
 assert.match(printCode, /window\.print\(\)/);
+assert.match(printCode, /sr-workpaper-exclude.*\.remove\(\)/,
+  'auditor review buttons are excluded from the printed copy');
 assert.match(exportCode, /selectionConfirmed/);
+assert.match(exportCode, /withoutWorkpaperExclusions/,
+  'manual auditor exclusions are honored by the XLSX workpaper too');
 assert.match(exportCode, /XLSX\.utils\.book_new\(\)/);
 assert.match(exportCode, /XLSX\.writeFile\(/);
 assert.match(exportCode, /const fiscalYear=String\(cfg\.year\?\?'\'\)\.trim\(\)/);
@@ -123,12 +135,20 @@ yearSandbox.SHEET_CFG.year='۱۴۰۴';
 assert.equal(yearSandbox.srCaseYear(), 1404, 'a year-only value is not mistaken for an Excel date serial');
 yearSandbox.SHEET_CFG.year='';
 assert.equal(yearSandbox.srCaseYear(), null, 'an empty case year is never inferred from ledger dates');
-assert.doesNotMatch(html, /id="srPriorFile"|بارگذاری اکسل اسناد ۱۴۰۳/,
-  'the raw prior-year ledger upload is no longer requested');
-assert.match(html, /id="srHistoryPick"[\s\S]*?srYearText\(plan\?\.history\)/,
-  'the required two-years-prior ledger upload prompt is generated from the case year');
-assert.match(html, /id="srNextPick"[\s\S]*?srYearText\(plan\?\.next\)/,
-  'the following-year ledger upload prompt is generated from the case year');
+assert.match(html, /role:'prior',year:plan\?\.prior,title:'اسناد خام سال قبل'/,
+  'raw Y−1 ledger upload is available as an alternative to the prior workpaper');
+assert.match(html, /role:'history',year:plan\?\.history,title:'اسناد خام دو سال قبل',required:false/,
+  'raw Y−2 ledger is optional');
+assert.match(html, /role:'next',year:plan\?\.next,title:'اسناد خام سال بعد برای پیگیری',required:false/,
+  'Y+1 follow-up ledger is optional');
+assert.match(html, /id="srPick_\$\{spec\.role\}"/,
+  'year-role file input ids are generated dynamically from the selected fiscal year roles');
+assert.match(html, /if\(prior\)\{[\s\S]*?SR\.priorResult=SRE\.analyze/,
+  'Y−1 is independently rebuilt from raw ledger evidence when available');
+assert.match(html, /SR\.priorWorkpaper&&!SR\.priorResult/,
+  'prior workpaper import is not added again when raw Y−1 analysis exists');
+assert.match(html, /SR\.priorComparison=\{\.\.\.stats\}/,
+  'the raw Y−1 calculation and prior workpaper are compared without double counting');
 assert.match(html, /if\(!SHEET_CFG\.company\.trim\(\)\)\{[\s\S]*?سال مالی اختیاری است/,
   'the case may continue with an empty fiscal-year field');
 assert.match(exportCode, /x\.code==='TRANSFER_REVIEW'&&x\.fileId===currentFileId/);
@@ -137,14 +157,24 @@ const finalRowsStart = html.indexOf('function finalWorkpaperRows(');
 const finalRowsEnd = html.indexOf('\nfunction signedText(', finalRowsStart);
 assert(finalRowsStart >= 0 && finalRowsEnd > finalRowsStart);
 const finalRowsCode = html.slice(finalRowsStart, finalRowsEnd);
-assert.match(finalRowsCode, /const visible=rows\.filter\(r=>rangeHasNonZero\(r\.finalRange\)\)/,
-  'final worksheet filters by its final aged/stale balance, not intermediate activity columns');
-assert.match(html, /Math\.max\(11,Math\.min\(3\.2,perCtrlMm-0\.55\)\*96\/25\.4\)/,
-  'sampling control checkboxes are printed at a larger size');
+assert.match(finalRowsCode, /const visible=rows\.filter\(r=>rangeHasNonZero\(r\.finalRange\)\|\|\(!r\.finalRange&&r\.priorAmount!==null&&r\.priorAmount!==undefined&&r\.priorAmount!==0n\)\)/,
+  'final worksheet shows nonzero final balances and historical-only prior-year items whose current-year result is unavailable');
+assert.match(workpaperMarkup, /amountHead\('سال',yearPlan\?\.prior\)\}\$\{amountHead\('سال',yearPlan\?\.audit\)/,
+  'workpaper headings identify the prior and audit fiscal years directly');
+assert.match(workpaperMarkup, /amountHead\('پیگیری سال مالی بعد',yearPlan\?\.next\)\}\$\{amountHead\('تهاتر',yearPlan\?\.audit\)/,
+  'workpaper headings clearly name next-year follow-up and offset columns');
+assert.match(html, /Array\.from\(\{length:n\},\(\)=>'<td class="ctl"><\/td>'\)/,
+  'sampling audit-control cells remain while their checkbox marks are omitted');
+assert.doesNotMatch(html, /\.sampling-template \.box\{display:inline-block/,
+  'sampling audit-control checkbox styling is removed');
+assert.doesNotMatch(html, /sample-page-bottom|sample-page-ref/,
+  'sampling page footer retains its compact original layout without an oversized blank box');
+assert.match(html, /صفحه \$\{faNum\(i\+1\)\} از \$\{faNum\(pages\.length\)\}/,
+  'sampling page numbers use the unified Persian wording without the small hamza');
 assert.match(html, /\.sr-aged-page-sheet \.sr-meta-grid \.sr-refbox\{[^}]*background:#fff!important/,
   'aged worksheet reference box remains white in print');
-assert.match(html, /\.sr-aged-page-number\{font-size:8pt!important/,
-  'aged worksheet page number matches the sampling footer scale');
+assert.match(html, /\.sr-aged-page-number\{font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:10\.5px!important/,
+  'aged worksheet page number uses the unified font and size');
 assert.match(html, /grid-template-columns:18mm minmax\(0,1fr\) minmax\(0,92mm\)!important/,
   'aged worksheet preparation fields have a stable-width column at the left edge');
 assert.doesNotMatch(html, /class="side sr-head-prep"/,
@@ -161,7 +191,7 @@ assert.match(workpaperMarkup, /class="sr-workpaper-total"/,
   'the aged workpaper includes a grand-total row');
 assert.match(workpaperMarkup, /subtotalGroups\.map\(group=>/,
   'kol subtotals are emitted even when a group has only one detail row');
-assert.match(workpaperMarkup, /columnTotals\.amount1403[\s\S]*columnTotals\.finalAmount/,
+assert.match(workpaperMarkup, /columnTotals\.priorAmount[\s\S]*columnTotals\.finalAmount/,
   'the grand total aggregates all five numeric columns');
 assert.match(exportCode, /subtotalGroups\.flatMap\(group=>/,
   'the XLSX workpaper also inserts kol-level subtotals');
@@ -171,29 +201,72 @@ const subtotalSandbox = {};
 vm.createContext(subtotalSandbox);
 vm.runInContext(html.slice(subtotalHelpersStart, subtotalHelpersEnd), subtotalSandbox);
 const groupedRows = subtotalSandbox.workpaperSubtotalGroups([
-  {kolCode:'100',kolTitle:'دریافتنی',amount1403:2n,amount1404:3n,followUp:2n,offset1404:1n,finalAmount:1n},
-  {kolCode:'100',kolTitle:'دریافتنی',amount1403:4n,amount1404:5n,followUp:4n,offset1404:2n,finalAmount:2n},
-  {kolCode:'200',kolTitle:'پرداختنی',amount1403:7n,amount1404:8n,followUp:7n,offset1404:0n,finalAmount:7n}
+  {kolCode:'100',kolTitle:'دریافتنی',priorAmount:2n,auditAmount:3n,followUp:2n,auditOffset:1n,finalAmount:1n},
+  {kolCode:'100',kolTitle:'دریافتنی',priorAmount:4n,auditAmount:5n,followUp:4n,auditOffset:2n,finalAmount:2n},
+  {kolCode:'200',kolTitle:'پرداختنی',priorAmount:7n,auditAmount:8n,followUp:7n,auditOffset:0n,finalAmount:7n}
 ]);
 assert.equal(groupedRows.length,2);
 assert.equal(groupedRows[0].rows.length,2);
 const firstKolTotals = subtotalSandbox.workpaperColumnTotals(groupedRows[0].rows);
-assert.equal(firstKolTotals.amount1403,6n);
-assert.equal(firstKolTotals.amount1404,8n);
+assert.equal(firstKolTotals.priorAmount,6n);
+assert.equal(firstKolTotals.auditAmount,8n);
 assert.equal(firstKolTotals.followUp,6n);
-assert.equal(firstKolTotals.offset1404,3n);
+assert.equal(firstKolTotals.auditOffset,3n);
 assert.equal(firstKolTotals.finalAmount,3n);
 assert.equal(groupedRows[1].rows.length,1,'single-item kol groups still receive their own subtotal');
 assert.match(exportCode, /\['جمع کل کاربرگ'[\s\S]*xval\(columnTotals\.finalAmount\)/,
   'the XLSX worksheet also includes totals for all numeric columns');
-assert.match(html, /sr-paper-table\{border:1\.2px solid #475569/,
-  'the whole worksheet table has a visible perimeter border');
-assert.match(html, /const capacity=Math\.max\(0,available-fixedHeight-18\)/,
-  'manual print pagination reserves a cross-browser layout safety margin');
-assert.match(html, /\.sr-aged-page-sheet\{[^}]*padding:2mm!important[^}]*border:1\.5px solid/,
-  'outer worksheet frame is separated from the inner frame');
-assert.match(html, /\.sr-aged-page-sheet \.sr-rows-box\{padding:1\.5mm!important/,
-  'rounded table frame has an inset so the corner strokes remain visible');
+assert.match(workpaperMarkup, /const widths=\[40,104,44,150\.1,86,86,86,86,86\]/,
+  'the worksheet uses the nine fixed right-to-left widths totaling 768.1pt');
+assert.match(workpaperMarkup, /class=\"sr-major-title\"/,
+  'every kol group starts with a merged major-account title row');
+assert.match(workpaperMarkup, /sr-data-even|sr-data-odd/,
+  'zebra striping is counted only on actual data rows');
+assert.match(html, /function paginateMeasuredWorkpaperGroups\(/,
+  'both workpaper modules share measured row-based pagination with group titles and subtotals');
+assert.match(html, /first\.cells\[0\]\.rowSpan=span/,
+  'consecutive identical moein codes and titles are vertically merged');
+assert.match(html, /maxBodyHeight:Math\.max\(0,available-fixedHeight-1\)/,
+  'pagination measures available body height after the frame and headers');
+assert.match(html, /max-height:541\.7pt!important/,
+  'the outer worksheet frame is capped at 541.7 points');
+assert.match(html, /sr-aged-page-sheet\.sr-aged-page-full\{height:541\.7pt!important\}/,
+  'every non-final aged-workpaper page uses the full 541.7-point outer frame');
+assert.match(html, /padding:1\.6pt 2pt!important;line-height:1\.2!important/,
+  'aged-workpaper rows have a little extra vertical breathing room');
+assert.match(html, /td\.sr-account-title\{text-align:right!important;font-size:8pt!important\}/,
+  'aged-workpaper account text is slightly larger for readability');
+assert.match(html, /font-size:8pt!important;padding:1mm \.6mm!important;line-height:1\.22!important/,
+  'printed aged-workpaper rows use the same slightly roomier typography');
+assert.match(html, /width:768\.1pt!important/,
+  'the printable table spans exactly 768.1 points');
+assert.match(html, /#fbe3a0!important/,
+  'kol and grand total rows use the specified amber fill');
+assert.match(html, /sr-page-carry[\s\S]*sr-page-transfer/ ,
+  'non-final pages end in a cumulative total and following pages start with its carry-forward');
+assert.match(html, /expectedTotals&&totals\.some\(\(v,i\)=>v!==BigInt\(expectedTotals\[i\]\?\?0\)\)/,
+  'the shared page engine refuses to produce output when carried totals do not equal the worksheet total');
+assert.match(html, /#0b4f8a!important[\s\S]*#9e0000!important/,
+  'positive amounts are blue and negative amounts red');
+assert.doesNotMatch(workpaperMarkup, /class=\"frame sr-rows-box\"/,
+  'the obsolete nested fourth frame is removed');
+const pagerStart=html.indexOf('function paginateMeasuredWorkpaperGroups('),pagerEnd=html.indexOf('\nwindow.paginateMeasuredWorkpaperGroups=',pagerStart);
+const pagerContext={window:{}};vm.createContext(pagerContext);vm.runInContext(html.slice(pagerStart,pagerEnd),pagerContext);
+const mockRow=(kind,values={})=>({kind,dataset:values,cloneNode(){return mockRow(kind,{...values});}});
+const pagesTest=pagerContext.paginateMeasuredWorkpaperGroups({groups:[
+  {title:mockRow('title'),details:[mockRow('detail',{a:'3',b:'4'}),mockRow('detail',{a:'5',b:'6'})],subtotal:mockRow('subtotal')},
+  {title:mockRow('title'),details:[mockRow('detail',{a:'7',b:'8'}),mockRow('detail',{a:'9',b:'10'})],subtotal:mockRow('subtotal')}
+],maxBodyHeight:35,carryHeight:8,rowHeight:row=>row.kind==='title'||row.kind==='subtotal'?5:10,readValues:row=>[row.dataset.a||0,row.dataset.b||0],expectedTotals:[24n,28n]});
+assert.ok(pagesTest.pages.length>1,'row-by-row measured packing creates continuation pages');
+assert.equal(pagesTest.pages[0].details.length,1,'a group can continue to another page rather than forcing large blank space');
+assert.deepEqual(pagesTest.pages[1].carryInTotals,[3n,4n],'carry-forward totals contain data rows only');
+assert.deepEqual(pagesTest.pages[1].carryInTotals,pagesTest.pages[0].carryOutTotals,'the next page receives the exact previous-page cumulative totals');
+assert.throws(()=>pagerContext.paginateMeasuredWorkpaperGroups({groups:[{title:mockRow('title'),details:[mockRow('detail',{a:'2'})],subtotal:mockRow('subtotal')}],maxBodyHeight:100,carryHeight:8,rowHeight:()=>1,readValues:row=>[row.dataset.a||0],expectedTotals:[3n]}),/جمع انتقالی/,'the pagination engine blocks inconsistent control totals');
+assert.match(html, /tr\.sr-page-carry td\{background:#fbe3a0!important/,
+  'the aged workpaper styles page-end cumulative rows in amber');
+assert.match(html, /tr\.sr-page-transfer td\{background:#fff2cc!important/,
+  'the aged workpaper styles next-page carry-forward rows in pale yellow');
+assert.match(html, /انتقال از صفحات قبل/);
 assert.match(html, /انتقال‌های حساب سال مورد رسیدگی نیازمند بررسی/);
 assert.match(html, /هشدارهای نیازمند بررسی:<\/b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر/);
 const bindingStart = html.indexOf('function bindReport(){');
