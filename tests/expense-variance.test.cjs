@@ -146,8 +146,10 @@ function dispatchFile(input, file) {
     assert.equal(lines.filter(line => line.classList.contains('variance-group-title')).length, 2, 'one group is emitted per major account');
     assert.equal(lines.filter(line => line.classList.contains('variance-workpaper-subtotal')).length, 2, 'major-account subtotals are printed');
     const adminSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal'));
-    assert.equal(adminSubtotal.querySelector('td:nth-child(2)').textContent.trim(), '', 'subtotal rows do not repeat the major-account code');
-    assert.deepEqual([...adminSubtotal.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۶۰۰٬۰۰۰', '۹۹۹٬۰۰۰٬۰۰۰', '۹۹٫۸٪'], 'subtotal sums amount columns and computes percent from group totals');
+    assert.equal(adminSubtotal.querySelector('td:first-child').colSpan, 3, 'the subtotal label merges row, code, and account-name cells into one continuous cell');
+    assert.equal(adminSubtotal.querySelector('td:first-child').textContent.trim(), 'جمع');
+    assert.deepEqual([...adminSubtotal.querySelectorAll('td.vamount')].map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۶۰۰٬۰۰۰', '۹۹۹٬۰۰۰٬۰۰۰'], 'subtotal sums amount columns without separating the label cell');
+    assert.equal(adminSubtotal.querySelector('td.vpct').textContent, '۹۹٫۸٪', 'subtotal percentage is calculated from group totals');
     const summaryRows = [...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')];
     assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5], 'each summary row contains no fluctuation count');
     assert.ok(!paper.textContent.includes('کنترل‌های حسابرسی') && !paper.textContent.includes('یادداشت حسابرس'));
@@ -182,6 +184,7 @@ function dispatchFile(input, file) {
     assert.equal(printPage.querySelectorAll('.variance-note-print-text').length, 5, 'description text remains visible in the printed workpaper');
     assert.equal(printPage.querySelector('.variance-paper-title'), null, 'there is no separate title above the header');
     assert.equal(printPage.querySelector('.variance-group-title td').colSpan, 8, 'major-account title merges all eight columns');
+    assert.equal(printPage.querySelector('.variance-workpaper-subtotal td:first-child').colSpan, 3, 'the subtotal label stays merged in print output');
     assert.ok([...w.document.head.querySelectorAll('style[data-variance-print]')].some(style => style.textContent.includes('@page{size:A4 landscape')), 'PDF print uses A4 landscape');
     assert.ok(printed[0].pageNumber.includes('از ۱'), 'pagination reports total page count');
     if (typeof w.__activePrintRestore === 'function') w.__activePrintRestore();
@@ -192,6 +195,7 @@ function dispatchFile(input, file) {
     const withoutDescriptions = w.document.querySelector('#varianceV4 .variance-paper-table');
     assert.equal(withoutDescriptions.querySelectorAll('thead th').length, 7, 'turning descriptions off removes the column rather than leaving it blank');
     assert.equal(withoutDescriptions.querySelector('tbody .variance-group-title td').colSpan, 7, 'group headings span the reduced column count');
+    assert.equal(withoutDescriptions.querySelector('tbody .variance-workpaper-subtotal td:first-child').colSpan, 3, 'merged subtotal labels remain continuous when descriptions are disabled');
     assert.equal(w.document.querySelectorAll('#varianceV4 [data-vnote]').length, 0, 'description editors are removed from both source and preview when disabled');
     const orientationControl = w.document.querySelector('#varianceV4 [data-vorientation]');
     orientationControl.value = 'portrait';
