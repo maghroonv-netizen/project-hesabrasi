@@ -12966,38 +12966,38 @@ function applyTrialBalanceFilter(root){
   });
 }
 
-function paginateMeasuredWorkpaperGroups({groups,maxBodyHeight,carryHeight,carryInHeight=carryHeight,finalHeight=0,allowSubtotalSplit=false,rowHeight,readValues,expectedTotals}){
+function paginateMeasuredWorkpaperGroups({groups,maxBodyHeight,carryHeight,carryInHeight=carryHeight,finalHeight=0,allowSubtotalSplit=false,continuationOnly=false,rowHeight,readValues,expectedTotals}){
   const items=[];groups.forEach((group,groupIndex)=>group.details.forEach((detail,index)=>items.push({group,groupIndex,detail,first:index===0,last:index===group.details.length-1})));
   if(!items.length)return {pages:[],totals:(expectedTotals||[]).map(()=>0n),overflow:false};
-  const pages=[{rows:[],details:[],seenGroups:new Set(),used:0,overflow:false}];let page=pages[0];
+  const pages=[{rows:[],details:[],detailGroupIndices:[],seenGroups:new Set(),used:0,overflow:false}];let page=pages[0];
   items.forEach((item,itemIndex)=>{
-    const remaining=itemIndex<items.length-1,isFinal=!remaining,includeTitle=!page.seenGroups.has(item.groupIndex),reservedEnd=remaining?carryHeight:0;
+    const remaining=itemIndex<items.length-1,isFinal=!remaining,includeTitle=!page.seenGroups.has(item.groupIndex),continuesSameGroup=remaining&&items[itemIndex+1].groupIndex===item.groupIndex,reservedEnd=remaining&&(!continuationOnly||continuesSameGroup)?carryHeight:0;
     const titleHeight=rowHeight(item.group.title),detailHeight=rowHeight(item.detail),subtotalHeight=item.last&&item.group.subtotal?rowHeight(item.group.subtotal):0;
     let candidateHeight=(includeTitle?titleHeight:0)+detailHeight+subtotalHeight+(isFinal?finalHeight:0);
     const fullDoesNotFit=page.used+candidateHeight+reservedEnd>maxBodyHeight;
     const detailCanFit=page.used+(includeTitle?titleHeight:0)+detailHeight+reservedEnd<=maxBodyHeight;
     if(allowSubtotalSplit&&!isFinal&&item.last&&item.group.subtotal&&page.rows.length&&fullDoesNotFit&&detailCanFit){
       if(includeTitle){page.rows.push({kind:'title',node:item.group.title.cloneNode(true)});page.used+=titleHeight;page.seenGroups.add(item.groupIndex);}
-      page.rows.push({kind:'detail',node:item.detail.cloneNode(true)});page.details.push(item.detail);page.used+=detailHeight;page.hasCarryOut=true;
-      const next={rows:[{kind:'title',node:item.group.title.cloneNode(true)},{kind:'subtotal',node:item.group.subtotal.cloneNode(true)}],details:[],seenGroups:new Set([item.groupIndex]),used:carryInHeight+titleHeight+subtotalHeight+(isFinal?finalHeight:0),hasCarryIn:carryInHeight>0,overflow:false};
+      page.rows.push({kind:'detail',node:item.detail.cloneNode(true)});page.details.push(item.detail);page.detailGroupIndices.push(item.groupIndex);page.lastDetailGroupIndex=item.groupIndex;page.used+=detailHeight;page.hasCarryOut=false;
+      const next={rows:[{kind:'title',node:item.group.title.cloneNode(true)},{kind:'subtotal',node:item.group.subtotal.cloneNode(true)}],details:[],detailGroupIndices:[],seenGroups:new Set([item.groupIndex]),used:carryInHeight+titleHeight+subtotalHeight+(isFinal?finalHeight:0),hasCarryIn:carryInHeight>0,overflow:false};
       if(next.used>maxBodyHeight)next.overflow=true;
       pages.push(next);page=next;return;
     }
     if(page.rows.length&&fullDoesNotFit){
-      page.hasCarryOut=true;page={rows:[],details:[],seenGroups:new Set(),used:carryInHeight,hasCarryIn:carryInHeight>0,overflow:false};pages.push(page);
+      page.hasCarryOut=continuationOnly?page.lastDetailGroupIndex===item.groupIndex:true;page={rows:[],details:[],detailGroupIndices:[],seenGroups:new Set(),used:carryInHeight,hasCarryIn:carryInHeight>0,overflow:false};pages.push(page);
       candidateHeight=titleHeight+detailHeight+subtotalHeight+(isFinal?finalHeight:0);
     }
     const needsTitle=!page.seenGroups.has(item.groupIndex);
     if(needsTitle){page.rows.push({kind:'title',node:item.group.title.cloneNode(true)});page.used+=titleHeight;page.seenGroups.add(item.groupIndex);}
-    page.rows.push({kind:'detail',node:item.detail.cloneNode(true)});page.details.push(item.detail);page.used+=detailHeight;
+    page.rows.push({kind:'detail',node:item.detail.cloneNode(true)});page.details.push(item.detail);page.detailGroupIndices.push(item.groupIndex);page.lastDetailGroupIndex=item.groupIndex;page.used+=detailHeight;
     if(item.last&&item.group.subtotal){page.rows.push({kind:'subtotal',node:item.group.subtotal.cloneNode(true)});page.used+=subtotalHeight;}
     if(isFinal)page.used+=finalHeight;
-    if(page.used+(remaining?carryHeight:0)>maxBodyHeight)page.overflow=true;
+    if(page.used+reservedEnd>maxBodyHeight)page.overflow=true;
   });
-  const totals=(expectedTotals||[]).map(()=>0n),carryBefore=[];
-  pages.forEach((entry,index)=>{carryBefore.push(totals.map(v=>v));entry.details.forEach(row=>{const values=readValues(row);values.forEach((v,i)=>totals[i]+=BigInt(v??0));});entry.carryOutTotals=totals.map(v=>v);});
+  const totals=(expectedTotals||[]).map(()=>0n),carryBefore=[],groupTotals=new Map();
+  pages.forEach((entry,index)=>{carryBefore.push(totals.map(v=>v));entry.details.forEach((row,detailIndex)=>{const values=readValues(row),groupIndex=entry.detailGroupIndices[detailIndex];values.forEach((v,i)=>{const amount=BigInt(v??0);totals[i]+=amount;if(!groupTotals.has(groupIndex))groupTotals.set(groupIndex,(expectedTotals||[]).map(()=>0n));groupTotals.get(groupIndex)[i]+=amount;});});entry.carryOutTotals=totals.map(v=>v);if(continuationOnly&&index<pages.length-1){const nextGroup=pages[index+1].detailGroupIndices?.[0],lastGroup=entry.detailGroupIndices.at(-1);entry.hasCarryOut=lastGroup!==undefined&&lastGroup===nextGroup;if(entry.hasCarryOut){entry.carryOutGroupIndex=lastGroup;entry.carryOutGroupTotals=groupTotals.get(lastGroup).map(v=>v);}}});
   if(expectedTotals&&totals.some((v,i)=>v!==BigInt(expectedTotals[i]??0)))throw new Error('جمع انتقالی با جمع کل کاربرگ مطابقت ندارد.');
-  pages.forEach((entry,index)=>{entry.carryInTotals=carryBefore[index];entry.hasCarryIn=index>0;entry.hasCarryOut=index<pages.length-1;});
+  pages.forEach((entry,index)=>{entry.carryInTotals=carryBefore[index];entry.hasCarryIn=continuationOnly?false:index>0;if(!continuationOnly)entry.hasCarryOut=index<pages.length-1;});
   return {pages,totals,overflow:pages.some(p=>p.overflow)};
 }
 window.paginateMeasuredWorkpaperGroups=paginateMeasuredWorkpaperGroups;
@@ -13993,18 +13993,18 @@ function vBuildPrintPages(source,printMode=false){
  const measurePage=vCreatePrintPage(source,measure),baseHeight=vPrintPageHeight(measurePage),measureBody=measurePage.body,heightCache=new WeakMap();
  const cloneWorkpaperRow=row=>{const clone=row.cloneNode(true);if(printMode)clone.querySelectorAll('textarea[data-vnote]').forEach(editor=>{const text=document.createElement('span');text.className='variance-note-print-text';text.textContent=String(V.notes[editor.dataset.vnote]??editor.value);editor.replaceWith(text);});return clone;};
  const rowHeight=row=>{if(!row)return 0;if(heightCache.has(row))return heightCache.get(row);const before=vPrintPageHeight(measurePage),clone=cloneWorkpaperRow(row);measureBody.append(clone);const h=Math.max(1,vPrintPageHeight(measurePage)-before);clone.remove();heightCache.set(row,h);return h;};
- const carrySample=document.createElement('tr');carrySample.className='variance-page-carry';carrySample.innerHTML='<td colspan="3">جمع تا پایان صفحه</td><td class="vamount">۰</td><td class="vamount">۰</td><td class="vamount">۰</td><td class="vpct">—</td>'+(V.includeDescriptions?'<td></td>':'');
+ const carrySample=document.createElement('tr');carrySample.className='variance-page-carry';carrySample.innerHTML='<td colspan="3"></td><td class="vamount">۰</td><td class="vamount">۰</td><td class="vamount">۰</td><td class="vpct">—</td>'+(V.includeDescriptions?'<td></td>':'');const longestCarryTitle=groups.reduce((best,item)=>String(item.title.textContent||'').length>String(best||'').length?item.title.textContent:best,'');carrySample.firstElementChild.textContent=`جمع ${longestCarryTitle} تا پایان صفحهٔ ۹۹۹۹`;
  const carryHeight=rowHeight(carrySample),summarySample=summarySource.cloneNode(true),beforeSummary=vPrintPageHeight(measurePage);measurePage.mid.insertBefore(summarySample,measurePage.number);const finalHeight=Math.max(1,vPrintPageHeight(measurePage)-beforeSummary);summarySample.remove();
  const expected=[groups.reduce((n,g)=>n+BigInt(g.subtotal?.dataset.vsubtotalcurrent||0),0n),groups.reduce((n,g)=>n+BigInt(g.subtotal?.dataset.vsubtotalprior||0),0n)],summaryRows=[...summarySource.querySelectorAll('tbody tr')],summaryExpected=[summaryRows.reduce((n,row)=>n+BigInt(row.dataset.vsummarycurrent||0),0n),summaryRows.reduce((n,row)=>n+BigInt(row.dataset.vsummaryprior||0),0n)];
  if(expected.some((value,i)=>value!==summaryExpected[i])){measure.remove();const host=source.parentElement;if(host)host.innerHTML='<div class="variance-pagination-error" role="alert">کنترل جمع گروه‌ها با خلاصهٔ کاربرگ مطابقت ندارد؛ خروجی چاپ ساخته نشد.</div>';return [];}
  let packed;
- try{packed=window.paginateMeasuredWorkpaperGroups({groups,maxBodyHeight:Math.max(0,MAX-baseHeight),carryHeight,carryInHeight:0,finalHeight,allowSubtotalSplit:true,rowHeight,readValues:row=>[row.dataset.vcurrent||0,row.dataset.vprior||0],expectedTotals:expected.slice(0,2)});}
+ try{packed=window.paginateMeasuredWorkpaperGroups({groups,maxBodyHeight:Math.max(0,MAX-baseHeight),carryHeight,carryInHeight:0,finalHeight,allowSubtotalSplit:true,continuationOnly:true,rowHeight,readValues:row=>[row.dataset.vcurrent||0,row.dataset.vprior||0],expectedTotals:expected.slice(0,2)});}
  catch(error){measure.remove();const host=source.parentElement;if(host)host.innerHTML=`<div class="variance-pagination-error" role="alert">${vx(error.message||'کنترل جمع‌های انتقالی ناموفق بود؛ خروجی چاپ ساخته نشد.')}</div>`;return [];}
- const makeCarry=(pageIndex,values)=>{const current=BigInt(values[0]??0),prior=BigInt(values[1]??0),delta=current-prior,pctClass=(vPctNegative(prior,current)?' variance-negative':'')+(vPctOverThreshold(prior,current)?' variance-over-threshold':'');const row=document.createElement('tr');row.className='variance-page-carry';const label=`جمع تا پایان صفحهٔ ${vdigits(pageIndex)}`;row.innerHTML=`<td colspan="3">${vx(label)}</td><td class="vamount ${vnumClass(current)}">${vmoney(current)}</td><td class="vamount ${vnumClass(prior)}">${vmoney(prior)}</td><td class="vamount ${vnumClass(delta)}">${vmoney(delta)}</td><td class="vpct${pctClass}">${vx(vPctValues(prior,current))}</td>${V.includeDescriptions?'<td></td>':''}`;return row;};
+ const makeCarry=(pageIndex,values,groupIndex)=>{const current=BigInt(values[0]??0),prior=BigInt(values[1]??0),delta=current-prior,pctClass=(vPctNegative(prior,current)?' variance-negative':'')+(vPctOverThreshold(prior,current)?' variance-over-threshold':'');const row=document.createElement('tr');row.className='variance-page-carry';const accountName=String(groups[groupIndex]?.title?.textContent||'حساب در حال ادامه').trim(),label=`جمع ${accountName} تا پایان صفحهٔ ${vdigits(pageIndex)}`;row.dataset.vcarrygroup=String(groupIndex);row.innerHTML=`<td colspan="3">${vx(label)}</td><td class="vamount ${vnumClass(current)}">${vmoney(current)}</td><td class="vamount ${vnumClass(prior)}">${vmoney(prior)}</td><td class="vamount ${vnumClass(delta)}">${vmoney(delta)}</td><td class="vpct${pctClass}">${vx(vPctValues(prior,current))}</td>${V.includeDescriptions?'<td></td>':''}`;return row;};
  const pages=packed.pages.map((plan,pageIndex)=>{
   const page=vCreatePrintPage(source,measure);page.page.classList.add(pageIndex<packed.pages.length-1?'variance-page-full':'variance-page-short');if(plan.overflow)page.page.classList.add('variance-page-overflow');
   plan.rows.forEach(item=>page.body.appendChild(cloneWorkpaperRow(item.node)));
-  if(pageIndex<packed.pages.length-1)page.body.appendChild(makeCarry(pageIndex+1,plan.carryOutTotals));
+  if(plan.hasCarryOut)page.body.appendChild(makeCarry(pageIndex+1,plan.carryOutGroupTotals,plan.carryOutGroupIndex));
   if(pageIndex===packed.pages.length-1)page.mid.insertBefore(summarySource.cloneNode(true),page.number);
   return page;
  });
