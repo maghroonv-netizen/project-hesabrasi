@@ -88,7 +88,7 @@ function dispatchFile(input, file) {
     w.document.querySelector('#varianceV3 [data-vconfirm]').click();
 
     assert.equal(w.document.querySelector('#metaSubject'), null, 'the case-information form does not request a redundant subject');
-    assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('بررسی نوسانات هزینه'), 'the module supplies its own workpaper subject');
+    assert.equal(w.document.querySelector('#varianceV4 .variance-meta-right .variance-line:nth-child(2) .variance-value').textContent, 'کاربرگ بررسی نوسانات هزینه', 'the workpaper subject uses exactly the requested wording');
     assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('آبان ۱۴۰۵'), 'preparation month uses the hamza spelling and Persian digits');
     assert.ok(w.document.querySelector('#varianceV4 .variance-meta').textContent.includes('سال مالی منتهی به ۲۹ اسفند ۱۴۰۴'), 'the audit year-end is stated explicitly in the header');
     assert.equal(w.document.querySelector('#varianceV4 [data-vthreshold]'), null, 'the user-configurable fluctuation threshold is removed');
@@ -102,6 +102,7 @@ function dispatchFile(input, file) {
     assert.ok(paper.tBodies[0].rows[0].textContent.includes('هزینه‌های اداری'), 'group heading comes from the major account title');
     assert.ok([...paper.tBodies[0].rows].some(row => row.classList.contains('variance-group-title') && row.textContent.includes('هزینه مالی')), 'a second major account becomes a separate group automatically');
     assert.equal(w.document.querySelectorAll('#varianceV4 [data-vnote]').length, 10, 'notes are editable in both the source table and paginated preview');
+    assert.equal(w.document.querySelector('#varianceV4 .variance-preview-pages textarea[data-vnote]').style.height, '12px', 'description editors begin at a compact one-line height');
     const lines = [...paper.tBodies[0].rows];
     const dataRows = lines.filter(line => !line.classList.contains('variance-group-title') && !line.classList.contains('variance-workpaper-subtotal'));
     assert.equal(dataRows.length, 5);
@@ -128,7 +129,8 @@ function dispatchFile(input, file) {
     assert.deepEqual([...zeroLine.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۰', '۰', '۰', '—'], 'an account with zero in both years displays zero amounts and a dash percentage');
     assert.equal(lines.filter(line => line.classList.contains('variance-group-title')).length, 2, 'one group is emitted per major account');
     assert.equal(lines.filter(line => line.classList.contains('variance-workpaper-subtotal')).length, 2, 'major-account subtotals are printed');
-    const adminSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal') && line.querySelector('td:nth-child(2)')?.textContent === '۶۱');
+    const adminSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal'));
+    assert.equal(adminSubtotal.querySelector('td:nth-child(2)').textContent.trim(), '', 'subtotal rows do not repeat the major-account code');
     assert.deepEqual([...adminSubtotal.querySelectorAll('td')].slice(3, 7).map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۶۰۰٬۰۰۰', '۹۹۹٬۰۰۰٬۰۰۰', '۹۹٫۸٪'], 'subtotal sums amount columns and computes percent from group totals');
     const summaryRows = [...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')];
     assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5], 'each summary row contains no fluctuation count');
@@ -159,6 +161,9 @@ function dispatchFile(input, file) {
     assert.ok(printPage.querySelector('.variance-mid > .variance-page-number'), 'page number sits inside the middle frame below the inner frame');
     assert.ok(printPage.querySelector('.variance-mid > .variance-summary'), 'summary is in a separate inner frame');
     assert.ok(printPage.querySelector('.variance-summary + .variance-workpaper-filler'), 'ruled filler occupies the lower page area after the summary');
+    assert.equal(printPage.querySelectorAll('textarea[data-vnote]').length, 0, 'editable description controls are not printed');
+    assert.equal(printPage.querySelectorAll('tr.variance-page-transfer').length, 0, 'the transfer-from-previous-page bar is removed from printed output');
+    assert.equal(printPage.querySelectorAll('.variance-note-print-text').length, 5, 'description text remains visible in the printed workpaper');
     assert.equal(printPage.querySelector('.variance-paper-title'), null, 'there is no separate title above the header');
     assert.equal(printPage.querySelector('.variance-group-title td').colSpan, 8, 'major-account title merges all eight columns');
     assert.ok([...w.document.head.querySelectorAll('style[data-variance-print]')].some(style => style.textContent.includes('@page{size:A4 landscape')), 'PDF print uses A4 landscape');
@@ -215,7 +220,8 @@ function dispatchFile(input, file) {
     w.document.querySelector('#varianceV4 [data-vprint]').click();
     assert.ok(printed.length >= 2, 'additional account rows paginate across pages');
     assert.ok(printed.slice(0, -1).every(page => page.carryOut.length === 1 && page.fullFrame), 'every non-final page has the full 541.7pt frame and ends with a cumulative page total');
-    assert.ok(printed.slice(1).every((page, i) => page.carryIn.length === 1 && JSON.stringify(page.carryIn[0]) === JSON.stringify(printed[i].carryOut[0])), 'each continuation starts with the exact carry-forward values from the preceding page');
+    assert.ok(printed.every(page => page.carryIn.length === 0), 'no page contains a transfer-from-previous-page bar');
+    assert.ok(printed.slice(1).every(page => page.carryIn.length === 0), 'continuation pages do not show a transfer-from-previous-page bar');
     assert.equal(printed.at(-1).carryOut.length, 0, 'the final page has no page-total row');
     assert.ok(w.document.querySelector('#printHost .variance-paper-table tbody').rows.length >= 20, 'each measured page uses its available height for more account rows');
     const summaryPage = printed.at(-1);
@@ -247,6 +253,15 @@ function dispatchFile(input, file) {
     assert.equal(aiExplanation.textContent, 'افزایش حقوق و مزایا؛ تطبیق فهرست حقوق لازم است.', 'AI-written text replaces the local fallback in the explanation cell');
     assert.ok(aiExplanation.textContent.length <= 55, 'AI explanations are limited to a brief half-line');
     assert.ok(w.document.querySelector('#varianceV4 #vAiStatus').textContent.includes('مبالغ و کد حسابی برای AI ارسال نشد'));
+    const manualEditor = w.document.querySelector('#varianceV4 .variance-preview-pages textarea[data-vnote]');
+    manualEditor.value = 'یادداشت دستی برای بررسی چاپ';
+    manualEditor.dispatchEvent(new w.Event('input', { bubbles: true }));
+    assert.equal(w.document.querySelector(`#varianceV4 .variance-workpaper-source textarea[data-vnote="${manualEditor.dataset.vnote}"]`).value, manualEditor.value, 'preview edits remain synchronized to the saved note value');
+    w.document.querySelector('#varianceV4 [data-vprint]').click();
+    const manualPrintedText = [...w.document.querySelectorAll('#printHost .variance-note-print-text')].find(node => node.textContent === manualEditor.value);
+    assert.ok(manualPrintedText, 'print keeps the explanation text without printing an editable textbox');
+    assert.equal(w.document.querySelectorAll('#printHost textarea[data-vnote]').length, 0, 'no description textbox frame appears in print output');
+    if (typeof w.__activePrintRestore === 'function') w.__activePrintRestore();
     if (errors.length) throw new Error('jsdom errors: ' + errors.join(' | '));
     console.log('expense variance UI: passed (automatic years, rial-only amounts, local account classification, short AI explanations, zero handling, page frames and pagination)');
   } finally {
