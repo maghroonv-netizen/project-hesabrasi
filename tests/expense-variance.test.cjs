@@ -158,6 +158,7 @@ function dispatchFile(input, file) {
     assert.ok(printPage.querySelector('.variance-outer > .variance-mid > .variance-inner'), 'print page has three nested rounded frames');
     assert.ok(printPage.querySelector('.variance-mid > .variance-page-number'), 'page number sits inside the middle frame below the inner frame');
     assert.ok(printPage.querySelector('.variance-mid > .variance-summary'), 'summary is in a separate inner frame');
+    assert.ok(printPage.querySelector('.variance-summary + .variance-workpaper-filler'), 'ruled filler occupies the lower page area after the summary');
     assert.equal(printPage.querySelector('.variance-paper-title'), null, 'there is no separate title above the header');
     assert.equal(printPage.querySelector('.variance-group-title td').colSpan, 8, 'major-account title merges all eight columns');
     assert.ok([...w.document.head.querySelectorAll('style[data-variance-print]')].some(style => style.textContent.includes('@page{size:A4 landscape')), 'PDF print uses A4 landscape');
