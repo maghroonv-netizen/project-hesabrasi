@@ -53,6 +53,26 @@ function dispatchFile(input, file) {
     assert.equal(packedSplit.pages[0].details.length, 2, 'a detail row from the next page moves upward when it fits, even when its subtotal must follow');
     assert.equal(packedSplit.pages[0].rows.map(row => row.kind).join(','), 'title,detail,detail', 'the upper page is filled with real workpaper rows, not decorative lines');
     assert.equal(packedSplit.pages[1].rows.map(row => row.kind).join(','), 'title,subtotal,title,detail,subtotal', 'the split subtotal stays with its heading while following account details still fill that page');
+    const continuationOnly = w.paginateMeasuredWorkpaperGroups({
+      groups: [
+        { title: packRow('title', 5), details: [packRow('detail', 5, 900)], subtotal: packRow('subtotal', 5) },
+        { title: packRow('title', 5), details: [packRow('detail', 20, 10), packRow('detail', 20, 20), packRow('detail', 20, 30)], subtotal: packRow('subtotal', 5) }
+      ],
+      maxBodyHeight: 55, carryHeight: 8, carryInHeight: 0, continuationOnly: true,
+      rowHeight: row => row.h, readValues: row => [row.value], expectedTotals: [960]
+    });
+    assert.equal(continuationOnly.pages[0].hasCarryOut, true, 'a page-end subtotal appears when that same account group continues onto the next page');
+    assert.equal(continuationOnly.pages[0].carryOutGroupIndex, 1, 'the continuation subtotal identifies only the account group that continues');
+    assert.deepEqual(continuationOnly.pages[0].carryOutGroupTotals, [10n], 'the carry subtotal excludes unrelated account groups and includes only the continuing group so far');
+    const boundaryOnly = w.paginateMeasuredWorkpaperGroups({
+      groups: [
+        { title: packRow('title', 5), details: [packRow('detail', 20, 10)], subtotal: packRow('subtotal', 5) },
+        { title: packRow('title', 5), details: [packRow('detail', 20, 20)], subtotal: packRow('subtotal', 5) }
+      ],
+      maxBodyHeight: 34, carryHeight: 8, carryInHeight: 0, continuationOnly: true,
+      rowHeight: row => row.h, readValues: row => [row.value], expectedTotals: [30]
+    });
+    assert.equal(boundaryOnly.pages[0].hasCarryOut, false, 'no page-end subtotal is inserted when the page break is only between separate account groups');
 
     // Reveal the app's module picker as if the existing shared import has completed.
     w.eval(`ENTRY.phase='ready'; FULL_ROWS=[
@@ -161,6 +181,7 @@ function dispatchFile(input, file) {
       mainHead: page.querySelectorAll('.variance-paper-table thead').length,
       summaryHead: page.querySelectorAll('.variance-summary-table thead th').length,
       carryOut: [...page.querySelectorAll('tr.variance-page-carry')].map(row => [...row.querySelectorAll('td')].slice(1, 4).map(cell => cell.textContent)),
+      carryLabels: [...page.querySelectorAll('tr.variance-page-carry')].map(row => row.querySelector('td')?.textContent.trim() || ''),
       carryIn: [...page.querySelectorAll('tr.variance-page-transfer')].map(row => [...row.querySelectorAll('td')].slice(1, 4).map(cell => cell.textContent)),
       fullFrame: page.classList.contains('variance-page-full'),
       pageNumber: page.querySelector('.variance-page-number')?.textContent || ''
@@ -241,7 +262,8 @@ function dispatchFile(input, file) {
     printed = null;
     w.document.querySelector('#varianceV4 [data-vprint]').click();
     assert.ok(printed.length >= 2, 'additional account rows paginate across pages');
-    assert.ok(printed.slice(0, -1).every(page => page.carryOut.length === 1 && page.fullFrame), 'every non-final page has the full 541.7pt frame and ends with a cumulative page total');
+    assert.ok(printed.slice(0, -1).every(page => page.carryOut.length === 1 && page.fullFrame), 'pages ending inside the same continuing account group have the full frame and a group-specific subtotal');
+    assert.ok(printed.slice(0, -1).every(page => page.carryLabels.every(label => label.includes('گروه آزمایشی'))), 'page-end subtotal labels identify the account group that continues, not all accounts on that page');
     assert.ok(printed.every(page => page.carryIn.length === 0), 'no page contains a transfer-from-previous-page bar');
     assert.ok(printed.slice(1).every(page => page.carryIn.length === 0), 'continuation pages do not show a transfer-from-previous-page bar');
     assert.equal(printed.at(-1).carryOut.length, 0, 'the final page has no page-total row');
