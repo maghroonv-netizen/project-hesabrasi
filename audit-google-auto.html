@@ -6209,7 +6209,7 @@ function usageOperationEnsure(meta={}){
   return record;
 }
 function usageOperationFinish(id,status='completed'){
-  const o=USAGE.operations.find(x=>x.operationId===id);if(!o)return;o.status=status;o.endedAt=new Date().toISOString();o.updatedAt=o.endedAt;usageSave();
+  const o=USAGE.operations.find(x=>x.operationId===id);if(!o)return;if(['approved','running'].includes(o.status))o.status=status;o.endedAt=o.endedAt||new Date().toISOString();o.updatedAt=new Date().toISOString();for(const j of o.plannedJobs||[])if(j.status==='planned')j.status='not_run';for(const j of USAGE.plannedRequests||[])if(j.operationId===id&&j.status==='planned'){j.status='not_run';j.updatedAt=o.updatedAt;}usageSave();
 }
 function usageOperationForEntry(entry){return entry&&USAGE.operations.find(o=>o.operationId===entry.operationId);}
 function usageAccount(purpose){
@@ -6253,7 +6253,7 @@ function usageComplete(entry,data,status){
   const op=usageOperationForEntry(entry);if(op){const job=op.plannedJobs?.[entry.jobIndex-1],planned=USAGE.plannedRequests.find(p=>p.operationId===entry.operationId&&p.jobIndex===entry.jobIndex);if(job){job.status=status==='received'||status==='catalog_received'?'completed':'failed';job.httpStatus=entry.httpStatus;job.outputDisposition=entry.accepted===true?'accepted':entry.accepted===false?'rejected':'unreviewed';}if(planned){planned.status=status==='received'||status==='catalog_received'?'completed':'failed';planned.httpStatus=entry.httpStatus;planned.outputDisposition=entry.accepted===true?'accepted':entry.accepted===false?'rejected':'unreviewed';planned.endedAt=entry.endedAt;planned.updatedAt=entry.updatedAt;}op.completedAttempts=(op.completedAttempts||0)+1;op.updatedAt=entry.endedAt;if(op.usedAttempts>=op.plan.approvedMaxAttempts||op.completedAttempts>=op.plan.approvedMaxAttempts){op.status='completed';op.endedAt=entry.endedAt;}}
   usageSave();
 }
-function usageDecision(id,accepted){const entry=USAGE.entries.find(e=>e.id===id||e.attemptId===id);if(entry){entry.accepted=accepted;entry.updatedAt=new Date().toISOString();const op=usageOperationForEntry(entry),job=op?.plannedJobs?.[entry.jobIndex-1],planned=USAGE.plannedRequests.find(p=>p.operationId===entry.operationId&&p.jobIndex===entry.jobIndex);if(job)job.outputDisposition=accepted?'accepted':'rejected';if(planned){planned.outputDisposition=accepted?'accepted':'rejected';planned.updatedAt=entry.updatedAt;}if(op){op.updatedAt=entry.updatedAt;if(!accepted&&op.status!=='interrupted'){op.status='stopped_output_rejected';op.endedAt=entry.updatedAt;for(const pending of op.plannedJobs||[])if(pending.status==='planned')pending.status='not_run';for(const pending of USAGE.plannedRequests)if(pending.operationId===op.operationId&&pending.status==='planned'){pending.status='not_run';pending.updatedAt=entry.updatedAt;}}}usageSave();}}
+function usageDecision(id,accepted,continueOnFailure=false){const entry=USAGE.entries.find(e=>e.id===id||e.attemptId===id);if(entry){entry.accepted=accepted;entry.updatedAt=new Date().toISOString();const op=usageOperationForEntry(entry),job=op?.plannedJobs?.[entry.jobIndex-1],planned=USAGE.plannedRequests.find(p=>p.operationId===entry.operationId&&p.jobIndex===entry.jobIndex);if(job)job.outputDisposition=accepted?'accepted':'rejected';if(planned){planned.outputDisposition=accepted?'accepted':'rejected';planned.updatedAt=entry.updatedAt;}if(op){op.updatedAt=entry.updatedAt;if(!accepted&&!continueOnFailure&&op.status!=='interrupted'){op.status='stopped_output_rejected';op.endedAt=entry.updatedAt;for(const pending of op.plannedJobs||[])if(pending.status==='planned')pending.status='not_run';for(const pending of USAGE.plannedRequests)if(pending.operationId===op.operationId&&pending.status==='planned'){pending.status='not_run';pending.updatedAt=entry.updatedAt;}}}usageSave();}}
 function usageEstimate(entry){
   const p=entry.adaptiveRate||USAGE.prices[entry.model];
   if(!p||entry.input===null||entry.output===null||usageFinite(p.input)===null||usageFinite(p.output)===null)return null;
@@ -7756,7 +7756,7 @@ function adNaturePrompt(system){return system.replace('ترجیحاً یک یا 
 
 // <<<ADAPTIVE-AI-LAB-BEGIN>>>
 if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
- const AD={lastError:'',profile:null,promise:null,serial:0,controller:null,running:0};let credential='',model='',provider='';
+ const AD={lastError:'',profile:null,promise:null,serial:0,controller:null,running:0};let credential='',model='',provider='',providerConfig='';
  // Results cache: only validated AI outputs and their one-way fingerprints are stored locally.
  // Raw ledger evidence is never written to IndexedDB. A prompt/schema version invalidates old entries.
  const AD_CACHE_DB='hesabrasi-ai-results-v1',AD_CACHE_STORE='results',AD_CACHE_VERSION='2026-11-13-targeted-optimisation-v1';
@@ -7794,18 +7794,19 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
   const cleanRouterKey=cleanTok(ROUTER_KEY);
   const cleanRouterModel=cleanTok(ROUTER_MODEL);
   if(!cleanRouterKey){AD.controller?.abort();AD.serial++;AD.profile=null;AD.promise=null;credential='';model='';notify(describe(null));return null;}
-  if(!force&&credential===cleanRouterKey&&model===cleanRouterModel&&provider===AD_PROVIDER){if(AD.promise)return AD.promise;if(AD.profile&&(AD.profile.source!=='provider_catalog'||Date.now()-Date.parse(AD.profile.retrievedAt)<900000))return AD.profile;}
-  AD.controller?.abort();const serial=++AD.serial,key=cleanRouterKey,id=cleanRouterModel;credential=key;model=id;provider=AD_PROVIDER;AD.profile=null;AD.lastError='';const chosenProvider=AD_PROVIDER;
+  const currentSlot=window.HesabrasiAI?HesabrasiAI.readySlots().find(x=>x.key===cleanRouterKey&&x.model===cleanRouterModel&&x.wireProvider===AD_PROVIDER):null;const configFingerprint=JSON.stringify(currentSlot?.extra||{});
+  if(!force&&credential===cleanRouterKey&&model===cleanRouterModel&&provider===AD_PROVIDER&&providerConfig===configFingerprint){if(AD.promise)return AD.promise;if(AD.profile&&AD.profile.source==='provider_catalog'&&Date.now()-Date.parse(AD.profile.retrievedAt)<900000)return AD.profile;if(AD.profile&&AD.profile.source==='user_declared_not_provider_verified'&&window.HesabrasiAI){const manual=HesabrasiAI.fallbackProfile();if(manual&&manual.model===AD.profile.model&&manual.provider===AD.profile.provider&&manual.contextTokens===AD.profile.contextTokens&&manual.outputTokens===AD.profile.outputTokens)return AD.profile;}}
+  AD.controller?.abort();const serial=++AD.serial,key=cleanRouterKey,id=cleanRouterModel;credential=key;model=id;provider=AD_PROVIDER;providerConfig=configFingerprint;AD.profile=null;AD.lastError='';const chosenProvider=AD_PROVIDER;
   const controller=new AbortController();AD.controller=controller;notify('در حال خواندن ظرفیت مدل از فهرست سرویس؛ بدون ارسال دفتر یا درخواست تولید متن؛ در اتصال گوگل، کلید فقط به گوگل ارسال می‌شود…');
   AD.promise=(async()=>{const timer=setTimeout(()=>controller.abort(),15000);try{
    let catalog=null;
-   if(chosenProvider!=='google'&&window.HesabrasiAI&&typeof HesabrasiAI.getCachedCatalog==='function'){catalog=HesabrasiAI.getCachedCatalog(chosenProvider);}
+   if(chosenProvider!=='google'&&window.HesabrasiAI&&typeof HesabrasiAI.getCachedCatalog==='function'){catalog=HesabrasiAI.getCachedCatalog(chosenProvider,key);}
    if(!catalog){
     const url=(window.HesabrasiAI&&HesabrasiAI.modelsUrl)?HesabrasiAI.modelsUrl({provider:chosenProvider,key,model:id}):(chosenProvider==='google'?AD_GOOGLE_ROOT+'models/'+adGoogleModelId(id):catalogURL);
     if(!url)throw Error('فهرست مدل این سرویس از مرورگر خوانده نمی‌شود.');
     const extraHeaders=(window.HesabrasiAI&&HesabrasiAI.modelsHeaders)?HesabrasiAI.modelsHeaders({provider:chosenProvider,key}):(chosenProvider==='google'?{'x-goog-api-key':key}:{});
     const catalogAttempt=await usageFetch(url,{method:'GET',headers:extraHeaders,credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:controller.signal},{purpose:'catalog',requestClass:'catalog',provider:chosenProvider,model:id,endpointFamily:'model-catalog',operationId:usageNewId('operation'),jobIndex:1,attemptIndex:1,reason:'catalog-read'});try{const response=catalogAttempt.response;if(!response.ok)throw Error('دریافت ظرفیت از سرویس: HTTP '+response.status);catalog=await response.json();catalogAttempt.finish(null,'catalog_received');}catch(error){catalogAttempt.finish(null,error.name==='AbortError'?'timeout_usage_unknown':'catalog_error');throw error;}
-    if(chosenProvider!=='google'&&window.HesabrasiAI&&typeof HesabrasiAI.storeCachedCatalog==='function')HesabrasiAI.storeCachedCatalog(chosenProvider,catalog);
+    if(chosenProvider!=='google'&&window.HesabrasiAI&&typeof HesabrasiAI.storeCachedCatalog==='function')HesabrasiAI.storeCachedCatalog(chosenProvider,catalog,key||'anon');
    }
    if(serial!==AD.serial||key!==cleanTok(ROUTER_KEY)||id!==cleanTok(ROUTER_MODEL)||chosenProvider!==AD_PROVIDER)return null;
    AD.profile=Object.freeze(chosenProvider==='google'?adGoogleProfile(catalog,id):adCatalogProfile(catalog,id));notify(describe(AD.profile));return AD.profile;
@@ -7813,12 +7814,26 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
   finally{clearTimeout(timer);if(serial===AD.serial)AD.promise=null;}})();return AD.promise;
  }
  async function profile(){const p=await discover();if(p)return p;if(window.HesabrasiAI&&typeof HesabrasiAI.fallbackProfile==='function'){const fb=HesabrasiAI.fallbackProfile();if(fb){AD.profile=Object.freeze(fb);notify(describe(AD.profile));return AD.profile;}}throw Error('ظرفیت خودکار مدل دریافت نشد: '+(AD.lastError||'حداقل یک سرویس را وصل و آزمایش کنید.'));}
- const stamp=p=>({p,key:ROUTER_KEY,model:ROUTER_MODEL,provider:AD_PROVIDER});
- const fresh=(s,current)=>s.p===AD.profile&&current()&&(s.failover===true||(s.key===ROUTER_KEY&&s.model===ROUTER_MODEL&&s.provider===AD_PROVIDER));
+ const stamp=p=>{const base={p,key:ROUTER_KEY,model:ROUTER_MODEL,provider:AD_PROVIDER};const slots=window.HesabrasiAI?HesabrasiAI.readySlots():[];const match=slots.find(x=>x.key===base.key&&x.model===base.model&&x.wireProvider===base.provider);return match?{...base,slotId:match.id,kind:match.kind,extra:match.extra,candidate:{id:match.id,key:match.key,originalModel:match.model,extraSnapshot:JSON.stringify(match.extra||{})}}:base;};
+ const fresh=(s,current)=>s.p===AD.profile&&current()&&((s.origin||s).key===ROUTER_KEY&&(s.origin||s).model===ROUTER_MODEL&&(s.origin||s).provider===AD_PROVIDER)&&(!s.candidate||HesabrasiAI.snapshotMatches(s.candidate))&&(!s.originCandidate||HesabrasiAI.snapshotMatches(s.originCandidate));
+ function failoverCandidates(primary){
+  if(!window.HesabrasiAI||!HesabrasiAI.failoverEnabled())return [];
+  const slots=HesabrasiAI.readySlots(),out=[];
+  for(const slot of slots){
+   const ex=slot.extra||{},ctx=adPositive(ex.fallbackContext),limit=adPositive(ex.fallbackOutput);
+   if(!ctx||!limit)continue;
+   const ids=(slot.id===primary.slotId?[]:[slot.model]).concat(Array.isArray(ex.fallbackModels)?ex.fallbackModels:[]);
+   const seen=new Set();
+   for(const id of ids){if(!id||seen.has(id)||(slot.id===primary.slotId&&id===primary.model))continue;seen.add(id);
+    out.push({id:slot.id,name:slot.name,key:slot.key,model:id,originalModel:slot.model,wireProvider:slot.wireProvider,kind:slot.kind,extra:JSON.parse(JSON.stringify(ex)),extraSnapshot:JSON.stringify(ex),context:ctx,output:limit});
+   }
+  }
+  return out;
+ }
  function approve(plan,p,title){return new Promise(resolve=>{
   const dialog=document.createElement('dialog');dialog.dir='rtl';dialog.style.cssText='max-width:540px;width:calc(100% - 32px);border-radius:14px;padding:20px;background:var(--panel,#fff);color:var(--ink,#222);border:1px solid var(--line,#888)';
   const heading=document.createElement('h3');heading.textContent=title;
-  const text=document.createElement('p');text.style.whiteSpace='pre-wrap';text.textContent='مدل: '+p.model+'\nحداکثر '+plan.maxCalls+' ارسال واقعی در کل این عملیات؛ هر بخش فقط یک بار فرستاده می‌شود. سوییچ سرویس و retry خودکار غیرفعال است.\n'+(plan.cost===null?'برآورد هزینه: نامشخص؛ درخواست می‌تواند اعتبار مصرف کند.':'سقف برآورد مصرف با نرخ فعلی: '+plan.cost.toFixed(6)+' دلار بر اساس نرخ اعلام‌شده، بدون کارمزد و تبدیل ارز؛ مبلغ قطعی نیست.')+'\nبرآورد توکن دقیق نیست. این تأیید شامل مراحل خوانش شرح اسناد و نگارش/دسته‌بندی همین عملیات است (بدون نیاز به بررسی طرف‌حساب)؛ سقف ارسال/برآورد مصرف افزایش خودکار ندارد. اگر شبکه پاسخ ندهد، مصرف آن تلاش نامعلوم ثبت می‌شود و تکرار نمی‌گردد. نتایج AI نیازمند بازبینی حسابرس هستند.\nآیا کل عملیات را در همین محدوده تأیید می‌کنید؟';
+  const text=document.createElement('p');text.style.whiteSpace='pre-wrap';text.textContent='مدل: '+p.model+'\nحداکثر '+plan.maxCalls+' ارسال واقعی در کل این عملیات. '+(plan.chain?.length?'در خطاهای صریح سهمیه/اختلال، همان داده ممکن است به این گزینه‌ها ارسال شود: '+plan.chain.map(c=>c.name+' / '+c.model).join('، ')+'؛ هزینهٔ تمام تلاش‌ها ممکن است جداگانه محاسبه شود. ظرفیت پشتیبان طبق مقادیر اعلامی شماست، نه تأیید سرویس.':'هر بخش فقط یک بار فرستاده می‌شود؛ سوییچ خودکار غیرفعال یا بدون گزینهٔ واجد شرایط است.')+'\n'+(plan.cost===null?'برآورد هزینه: نامشخص؛ درخواست می‌تواند اعتبار مصرف کند.':'سقف برآورد مصرف با نرخ فعلی: '+plan.cost.toFixed(6)+' دلار بر اساس نرخ اعلام‌شده، بدون کارمزد و تبدیل ارز؛ مبلغ قطعی نیست.')+'\nبرآورد توکن دقیق نیست. این تأیید شامل مراحل خوانش شرح اسناد و نگارش/دسته‌بندی همین عملیات است (بدون نیاز به بررسی طرف‌حساب)؛ سقف ارسال/برآورد مصرف افزایش خودکار ندارد. اگر شبکه پاسخ ندهد، مصرف آن تلاش نامعلوم ثبت می‌شود و تکرار نمی‌گردد. نتایج AI نیازمند بازبینی حسابرس هستند.\nآیا کل عملیات را در همین محدوده تأیید می‌کنید؟';
   const accept=document.createElement('button');accept.type='button';accept.dataset.adAccept='';accept.textContent='تأیید و اجرای کل عملیات';const cancel=document.createElement('button');cancel.type='button';cancel.textContent='لغو';cancel.dataset.adCancel='';
   let done=false;const finish=value=>{if(done)return;done=true;if(dialog.open)dialog.close();dialog.remove();resolve(value);};accept.onclick=()=>finish(true);cancel.onclick=()=>finish(false);dialog.oncancel=e=>{e.preventDefault();finish(false);};dialog.onclose=()=>finish(false);dialog.append(heading,text,accept,cancel);document.body.appendChild(dialog);dialog.dataset.adApproval='';try{dialog.showModal();}catch{finish(false);}
  });}
@@ -7830,8 +7845,9 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  }
  async function beginOperation(p,cpPlan,finalPlan,pending,current,title){
   const plan=adOperationPlan(p,cpPlan,finalPlan,pending),s=stamp(p);
+  plan.chain=failoverCandidates(s); if(plan.chain.length){ plan.maxCalls *= (plan.chain.length+1); plan.cost=null; }
   if(!await approve(plan,p,title))throw Error('عملیات لغو شد؛ هیچ درخواست این عملیات ارسال نشد.');
-  const operation={id:usageNewId('operation'),plan,stamp:s,current,used:0,spent:0};
+  const operation={id:usageNewId('operation'),plan,stamp:s,current,used:0,spent:0,activeCandidate:-1};
   usageOperationStart(operation,{module:title||'approved-operation',purpose:'analysis',provider:AD_PROVIDER,model:p.model});
   return operation;
  }
@@ -7909,7 +7925,7 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
     if(gemini)data=adGoogleResponse(data);else if(anthropic)data=HesabrasiAI.anthropicResponse(data);
     const hasMidStreamErr=!!(response.ok&&data&&data.error);
     status=(response.ok&&!hasMidStreamErr)?'received':'HTTP '+response.status;
-    if(!response.ok||hasMidStreamErr){let message=typeof data.error?.message==='string'?data.error.message:typeof data.error==='string'?data.error:typeof data.message==='string'?data.message:'';message=String(message);if(cleanKey)message=message.split(cleanKey).join('[کلید حذف شد]');message=message.replace(/ir-[A-Za-z0-9_-]+/g,'[کلید حذف شد]').slice(0,600);const codeLabel=hasMidStreamErr?'خطای سرویس در جریان پاسخ':'HTTP '+response.status;let rateHint='';if(response.status===429){const h=n=>response.headers?.get?.(n),retry=h('retry-after')||h('retry-after-ms'),remainingTokens=h('x-ratelimit-remaining-tokens')||h('ratelimit-remaining-tokens'),remainingRequests=h('x-ratelimit-remaining-requests')||h('ratelimit-remaining-requests'),limitTokens=h('x-ratelimit-limit-tokens')||h('ratelimit-limit-tokens'),limitRequests=h('x-ratelimit-limit-requests')||h('ratelimit-limit-requests'),resetTokens=h('x-ratelimit-reset-tokens')||h('ratelimit-reset-tokens'),resetRequests=h('x-ratelimit-reset-requests')||h('ratelimit-reset-requests');rateHint=' این خطا معمولاً به سهمیه/نرخ لحظه‌ای سرویس (مانند TPM یا RPM)، محدودیت پلن رایگان یا سقف روزانه مربوط است؛ ظرفیت زمینهٔ چندمیلیونی مدل این سهمیه‌ها را افزایش نمی‌دهد.'+(retry?' زمان اعلام‌شده برای تلاش بعدی (Retry-After): '+retry+'.':'')+(limitTokens?' سقف توکن اعلام‌شده: '+limitTokens+'.':'')+(remainingTokens?' توکن باقی‌ماندهٔ اعلام‌شده: '+remainingTokens+'.':'')+(resetTokens?' بازنشانی سهمیهٔ توکن: '+resetTokens+'.':'')+(limitRequests?' سقف درخواست اعلام‌شده: '+limitRequests+'.':'')+(remainingRequests?' درخواست باقی‌ماندهٔ اعلام‌شده: '+remainingRequests+'.':'')+(resetRequests?' بازنشانی سهمیهٔ درخواست: '+resetRequests+'.':'');}else if(response.status===413)rateHint=' بدنهٔ درخواست از سقف اندازهٔ سرویس عبور کرده است؛ ظرفیت زمینهٔ مدل به‌تنهایی این سقف را رفع نمی‌کند.';else if(response.status===402)rateHint=' سرویس از اعتبار یا بودجهٔ حساب خبر می‌دهد؛ این خطا با کوچک‌کردن متن لزوماً رفع نمی‌شود.';if(window.HesabrasiDebug)HesabrasiDebug.log('wire_http_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,status:response.status,error:codeLabel+' — '+message});return {ok:false,detail:codeLabel+' — '+message+rateHint+'؛ تلاش خودکار دیگری انجام نمی‌شود.',usageId:entry.id};}
+    if(!response.ok||hasMidStreamErr){let message=typeof data.error?.message==='string'?data.error.message:typeof data.error==='string'?data.error:typeof data.message==='string'?data.message:'';message=String(message);if(cleanKey)message=message.split(cleanKey).join('[کلید حذف شد]');message=message.replace(/ir-[A-Za-z0-9_-]+/g,'[کلید حذف شد]').slice(0,600);const codeLabel=hasMidStreamErr?'خطای سرویس در جریان پاسخ':'HTTP '+response.status;let rateHint='';if(response.status===429){const h=n=>response.headers?.get?.(n),retry=h('retry-after')||h('retry-after-ms'),remainingTokens=h('x-ratelimit-remaining-tokens')||h('ratelimit-remaining-tokens'),remainingRequests=h('x-ratelimit-remaining-requests')||h('ratelimit-remaining-requests'),limitTokens=h('x-ratelimit-limit-tokens')||h('ratelimit-limit-tokens'),limitRequests=h('x-ratelimit-limit-requests')||h('ratelimit-limit-requests'),resetTokens=h('x-ratelimit-reset-tokens')||h('ratelimit-reset-tokens'),resetRequests=h('x-ratelimit-reset-requests')||h('ratelimit-reset-requests');rateHint=' این خطا معمولاً به سهمیه/نرخ لحظه‌ای سرویس (مانند TPM یا RPM)، محدودیت پلن رایگان یا سقف روزانه مربوط است؛ ظرفیت زمینهٔ چندمیلیونی مدل این سهمیه‌ها را افزایش نمی‌دهد.'+(retry?' زمان اعلام‌شده برای تلاش بعدی (Retry-After): '+retry+'.':'')+(limitTokens?' سقف توکن اعلام‌شده: '+limitTokens+'.':'')+(remainingTokens?' توکن باقی‌ماندهٔ اعلام‌شده: '+remainingTokens+'.':'')+(resetTokens?' بازنشانی سهمیهٔ توکن: '+resetTokens+'.':'')+(limitRequests?' سقف درخواست اعلام‌شده: '+limitRequests+'.':'')+(remainingRequests?' درخواست باقی‌ماندهٔ اعلام‌شده: '+remainingRequests+'.':'')+(resetRequests?' بازنشانی سهمیهٔ درخواست: '+resetRequests+'.':'');}else if(response.status===413)rateHint=' بدنهٔ درخواست از سقف اندازهٔ سرویس عبور کرده است؛ ظرفیت زمینهٔ مدل به‌تنهایی این سقف را رفع نمی‌کند.';else if(response.status===402)rateHint=' سرویس از اعتبار یا بودجهٔ حساب خبر می‌دهد؛ این خطا با کوچک‌کردن متن لزوماً رفع نمی‌شود.';if(window.HesabrasiDebug)HesabrasiDebug.log('wire_http_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,status:response.status,error:codeLabel+' — '+message});const retryable=!hasMidStreamErr&&[402,429,500,502,503,504,529].includes(response.status);if(retryable&&operation?.plan?.chain?.length)usageDecision(entry.id,false,true);return {ok:false,detail:codeLabel+' — '+message+rateHint,usageId:entry.id,retryable};}
     if(data.choices?.[0]?.finish_reason==='length'){status='truncated';return {ok:false,detail:'پاسخ ناقص به سقف خروجی رسید؛ سقف '+job.output+' توکن؛ تلاش خودکار دیگری انجام نشد.',usageId:entry.id};}
     if(gemini&&data.googleFinish!=='STOP'){status='blocked_or_unfinished';return {ok:false,detail:'گوگل پاسخ کامل قابل استفاده نداد: '+String(data.googleFinish).slice(0,80)+'؛ تلاش خودکار دیگری انجام نشد.',usageId:entry.id};}
     const text=data.choices?.[0]?.message?.content;
@@ -7926,11 +7942,32 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
     if(window.HesabrasiDebug)HesabrasiDebug.log('wire_network_error',{provider:sxClean.provider,model:sxClean.model,purpose:meta.purpose,elapsedSec,url,error:errMsg});return {ok:false,detail,usageId:entry?.id||error?.usageId};
   }finally{clearTimeout(timer);if(entry&&entry.accepted===null)usageDecision(entry.id,status==='received');if(tracked)tracked.finish(data,status);}
  }
- async function run(job,p,s,purpose,current,operation){const r=await wire(job,p,s,{purpose},current,operation);if(!r.ok){if(typeof usageDecision==='function')usageDecision(r.usageId,false);throw Error(r.detail);}return r;}
+ async function run(job,p,s,purpose,current,operation){
+  const chain=operation?.plan?.chain||[];let index=operation?.activeCandidate??-1,last=null;
+  while(index<chain.length){
+   let useProfile=p,useStamp=s;
+   if(index>=0){
+    const candidate=chain[index];
+    if(!HesabrasiAI.snapshotMatches(candidate)||!fresh(s,current))throw Error('تنظیمات سرویس یا داده تغییر کرد؛ سوییچ متوقف شد.');
+    useProfile={...adManualProfile(candidate.model,candidate.context),provider:candidate.wireProvider,outputTokens:candidate.output,thinking:adIsReasoningModel(candidate.model),parameters:[]};
+    if(job.output>candidate.output||!adFits(useProfile,job.messages,job.output)){index++;continue;}
+    useStamp={...s,origin:{key:s.key,model:s.model,provider:s.provider},originCandidate:s.candidate,candidate,slotId:candidate.id,key:candidate.key,model:candidate.model,provider:candidate.wireProvider,kind:candidate.kind,extra:candidate.extra};
+   }
+   const wireMeta=typeof purpose==='object'&&purpose?{...purpose}:{purpose};if(index>=0)wireMeta.reason='provider-failover';
+   const r=await wire(job,useProfile,useStamp,wireMeta,current,operation);
+   if(r.ok){if(operation)operation.activeCandidate=index;return r;}
+   if(!r.retryable&&typeof usageDecision==='function')usageDecision(r.usageId,false);
+   last=r;if(!r.retryable)break;
+   index++;
+  }
+  if(last&&typeof usageDecision==='function')usageDecision(last.usageId,false);
+  throw Error(last?.detail||'هیچ مدل پشتیبانی با ظرفیت اعلام‌شده برای این بسته سازگار نیست.');
+ }
  const decision=(r,used)=>{if(typeof usageDecision==='function')usageDecision(r.usageId,used);};
  async function review(job,onProgress,current,operation){
   const check=()=>current()&&job.isFresh();if(!check())throw Error('بستهٔ طرف حساب منقضی شده است.');if(!job.pending.length)return {...anaCounterpartyValidate(job,'{"resolutions":[]}'),reviewRequestCount:0};
   const p=await profile(),s=stamp(p),packet=JSON.parse(anaCounterpartyResolverFacts(job)),plan=adPlanCounterpart(p,packet,AI_CP_RESOLVE_SYSTEM),activeOperation=operation||await beginOperation(p,plan,{jobs:[],maxCalls:0,cost:0},0,check,'بررسی طرف حساب — تأیید یک‌بارهٔ کل عملیات');
+  let reviewSucceeded=false;try {
   if(!await authorize(plan,p,'بررسی طرف حساب — برنامهٔ درخواست‌ها',activeOperation))throw Error('بررسی طرف حساب توسط کاربر لغو شد؛ درخواست‌های این مرحله ارسال نشدند.');
   const answers=[],responses=[];
   for(let i=0;i<plan.jobs.length;i++){
@@ -7938,7 +7975,8 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
    let parsed;try{const cleanCp=r.text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');const a0=cleanCp.indexOf('{'),b0=cleanCp.lastIndexOf('}');parsed=JSON.parse(a0>=0&&b0>a0?cleanCp.slice(a0,b0+1):cleanCp);}catch{decision(r,false);throw Error('پاسخ بخش طرف حساب JSON معتبر نیست؛ بدون تلاش مجدد متوقف شد.');}
    const allowed=new Set(plan.jobs[i].units.map(u=>u.id));if(!Array.isArray(parsed.resolutions)||parsed.resolutions.some(a=>!allowed.has(a?.id))){decision(r,false);throw Error('شناسهٔ پاسخ طرف حساب متعلق به بخش ارسالی نیست.');}answers.push(...parsed.resolutions);
   }
-  const result=anaCounterpartyValidate(job,JSON.stringify({resolutions:answers}));responses.forEach(r=>decision(r,result.reviewComplete));return {...result,reviewRequestCount:plan.jobs.length};
+  const result=anaCounterpartyValidate(job,JSON.stringify({resolutions:answers}));responses.forEach(r=>decision(r,result.reviewComplete));reviewSucceeded=result.reviewComplete;return {...result,reviewRequestCount:plan.jobs.length};
+  } finally { if(!operation)usageOperationFinish(activeOperation.id,reviewSucceeded?'completed':'failed'); }
  }
  async function writeNature(packet,current,onProgress,operation,natureSystem=NATURE_SYSTEM,natureNotesSystem=NATURE_NOTES_SYSTEM){
   const p=await profile(),s=stamp(p),plan=adPlanNature(p,packet,adNaturePrompt(natureSystem),natureNotesSystem);
@@ -7954,14 +7992,14 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
  const previousResolve=anaCounterpartyResolve,previousAuto=anaAIAuto,previousReport=reportRun;
  anaCounterpartyResolve=async function(job,progress=()=>{},current=()=>true,operation){if(!ROUTER_KEY)return previousResolve(job,progress,current);return review(job,progress,current,operation);};
  routerRequest=async function(messages,maxTokens=4096,meta={}){
-  if(!ROUTER_KEY)return {ok:false,detail:'ابتدا کلید را فعال کنید.'};AD.running++;try{const p=await profile(),s=stamp(p),output=adOutput(p,maxTokens);if(!adFits(p,messages,output))throw Error('این درخواست مستقل در ظرفیت مدل جا نمی‌شود؛ باید از مسیر ساختاریافتهٔ تقسیم استفاده شود.');const plan={maxCalls:1,jobs:[{messages,output}],cost:adCost(p,[{messages,output}])};if(!await approve(plan,p,'تأیید یک درخواست AI'))return {ok:false,detail:'ارسال توسط کاربر لغو شد.'};const operation={id:usageNewId('operation'),plan:{maxCalls:1,cost:plan.cost},used:0,spent:0};return await wire({messages,output},p,s,meta,()=>true,operation);}catch(error){return {ok:false,detail:error.message};}finally{AD.running--;}
+  if(!ROUTER_KEY)return {ok:false,detail:'ابتدا کلید را فعال کنید.'};let singleOperation=null,singleSucceeded=false;AD.running++;try{const p=await profile(),s=stamp(p),output=adOutput(p,maxTokens);if(!adFits(p,messages,output))throw Error('این درخواست مستقل در ظرفیت مدل جا نمی‌شود؛ باید از مسیر ساختاریافتهٔ تقسیم استفاده شود.');const plan={maxCalls:1,jobs:[{messages,output}],cost:adCost(p,[{messages,output}]),chain:failoverCandidates(s)};if(plan.chain.length){plan.maxCalls*=plan.chain.length+1;plan.cost=null;}if(!await approve(plan,p,'تأیید یک درخواست AI'))return {ok:false,detail:'ارسال توسط کاربر لغو شد.'};singleOperation={id:usageNewId('operation'),plan,used:0,spent:0,activeCandidate:-1};const result=await run({messages,output},p,s,meta,()=>true,singleOperation);singleSucceeded=true;return result;}catch(error){return {ok:false,detail:error.message};}finally{if(singleOperation)usageOperationFinish(singleOperation.id,singleSucceeded?'completed':'failed');AD.running--;}
  };
  anaAIAuto=async function(){
   if(!window.sharedOpeningReady?.()||!ROUTER_KEY||ANA.out[ANA.active]?.A?.rows?.every(anaIsOpening))return previousAuto();
   if(ANA.out.some(o=>o.report?.busy))return;const index=ANA.active,slot=anaAISlot(),store=ANA.aiBy,o=ANA.out[index];if(!o||slot.busy||slot.nature||slot.noEvidence)return;
   const sourceRef=FULL_ROWS,rowsSnap=[...(o.A.rows||[])];let counterpartContextSignature=null;
   const isFresh=()=>sourceRef===FULL_ROWS&&rowsSnap.length===(o.A.rows||[]).length&&rowsSnap.every((r,idx)=>r===o.A.rows[idx])&&(counterpartContextSignature===null||JSON.stringify(anaNatureCounterpartContext(o.A))===counterpartContextSignature);
-  const current=()=>ANA.aiBy===store&&ANA.out[index]===o&&ANA.active===index,paint=()=>{if(current()){ANA.ai.busy=slot.busy;anaAIShow();}};slot.busy=true;slot.error='';slot.detail='';slot.noEvidence=false;slot.adaptiveCalls=0;slot.counterpartEvidence=null;slot.receivedNature='';AD.running++;const started=Date.now();
+  const current=()=>ANA.aiBy===store&&ANA.out[index]===o&&ANA.active===index,paint=()=>{if(current()){ANA.ai.busy=slot.busy;anaAIShow();}};slot.busy=true;slot.error='';slot.detail='';slot.noEvidence=false;slot.adaptiveCalls=0;slot.counterpartEvidence=null;slot.receivedNature='';AD.running++;const started=Date.now();let operation=null;
   try{
    slot.stage='بررسی ظرفیت مدل و آماده‌سازی شرح اسناد…';paint();
    const base=NATURE_SEND_MODE==='target'?anaTargetNatureFacts(o.A):NATURE_SEND_MODE==='full'?anaNatureFactsText(o.A):anaCompactNatureFacts(o.A,NATURE_TOP_N);
@@ -7979,21 +8017,21 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
    }
    slot.cacheHit=false;
    const initialFinal=adPlanNature(initialProfile,packet,natureInstruction,natureNotesSystem);
-   const operation=await beginOperation(initialProfile,emptyCpPlan,initialFinal,0,()=>current()&&isFresh(),'تهیهٔ ماهیت — تأیید یک‌بارهٔ کل عملیات');
+   operation=await beginOperation(initialProfile,emptyCpPlan,initialFinal,0,()=>current()&&isFresh(),'تهیهٔ ماهیت — تأیید یک‌بارهٔ کل عملیات');
    slot.counterpartReviewRequests=0;
    slot.inputChars=requestChars;slot.sendMode=NATURE_SEND_MODE;slot.counterpartContextIncluded=!!slot.includeCounterpartAccounts;
    const r=await writeNature(packet,()=>current()&&isFresh(),stage=>{slot.stage=stage;paint();},operation,natureSystem,natureNotesSystem);
    slot.receivedNature=r.text;try{r.text=adNatureText(r.text);}catch(error){const cleaned=typeof adNatureSanitize==='function'?adNatureSanitize(r.text):'';if(cleaned&&cleaned.length>=40&&!/[0-9۰-۹٠-٩]/.test(cleaned)){r.text=adNatureText(cleaned);if(window.HesabrasiDebug)HesabrasiDebug.log('nature_fallback_sanitized',{cleaned});}else{decision(r,false);throw error;}}slot.receivedNature='';decision(r,true);slot.usage=r.usage;slot.elapsedSeconds=Math.round((Date.now()-started)/1000);slot.adaptiveCalls=r.adaptiveCalls;slot.noEvidence=r.text==='__NO_SUPPORTED_NATURE__';slot.nature=slot.noEvidence?'':r.text;slot.analysis='';o.sec['ماهیت']={k:'ماهیت',t:'ماهیت حساب',kind:'text',text:slot.nature};delete o.sec['آنالیز'];
-   await adCachePut(cacheKey,{text:r.text,noEvidence:slot.noEvidence});slot.cacheHit=false;slot.forceNatureRefresh=false;
+   if(operation.activeCandidate<0)await adCachePut(cacheKey,{text:r.text,noEvidence:slot.noEvidence});slot.cacheHit=false;slot.forceNatureRefresh=false;
   }catch(error){slot.cacheHit=false;slot.forceNatureRefresh=false;slot.nature='';slot.analysis='';slot.error=AI_UNAVAILABLE;slot.detail=error.message;o.sec['ماهیت']={k:'ماهیت',text:'',note:AI_UNAVAILABLE};}
-  finally{AD.running--;slot.busy=false;if(current()){ANA.ai={nature:slot.nature,analysis:'',error:slot.error,busy:false};renderAnalysisOutput();}}
+  finally{if(operation)usageOperationFinish(operation.id,slot.error?'failed':'completed');AD.running--;slot.busy=false;if(current()){ANA.ai={nature:slot.nature,analysis:'',error:slot.error,busy:false};renderAnalysisOutput();}}
  };
  reportRun=async function(){
   if(!window.sharedOpeningReady?.()||!ROUTER_KEY)return previousReport();const o=ANA.out[ANA.active];if(!o)return;const state=reportState(o);if(state.busy||Object.values(ANA.aiBy||{}).some(s=>s.busy))return;
   const data=reportBuild(o.A);Object.assign(state,{data,error:'',categories:[],sections:null,coverage:null,classificationRaw:'',prepared:false,pending:null,counterpartEvidence:null,rowProtocol:null,mathVerified:false,partial:false});if(data.invalidRows.length||data.mismatch){state.error='کنترل مبالغ/تطبیق تأیید نشد؛ درخواستی ارسال نشد.';renderAnalysisOutput();return;}if(!data.totals.rowCount){state.error='حساب ردیفی ندارد.';renderAnalysisOutput();return;}if(!data.groups.some(g=>!g.opening))return previousReport();
   const sourceRef=FULL_ROWS,rowsSnap=[...(o.A.rows||[])];
   const isFresh=()=>sourceRef===FULL_ROWS&&rowsSnap.length===(o.A.rows||[]).length&&rowsSnap.every((r,idx)=>r===o.A.rows[idx]);
-  const current=()=>ANA.out.includes(o)&&ANA.out[ANA.active]===o&&o.report===state,paint=()=>{if(current())renderAnalysisOutput();};state.busy=true;state.stage='برنامه‌ریزی ظرفیت مدل بر اساس شرح اسناد…';state.duplicateIds=[];state.rowProtocol={ignoredUnknownDeclarations:0,expected:0,classified:0,duplicateIds:[],missingIds:[],explicitUnknownIds:[],invalidCategoryRows:[]};state.mathVerified=false;state.receivedClassification=[];paint();AD.running++;
+  const current=()=>ANA.out.includes(o)&&ANA.out[ANA.active]===o&&o.report===state,paint=()=>{if(current())renderAnalysisOutput();};state.busy=true;state.stage='برنامه‌ریزی ظرفیت مدل بر اساس شرح اسناد…';state.duplicateIds=[];state.rowProtocol={ignoredUnknownDeclarations:0,expected:0,classified:0,duplicateIds:[],missingIds:[],explicitUnknownIds:[],invalidCategoryRows:[]};state.mathVerified=false;state.receivedClassification=[];paint();AD.running++;let operation=null;
   try{
    const packet=adCompactAnalysisPacket(o,data),initialProfile=await profile(),cacheKey=await adCacheKey('analysis',{model:initialProfile.model,provider:AD_PROVIDER,system:AD_ROW_CLASSIFY_SYSTEM,packet});
    const cachedAnalysis=await adCacheGet(cacheKey);
@@ -8006,13 +8044,13 @@ if(typeof window!=='undefined'&&window.AUDIT_EVIDENCE_LAB===true){
    }
    state.cacheHit=false;
    const emptyCpPlan={jobs:[],maxCalls:0,cost:0},initialFinal=adPlanAnalysis(initialProfile,packet,AD_ROW_CLASSIFY_SYSTEM);
-   const operation=await beginOperation(initialProfile,emptyCpPlan,initialFinal,0,()=>current()&&isFresh(),'آنالیز حساب — تأیید یک‌بارهٔ کل عملیات');
+   operation=await beginOperation(initialProfile,emptyCpPlan,initialFinal,0,()=>current()&&isFresh(),'آنالیز حساب — تأیید یک‌بارهٔ کل عملیات');
    const p=initialProfile,s=stamp(p),plan=adPlanAnalysis(p,packet,AD_ROW_CLASSIFY_SYSTEM);if(!await authorize(plan,p,'آنالیز حساب — برنامهٔ درخواست‌ها',operation))throw Error('آنالیز توسط کاربر لغو شد؛ درخواست‌های گروه‌بندی ارسال نشدند.');const groups=[],responses=[];
    for(let i=0;i<plan.jobs.length;i++){state.stage='طبقه‌بندی شرح اسناد، بخش '+(i+1)+' از '+plan.jobs.length;paint();const r=await run(plan.jobs[i],p,s,'analysis',()=>current()&&isFresh(),operation);responses.push(r);state.receivedClassification.push(r.text);let answer={};try{answer=adExpandAnalysisAnswer(reportJSON(r.text),plan.jobs[i].units);}catch(err){if(window.HesabrasiDebug)HesabrasiDebug.log('analysis_json_invalid',{raw:String(r.text||'').slice(0,20000),error:err.message});answer={format:'row-classification-v1',categories:[],assignments:[]};}const allowed=new Set(plan.jobs[i].units.flatMap(u=>Array.isArray(u.row_ids)?u.row_ids:[u.id]));let checked=adRowAssignments(answer,allowed);state.duplicateIds.push(...checked.duplicateIds);state.rowProtocol.ignoredUnknownDeclarations+=checked.ignoredUnknownDeclaration?1:0;state.rowProtocol.expected+=checked.expected;state.rowProtocol.classified+=checked.classified;for(const key of ['duplicateIds','missingIds','explicitUnknownIds','invalidCategoryRows'])state.rowProtocol[key].push(...checked[key]);groups.push(...checked.groups);}
    const leftover=new Set(data.groups.filter(g=>!g.opening).map(g=>g.id));groups.forEach(g=>(g.refs||[]).forEach(id=>leftover.delete(id)));if(leftover.size)groups.push(...adLocalFillGroups([...leftover],data));
    const categories=reportAggregate({groups},data,true);state.coverage=categories.coverage;state.categories=[...reportOpeningCategories(data),...adUnknownBuckets(categories,data,state.rowProtocol.explicitUnknownIds)];const check=reportTModel(o);if(check.errors.length)throw Error(check.errors.join('؛ '));responses.forEach(r=>decision(r,!state.coverage.missingIds.length));state.mathVerified=true;state.prepared=true;state.partial=state.rowProtocol.classified<state.rowProtocol.expected;state.classificationRaw='';state.adaptiveCalls=plan.jobs.length;
-   if(!state.coverage.missingIds.length)await adCachePut(cacheKey,{groups,rowProtocol:state.rowProtocol});state.cacheHit=false;
-  }catch(error){state.cacheHit=false;state.categories=[];state.prepared=false;state.error='آنالیز تهیه نشد — '+error.message;}finally{AD.running--;state.busy=false;state.stage='';paint();}
+   if(!state.coverage.missingIds.length&&operation.activeCandidate<0)await adCachePut(cacheKey,{groups,rowProtocol:state.rowProtocol});state.cacheHit=false;
+  }catch(error){state.cacheHit=false;state.categories=[];state.prepared=false;state.error='آنالیز تهیه نشد — '+error.message;}finally{if(operation)usageOperationFinish(operation.id,state.error?'failed':'completed');AD.running--;state.busy=false;state.stage='';paint();}
  };
  const oldEstimate=usageEstimate;usageEstimate=function(e){if(!e.adaptiveRate)return oldEstimate(e);const p=e.adaptiveRate;return p.input===null||p.output===null||e.input===null||e.output===null?null:e.input*p.input+e.output*p.output;};
  const rawDetails=(text,title)=>text?'<details class="report-controls adaptive-screen-only"><summary>'+esc(title)+'</summary><p>متن تأییدنشده و احتمالاً محرمانه است؛ فقط در حافظهٔ همین صفحه است، در کاربرگ یا گزارش مصرف ذخیره نمی‌شود.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(text)+'</pre></details>':'';
@@ -10619,7 +10657,16 @@ el('routerForget').onclick=()=>{
   var CATALOG = [
     { id: 'open_router', name: 'OpenRouter (کاتالوگ کامل مدل‌ها)', base: 'https://openrouter.ai/api/v1', kind: 'openai', site: 'https://openrouter.ai/', keys: 'https://openrouter.ai/keys', model: 'inclusionai/ling-3.0-flash', featured: true, hdr: 'openrouter', dynamicModels: true },
     { id: 'one_x_ai', name: '1xAi', base: 'https://1xai.ir/v1', kind: 'openai', site: 'https://1xai.ir/', model: 'gpt-4o-mini', featured: true },
-    { id: 'iranrouter', name: 'ایران‌روتر', base: '', kind: 'iranrouter', site: 'https://iranrouter.net/', keys: 'https://iranrouter.net/', model: 'openai/gpt-4o-mini', featured: true }
+    { id: 'iranrouter', name: 'ایران‌روتر', base: '', kind: 'iranrouter', site: 'https://iranrouter.net/', keys: 'https://iranrouter.net/', model: 'openai/gpt-4o-mini', featured: true },
+    { id: 'openai_api', name: 'OpenAI', base: 'https://api.openai.com/v1', kind: 'openai', site: 'https://platform.openai.com/', keys: 'https://platform.openai.com/api-keys', model: 'gpt-4o-mini', dynamicModels: true },
+    { id: 'gemini', name: 'Google Gemini', base: 'https://generativelanguage.googleapis.com/v1beta/', kind: 'gemini', site: 'https://ai.google.dev/', keys: 'https://aistudio.google.com/api-keys', model: 'gemini-2.5-flash', dynamicModels: true },
+    { id: 'anthropic', name: 'Anthropic', base: 'https://api.anthropic.com/v1', kind: 'anthropic', site: 'https://console.anthropic.com/', keys: 'https://console.anthropic.com/settings/keys', model: 'claude-sonnet-4-5', dynamicModels: true },
+    { id: 'groq', name: 'Groq', base: 'https://api.groq.com/openai/v1', kind: 'openai', site: 'https://console.groq.com/', model: 'llama-3.3-70b-versatile', dynamicModels: true },
+    { id: 'deepseek', name: 'DeepSeek', base: 'https://api.deepseek.com/v1', kind: 'openai', site: 'https://platform.deepseek.com/', model: 'deepseek-chat', dynamicModels: true },
+    { id: 'mistral', name: 'Mistral', base: 'https://api.mistral.ai/v1', kind: 'openai', site: 'https://console.mistral.ai/', model: 'mistral-small-latest', dynamicModels: true },
+    { id: 'cerebras', name: 'Cerebras', base: 'https://api.cerebras.ai/v1', kind: 'openai', site: 'https://cloud.cerebras.ai/', model: 'llama3.1-8b', dynamicModels: true },
+    { id: 'nvidia_nim', name: 'NVIDIA NIM', base: 'https://integrate.api.nvidia.com/v1', kind: 'openai', site: 'https://build.nvidia.com/', model: 'meta/llama-3.1-8b-instruct', dynamicModels: true },
+    { id: 'custom_openai', name: 'سرویس سفارشی سازگار با OpenAI', base: '', kind: 'openai', extra: 'base', model: '', dynamicModels: true, local: true }
   ];
 
   /* Preferred fallback/default models only; this list never limits the live catalog. */
@@ -10645,6 +10692,7 @@ el('routerForget').onclick=()=>{
   /* Live catalog cache per provider: { raw, textModels, fetchedAt, loading, error, keyFp } */
   var modelCache = {};
   var keyFetchTimers = {};
+  var catalogSequence = {};
 
   function isReasoningId(modelId, row) {
     if (typeof adIsReasoningModel === 'function') return adIsReasoningModel(modelId, row);
@@ -10784,9 +10832,9 @@ el('routerForget').onclick=()=>{
     return modelCache[provider];
   }
 
-  function getCachedCatalog(provider) {
+  function getCachedCatalog(provider, key) {
     var c = modelCache[provider];
-    if (c && c.raw && (Date.now() - c.fetchedAt) < CATALOG_TTL_MS) return c.raw;
+    if (c && c.raw && (typeof key !== 'string' || c.keyFp === (key || 'anon')) && (Date.now() - c.fetchedAt) < CATALOG_TTL_MS) return c.raw;
     return null;
   }
 
@@ -10812,7 +10860,7 @@ el('routerForget').onclick=()=>{
     var slots = {};
     var order = CATALOG.map(function (p) { return p.id; });
     order.forEach(function (id) { slots[id] = emptySlot(id); });
-    return { v: 1, slots: slots, order: order, cooldownMs: COOL_DEFAULT };
+    return { v: 1, slots: slots, order: order, cooldownMs: COOL_DEFAULT, failover: false };
   }
 
   var state = defaultState();
@@ -10825,6 +10873,7 @@ el('routerForget').onclick=()=>{
       var parsed = JSON.parse(raw);
       if (!parsed || parsed.v !== 1 || !parsed.slots) return;
       var next = defaultState();
+      next.failover = parsed.failover === true;
       next.cooldownMs = typeof parsed.cooldownMs === 'number' ? parsed.cooldownMs : COOL_DEFAULT;
       if (Array.isArray(parsed.order)) {
         var seen = {};
@@ -10869,16 +10918,6 @@ el('routerForget').onclick=()=>{
           lastTestAt: typeof s.lastTestAt === 'number' ? s.lastTestAt : 0
         };
       });
-      /* Ensure open_router appears first if no other provider was explicitly enabled ahead of it. */
-      var anyEnabledBefore = false;
-      for (var oi = 0; oi < next.order.length; oi++) {
-        var oid = next.order[oi];
-        if (oid === 'open_router') break;
-        if (next.slots[oid] && next.slots[oid].enabled && next.slots[oid].key) { anyEnabledBefore = true; break; }
-      }
-      if (!anyEnabledBefore && next.order.indexOf('open_router') > 0) {
-        next.order = ['open_router'].concat(next.order.filter(function (x) { return x !== 'open_router'; }));
-      }
       state = next;
     } catch (e) { /* keep defaults */ }
   }
@@ -10890,7 +10929,8 @@ el('routerForget').onclick=()=>{
         v: 1,
         slots: state.slots,
         order: state.order,
-        cooldownMs: state.cooldownMs
+        cooldownMs: state.cooldownMs,
+        failover: state.failover
       }));
     } catch (e) {
       logLine('ذخیره در این مرورگر ممکن نشد: حافظهٔ محلی پر یا مسدود است.');
@@ -10918,7 +10958,11 @@ el('routerForget').onclick=()=>{
     if (spec && spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true) return '/api/tooken';
     /* 1xAi is deliberately direct in this build; ignore any legacy saved proxy URL. */
     if (spec && spec.id === 'one_x_ai') return 'https://1xai.ir/v1';
-    if (slot && slot.extra && slot.extra.base) return trimSlash(slot.extra.base);
+    if (slot && slot.extra && slot.extra.base) {
+      var parsedBase = new URL(slot.extra.base, global.location && global.location.href);
+      if (parsedBase.username || parsedBase.password || parsedBase.search || parsedBase.hash || !(parsedBase.protocol === 'https:' || (parsedBase.protocol === 'http:' && ['localhost','127.0.0.1','[::1]'].indexOf(parsedBase.hostname) >= 0))) throw new Error('نشانی پایه باید HTTPS یا HTTP محلی و بدون نام کاربری، رمز، query و fragment باشد.');
+      return trimSlash(parsedBase.href);
+    }
     if (spec.kind === 'iranrouter') return iranChat();
     if (spec.id === 'cloudflare') {
       var acc = slot && slot.extra && slot.extra.account;
@@ -10990,6 +11034,7 @@ el('routerForget').onclick=()=>{
     if (spec.kind === 'anthropic') {
       if (!skipAuth) headers['x-api-key'] = key;
       headers['anthropic-version'] = '2023-06-01';
+      headers['anthropic-dangerous-direct-browser-access'] = 'true';
       return headers;
     }
     if (spec.kind === 'azure') {
@@ -11019,7 +11064,8 @@ el('routerForget').onclick=()=>{
       var m = typeof adGoogleModelId === 'function' ? adGoogleModelId(model) : String(model || '').replace(/^models\//, '');
       return r + 'models/' + m;
     }
-    if (spec.kind === 'anthropic' || spec.kind === 'azure') return null;
+    if (spec.kind === 'anthropic') return joinUrl(slotBase(spec, state.slots[spec.id]), '/models');
+    if (spec.kind === 'azure') return null;
     var slot = state.slots[spec.id];
     var base = slotBase(spec, slot);
     if (!base) return null;
@@ -11033,6 +11079,7 @@ el('routerForget').onclick=()=>{
     if (provider === 'google' || provider === 'gemini') return key ? { 'x-goog-api-key': key } : {};
     var spec = BY_ID[provider];
     if (spec && spec.kind === 'gemini') return key ? { 'x-goog-api-key': key } : {};
+    if (spec && spec.kind === 'anthropic') return { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
     if (spec && spec.kind === 'azure') return key ? { 'api-key': key } : {};
     if (spec && spec.hdr === 'openrouter') {
       var h = {};
@@ -11043,7 +11090,7 @@ el('routerForget').onclick=()=>{
       if (key) h.Authorization = 'Bearer ' + key;
       return h;
     }
-    return key ? { Authorization: 'Bearer ' + key } : {};
+    return key && key !== 'local' ? { Authorization: 'Bearer ' + key } : {};
   }
 
   async function fetchModelsCatalog(providerId, keyOverride, force) {
@@ -11051,19 +11098,21 @@ el('routerForget').onclick=()=>{
     if (!spec) return null;
     var sl = state.slots[providerId] || emptySlot(providerId);
     var key = cleanAsciiToken(typeof keyOverride === 'string' ? keyOverride : sl.key || '');
-    var keyFp = key ? (key.slice(0, 4) + ':' + key.length) : 'anon';
+    var keyFp = key || 'anon';
     var existing = modelCache[providerId];
     if (!force && existing && existing.raw && existing.keyFp === keyFp && (Date.now() - existing.fetchedAt) < CATALOG_TTL_MS) {
       return existing;
     }
-    var url = modelsUrl({ provider: providerId, key: key, model: sl.model });
+    var sequence = catalogSequence[providerId] = (catalogSequence[providerId] || 0) + 1;
+    var initialKey = sl.key, initialBase = sl.extra && sl.extra.base;
+    var url = providerId === 'gemini' ? 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000' : modelsUrl({ provider: providerId, key: key, model: sl.model });
     if (!url) return null;
 
     modelCache[providerId] = (existing && existing.keyFp === keyFp) ? existing : { raw: null, textModels: [], rejectedCount: 0, totalRaw: 0, fetchedAt: 0, loading: true, error: '', keyFp: keyFp };
     modelCache[providerId].loading = true;
     modelCache[providerId].error = '';
     paintModelSelector(providerId);
-    if (providerId !== 'open_router') paintDynamicModelSelector(providerId);
+    if (providerId !== 'open_router') { paintDynamicModelSelector(providerId); paintSimpleModelSelector(providerId); }
 
     var ctl = new AbortController();
     var timer = setTimeout(function () { ctl.abort(); }, 15000);
@@ -11080,12 +11129,25 @@ el('routerForget').onclick=()=>{
       var resp = catalogAttempt.response;
       if (!resp.ok) {catalogAttempt.finish(null,'HTTP '+resp.status);throw new Error('HTTP ' + resp.status);}
       var json = await resp.json();catalogAttempt.finish(null,'catalog_received');
+      if (providerId === 'gemini') {
+        var googleRows = Array.isArray(json.models) ? json.models : [];
+        var nextPage = json.nextPageToken, pages = 1;
+        while (nextPage && pages++ < 20) {
+          var pageAttempt = await global.usageFetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&pageToken=' + encodeURIComponent(nextPage), { method:'GET', headers:modelsHeaders({provider:providerId,key:key}), credentials:'omit', cache:'no-store', referrerPolicy:'no-referrer', signal:ctl.signal }, {purpose:'catalog',requestClass:'catalog',provider:providerId,model:'model-catalog',endpointFamily:'model-catalog',operationId:global.usageNewId('operation'),jobIndex:pages,attemptIndex:1,reason:'provider-model-page'});
+          var page;
+          try { if (!pageAttempt.response.ok) throw new Error('HTTP ' + pageAttempt.response.status); page = await pageAttempt.response.json(); pageAttempt.finish(null,'catalog_received'); } catch (pageError) { pageAttempt.finish(null,'catalog_error'); throw pageError; }
+          googleRows = googleRows.concat(Array.isArray(page.models) ? page.models : []); nextPage = page.nextPageToken;
+        }
+        if (nextPage) throw new Error('فهرست گوگل بیش از حد صفحه داشت؛ فهرست ناقص کنار گذاشته شد.');
+        json = {data:googleRows.filter(function (m) { return Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.indexOf('generateContent') >= 0; }).map(function (m) { return {id:String(m.name || '').replace(/^models\//,''),name:m.displayName || m.name, context_length:m.inputTokenLimit, top_provider:{max_completion_tokens:m.outputTokenLimit}, googleInfo:m}; })};
+      }
+      if (catalogSequence[providerId] !== sequence || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase) return null;
       var entry = storeCachedCatalog(providerId, json, keyFp);
       /* Preserve any current model in the full live catalog; otherwise choose a default text/chat model. */
       if (providerId === 'open_router' && entry.textModels.length) {
         var cur = String(sl.model || '').trim().toLowerCase();
         var exists = entry.textModels.some(function (m) { return m.id.toLowerCase() === cur; });
-        if (!exists) {
+        if (!exists && !sl.modelCustomized) {
           sl.model = pickBestAnalyticalModel(entry.textModels);
           state.slots[providerId] = sl;
           save();
@@ -11095,14 +11157,15 @@ el('routerForget').onclick=()=>{
         }
       }
       paintModelSelector(providerId);
-    if (providerId !== 'open_router') paintDynamicModelSelector(providerId);
+    if (providerId !== 'open_router') { paintDynamicModelSelector(providerId); paintSimpleModelSelector(providerId); }
       return entry;
     } catch (err) {
       if(catalogAttempt)catalogAttempt.finish(null,err&&err.name==='AbortError'?'timeout_usage_unknown':'catalog_error');
+      if (catalogSequence[providerId] !== sequence || !modelCache[providerId]) return null;
       modelCache[providerId].loading = false;
       modelCache[providerId].error = err && err.name === 'AbortError' ? 'مهلت دریافت فهرست مدل‌ها تمام شد.' : ('عدم دریافت فهرست زنده (' + (err && err.message ? err.message : 'خطای شبکه') + ')' + (providerId === 'open_router' ? ' — فهرست پیشنهادی OpenRouter باقی می‌ماند.' : ' — مدل زنده برای این سرویس تأیید نشد.'));
       paintModelSelector(providerId);
-    if (providerId !== 'open_router') paintDynamicModelSelector(providerId);
+    if (providerId !== 'open_router') { paintDynamicModelSelector(providerId); paintSimpleModelSelector(providerId); }
       return null;
     } finally {
       clearTimeout(timer);
@@ -11209,24 +11272,15 @@ el('routerForget').onclick=()=>{
   }
 
   function fallbackProfile() {
-    var model = (typeof ROUTER_MODEL === 'string' && ROUTER_MODEL) ? ROUTER_MODEL : 'openai/gpt-4o-mini';
-    var slots = readySlots();
-    if (slots.length) model = slots[0].model || model;
-    var reason = isReasoningId(model, null);
-    var preset = PRESET_BY_ID[String(model).toLowerCase()] || null;
-    var ctx = preset && preset.context ? preset.context : 128000;
+    var slots = readySlots(), primary = slots[0];
+    if (!primary) return null;
+    var extra = primary.extra || {}, context = Number(extra.fallbackContext), output = Number(extra.fallbackOutput);
+    if (!Number.isSafeInteger(context) || context <= 0 || !Number.isSafeInteger(output) || output <= 0) return null;
     return {
-      model: model,
-      contextTokens: ctx,
-      inputTokens: null,
-      outputTokens: reason ? 32768 : 16384,
-      charLimit: ctx * 3,
-      source: 'user_declared_not_provider_verified',
-      retrievedAt: new Date().toISOString(),
-      inputPrice: preset && preset.inPerM !== null ? (preset.inPerM / 1e6) : null,
-      outputPrice: preset && preset.outPerM !== null ? (preset.outPerM / 1e6) : null,
-      parameters: reason ? ['max_tokens', 'reasoning'] : ['max_tokens', 'temperature'],
-      thinking: reason,
+      model: primary.model, provider: primary.wireProvider, contextTokens: context,
+      inputTokens: null, outputTokens: output, charLimit: null,
+      source: 'user_declared_not_provider_verified', retrievedAt: new Date().toISOString(),
+      inputPrice: null, outputPrice: null, parameters: [], thinking: isReasoningId(primary.model, null),
       tokenMethod: 'UTF8_byte_conservative_estimate_not_exact_tokenizer'
     };
   }
@@ -11246,7 +11300,12 @@ el('routerForget').onclick=()=>{
   function syncPrimary() {
     var slots = readySlots();
     var primary = slots[0];
-    if (!primary) return;
+    if (!primary) {
+      try { if (typeof ROUTER_KEY !== 'undefined') ROUTER_KEY = ''; } catch (e) {}
+      var emptyKey = document.getElementById('routerKey'); if (emptyKey) emptyKey.value = '';
+      var emptyBadge = document.getElementById('routerBadge'); if (emptyBadge) emptyBadge.textContent = 'تنظیم نشده';
+      return;
+    }
     try {
       if (typeof ROUTER_KEY !== 'undefined') ROUTER_KEY = primary.key;
       if (typeof ROUTER_MODEL !== 'undefined') ROUTER_MODEL = primary.model;
@@ -11256,7 +11315,7 @@ el('routerForget').onclick=()=>{
     var modelEl = document.getElementById('routerModel');
     var provEl = document.getElementById('aiProvider');
     if (modelEl) modelEl.value = primary.model;
-    if (keyEl && !keyEl.value) keyEl.value = primary.key;
+    if (keyEl) keyEl.value = primary.key;
     if (provEl) {
       if (primary.wireProvider === 'google' || primary.wireProvider === 'iranrouter') {
         try { provEl.value = primary.wireProvider; } catch (e2) { /* ignore */ }
@@ -11309,6 +11368,7 @@ el('routerForget').onclick=()=>{
     var statusBox = card.querySelector('[data-aihub-catalog-status]');
     var effortWrap = card.querySelector('[data-aihub-effort-wrap]');
     var effortSel = card.querySelector('[data-f="reasoning-effort"]');
+    var manualField = card.querySelector('[data-f="openrouter-manual"]');
     if (!select) return;
 
     /* getDisplayModels returns the complete live text/chat catalog. */
@@ -11317,8 +11377,9 @@ el('routerForget').onclick=()=>{
     var allowedId = selected ? selected.id : 'inclusionai/ling-3.0-flash';
     var currentId = String((modelInput && modelInput.value) || sl.model || '').trim();
     var liveCatalogReady = !!(modelCache.open_router && modelCache.open_router.raw && !modelCache.open_router.error);
-    if (liveCatalogReady && !allModels.some(function (m) { return m.id.toLowerCase() === currentId.toLowerCase(); })) currentId = allowedId;
+    if (liveCatalogReady && !sl.modelCustomized && !allModels.some(function (m) { return m.id.toLowerCase() === currentId.toLowerCase(); })) currentId = allowedId;
     if (modelInput) modelInput.value = currentId;
+    if (manualField && document.activeElement !== manualField) manualField.value = currentId;
     if (sl.model !== currentId) {
       sl.model = currentId;
       sl.modelCustomized = false;
@@ -11379,7 +11440,7 @@ el('routerForget').onclick=()=>{
     var useFallback = !liveModels.length && !!(cache && cache.error && Array.isArray(spec.fallbackModels) && spec.fallbackModels.length);
     var models = liveModels.length ? liveModels : (useFallback ? spec.fallbackModels : []);
     var current = String(slot.model || spec.model);
-    if (liveModels.length && !(cache && cache.error) && !models.some(function (m) { return m.id === current; })) {
+    if (liveModels.length && !slot.modelCustomized && !(cache && cache.error) && !models.some(function (m) { return m.id === current; })) {
       current = models[0].id;
       slot.model = current;
       state.slots[providerId] = slot;
@@ -11391,14 +11452,26 @@ el('routerForget').onclick=()=>{
     select.innerHTML = models.length
       ? ((cache && cache.error && !models.some(function (m) { return m.id === current; }) ? '<option value="' + esc(current) + '" selected>' + esc(current) + ' (دستی؛ تأییدنشده)</option>' : '') + models.map(function (m) { return '<option value="' + esc(m.id) + '"' + (m.id === current ? ' selected' : '') + '>' + esc(formatOptionLabel(m) + (useFallback ? ' — کاتالوگ ارائه‌شده؛ تأیید زنده نشده' : '')) + '</option>'; }).join(''))
       : '<option value="' + esc(current) + '">' + esc(current) + '</option>';
-    if (manualWrap) manualWrap.hidden = !(cache && cache.error);
+    if (manualWrap) manualWrap.hidden = false;
     if (status) {
       if (cache && cache.loading) status.textContent = 'در حال دریافت فهرست مدل‌ها…';
       else if (cache && cache.error && /Failed to fetch/i.test(cache.error)) status.textContent = cache.error + ' ممکن است محدودیت CORS، شبکه یا دسترسی به endpoint باشد؛ این پیام به‌تنهایی نامعتبر بودن کلید را ثابت نمی‌کند. فهرست زیر از کاتالوگی است که کاربر ارائه کرده، نه پاسخ زندهٔ API؛ شناسه را انتخاب کنید اما دسترسی هر مدل هنوز زنده تأیید نشده است.';
-      else if (cache && cache.error) status.textContent = cache.error + ' فهرست زنده تأیید نشد؛ در صورت اطمینان از شناسهٔ مدل در پنل Tooken، می‌توانید آن را دستی وارد کنید.';
+      else if (cache && cache.error) status.textContent = cache.error + ' فهرست زنده تأیید نشد؛ در صورت اطمینان از شناسهٔ مدل در پنل سرویس، می‌توانید آن را دستی وارد کنید.';
       else if (models.length) status.textContent = '✓ ' + models.length.toLocaleString('fa-IR') + ' مدل متنی در دسترس است.';
       else status.textContent = 'کلید را وارد کنید تا مدل‌های حساب بارگذاری شوند.';
     }
+  }
+
+  function paintSimpleModelSelector(providerId) {
+    if (providerId !== 'one_x_ai' && providerId !== 'iranrouter') return;
+    var root = document.getElementById('hesabrasiAiHub');
+    var card = root && root.querySelector('[data-aihub-card="' + providerId + '"]');
+    if (!card) return;
+    var select = card.querySelector('[data-f="simple-model-select"]'), status = card.querySelector('[data-simple-model-status]');
+    var cache = modelCache[providerId]; if (!select || !status) return;
+    var rows = cache && cache.textModels || [];
+    select.innerHTML = '<option value="">انتخاب از فهرست دریافتی</option>' + rows.map(function (m) { return '<option value="' + esc(m.id) + '">' + esc(formatOptionLabel(m)) + '</option>'; }).join('');
+    status.textContent = cache && cache.loading ? 'در حال دریافت فهرست مدل‌ها…' : cache && cache.error ? cache.error + '؛ شناسهٔ مدل را می‌توانید دستی وارد کنید.' : rows.length ? rows.length + ' مدل دریافت شد؛ دسترسی هر مدل باید آزمایش شود.' : 'در صورت پشتیبانی سرویس، فهرست را دریافت یا مدل را دستی وارد کنید.';
   }
 
   function paintDiagDrawer() {
@@ -11463,9 +11536,13 @@ el('routerForget').onclick=()=>{
     }
     sl.extra = sl.extra || {};
     if (effort && effort.value) sl.extra.reasoningEffort = effort.value;
+    var fm = card.querySelector('[data-f="fallback-models"]'), fc = card.querySelector('[data-f="fallback-context"]'), fo = card.querySelector('[data-f="fallback-output"]');
+    if (fm) sl.extra.fallbackModels = fm.value.split(/\r?\n/).map(cleanAsciiToken).filter(Boolean).slice(0, 10);
+    if (fc) sl.extra.fallbackContext = Number(fc.value) || 0;
+    if (fo) sl.extra.fallbackOutput = Number(fo.value) || 0;
     if (spec.extra === 'base') {
       var b = card.querySelector('[data-f="base"]');
-      if (b) sl.extra.base = b.value.trim();
+      if (b) { var newBase = b.value.trim(); if (newBase !== sl.extra.base) delete modelCache[id]; sl.extra.base = newBase; }
     }
     if (spec.extra === 'account') {
       var a = card.querySelector('[data-f="account"]');
@@ -11529,7 +11606,7 @@ el('routerForget').onclick=()=>{
       return { ok: false, detail: sl.lastError };
     }
     if (spec.extra === 'base' && spec.id !== 'one_x_ai' && !(sl.extra && sl.extra.base)) {
-      sl.lastOk = false; sl.lastError = 'نشانی پایهٔ Azure لازم است.';
+      sl.lastOk = false; sl.lastError = 'نشانی پایهٔ API لازم است.';
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
     }
@@ -11538,6 +11615,7 @@ el('routerForget').onclick=()=>{
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
     }
+    if (!sl.model) { sl.lastOk = false; sl.lastError = 'شناسهٔ مدل لازم است.'; save(); paintStatus(); return { ok: false, detail: sl.lastError }; }
     sl.enabled = true;
     save();
     if (id === 'tooken_club') {
@@ -11595,7 +11673,7 @@ el('routerForget').onclick=()=>{
       if (!response.ok || (data && data.error)) {
         usageStatus='HTTP '+response.status;var message = (data && data.error && (data.error.message || data.error)) || data.message || '';
         if(tracked)global.usageDecision(tracked.entry.id,false);sl.lastOk = false;
-        sl.lastError = (response.ok ? 'خطای جریان پاسخ' : ('HTTP ' + response.status)) + (message ? ' — ' + String(message).slice(0, 240) : '');
+        sl.lastError = (response.ok ? 'خطای جریان پاسخ' : ('HTTP ' + response.status)) + (message ? ' — ' + String(message).split(sl.key).join('[کلید حذف شد]').slice(0, 240) : '');
         if (global.HesabrasiDebug) global.HesabrasiDebug.log('ai_test_failed', { provider: id, model: sx.model, error: spec.name + ': ' + sl.lastError });
         save(); paintStatus();
         return { ok: false, detail: sl.lastError };
@@ -11693,6 +11771,7 @@ el('routerForget').onclick=()=>{
           '<select data-f="model-select" dir="ltr" class="aihub-model-select"></select>' +
           '<input type="hidden" data-f="model" value="' + esc(sl.model || 'inclusionai/ling-3.0-flash') + '">' +
         '</label>' +
+        '<label>شناسهٔ دستی مدل OpenRouter<input data-f="openrouter-manual" dir="ltr" value="' + esc(sl.model || '') + '" placeholder="provider/model"></label>' +
         '<label data-aihub-effort-wrap hidden>عمق استدلال و مدیریت مصرف توکن' +
           '<select data-f="reasoning-effort">' +
             '<option value="low">بهینه و سریع — کمترین مصرف توکن</option>' +
@@ -11709,13 +11788,14 @@ el('routerForget').onclick=()=>{
     var sl = state.slots[spec.id] || emptySlot(spec.id);
     var extra = '';
     if (spec.extra === 'base') {
-      extra = '<label>نشانی پایه Azure (deployments/… )<input data-f="base" dir="ltr" placeholder="https://RESOURCE.openai.azure.com/openai/deployments/DEPLOYMENT" value="' + esc(sl.extra && sl.extra.base || spec.base || '') + '"></label>';
+      extra = '<label>نشانی پایه API (HTTPS؛ برای سرویس محلی localhost مجاز است)<input data-f="base" dir="ltr" placeholder="https://example.com/v1" value="' + esc(sl.extra && sl.extra.base || spec.base || '') + '"></label>';
     }
     if (spec.extra === 'account') {
       extra = '<label>Cloudflare Account ID<input data-f="account" dir="ltr" value="' + esc(sl.extra && sl.extra.account || '') + '"></label>';
     }
+    extra += '<details><summary>مدل‌های پشتیبان و ظرفیت اعلامی</summary><label>شناسه‌های پشتیبان همین سرویس، هر خط یک مدل<textarea data-f="fallback-models" dir="ltr" placeholder="model-id">' + esc((sl.extra && sl.extra.fallbackModels || []).join('\n')) + '</textarea></label><label>حد محافظه‌کارانهٔ زمینه (توکن) برای تمام گزینه‌های پشتیبان این کارت<input data-f="fallback-context" type="number" min="1" value="' + esc(sl.extra && sl.extra.fallbackContext || '') + '"></label><label>حد خروجی (توکن) برای تمام گزینه‌های پشتیبان این کارت<input data-f="fallback-output" type="number" min="1" value="' + esc(sl.extra && sl.extra.fallbackOutput || '') + '"></label><small>اعداد را از مستندات یا پنل سرویس بررسی کنید؛ تأییدشده توسط سرویس نیستند. بدون هر دو عدد سوییچ به گزینه‌های این کارت انجام نمی‌شود. اگر سرویس ظرفیت مدل اصلی را اعلام نکند، همین اعداد برای آن نیز استفاده می‌شوند.</small></details>';
     var localTookenProxy = spec.id === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true;
-    var keyPh = spec.local ? 'کلید فقط روی سرور محلی نگهداری می‌شود' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'کلید API با پیشوند 1xai-' : 'کلید API'));
+    var keyPh = localTookenProxy ? 'کلید فقط روی سرور محلی نگهداری می‌شود' : (spec.id === 'open_router' ? 'sk-or-v1-... (کلید OpenRouter را وارد کنید تا مدل‌های متنی بارگذاری شوند)' : (spec.id === 'one_x_ai' ? 'کلید API با پیشوند 1xai-' : 'کلید API'));
     var links = '';
     if (spec.keys) links += '<a href="' + esc(spec.keys) + '" target="_blank" rel="noopener">دریافت کلید</a>';
     if (spec.site) links += (links ? ' · ' : '') + '<a href="' + esc(spec.site) + '" target="_blank" rel="noopener">سایت</a>';
@@ -11726,8 +11806,8 @@ el('routerForget').onclick=()=>{
     var bodyFields = spec.id === 'open_router'
       ? ('<div class="aihub-key-only"><label>کلید API (OpenRouter)<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label></div>' + openRouterModelControlsHtml(sl))
       : spec.dynamicModels
-        ? ('<div class="aihub-grid"><label>' + (localTookenProxy ? 'کلید Tooken (فقط روی سرور محلی)' : 'کلید API') + '<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API Tooken Club" value="' + esc(localTookenProxy ? 'local' : sl.key) + '"' + (localTookenProxy ? ' disabled' : '') + '></label>' +
-          '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div>' + (localTookenProxy ? '<small>کلید فقط در فرایند محلی Node.js نگهداری می‌شود؛ مرورگر آن را دریافت یا ذخیره نمی‌کند.</small>' : '') + '<label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل از پنل Tooken (دستی؛ تأیید زنده نشده)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
+        ? ('<div class="aihub-grid"><label>' + (localTookenProxy ? 'کلید Tooken (فقط روی سرور محلی)' : 'کلید API') + '<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="کلید API" value="' + esc(localTookenProxy ? 'local' : sl.key) + '"' + (localTookenProxy ? ' disabled' : '') + '></label>' +
+          '<label>مدل از کاتالوگ<select data-f="dynamic-model-select"></select><input type="hidden" data-f="model" value="' + esc(sl.model) + '"></label></div>' + (localTookenProxy ? '<small>کلید فقط در فرایند محلی Node.js نگهداری می‌شود؛ مرورگر آن را دریافت یا ذخیره نمی‌کند.</small>' : '') + '<label data-dynamic-model-manual-wrap hidden>شناسهٔ مدل دستی (در صورت عدم دسترسی به فهرست)<input data-f="dynamic-model-manual" dir="ltr" autocomplete="off" placeholder="شناسه دقیق مدل را از پنل سرویس وارد کنید"></label><small data-dynamic-model-status>کلید را وارد کنید تا فهرست مدل‌ها بارگذاری شود.</small><button type="button" data-act="refresh-models">بروزرسانی مدل‌ها</button>')
         : ('<div class="aihub-grid">' +
           '<label>کلید API<input data-f="key" type="password" autocomplete="off" dir="ltr" placeholder="' + esc(keyPh) + '" value="' + esc(sl.key) + '"></label>' +
           '<label>' + (spec.id === 'one_x_ai' ? 'شناسهٔ مدل در 1xAi' : 'مدل') + '<input data-f="model" dir="ltr" value="' + esc(sl.model) + '" placeholder="' + (spec.id === 'one_x_ai' ? 'gpt-4o-mini یا شناسهٔ مدل از پنل' : '') + '"></label>' +
@@ -11738,10 +11818,10 @@ el('routerForget').onclick=()=>{
         '<div class="aihub-head">' +
           '<div class="aihub-order"><button type="button" data-act="up" title="اولویت بالاتر">▲</button><button type="button" data-act="down" title="اولویت پایین‌تر">▼</button></div>' +
           '<label class="aihub-en"><input type="checkbox" data-f="enabled"' + (sl.enabled ? ' checked' : '') + '> فعال</label>' +
-          '<span class="aihub-name">' + esc(spec.name) + '</span>' +
+          '<span class="aihub-name">' + esc(spec.name) + ' · اولویت ' + (state.order.indexOf(spec.id) + 1) + '</span>' +
           '<span class="aihub-mark">' + (sl.lastOk ? '✓ متصل' : '') + '</span>' +
         '</div>' +
-        bodyFields + extra + providerNote +
+        bodyFields + ((spec.id === 'one_x_ai' || spec.id === 'iranrouter') ? '<label>فهرست مدل‌های سرویس<select data-f="simple-model-select"><option value="">انتخاب از فهرست دریافتی</option></select></label><small data-simple-model-status></small><button type="button" data-act="refresh-models">دریافت مدل‌ها</button>' : '') + extra + providerNote +
         '<div class="aihub-links">' + links + '</div>' +
         '<div class="aihub-actions">' +
           '<button type="button" data-act="save">ذخیره</button>' +
@@ -11772,7 +11852,7 @@ el('routerForget').onclick=()=>{
     feat.innerHTML = featured.map(cardHtml).join('');
     rest.innerHTML = other.map(cardHtml).join('');
     paintModelSelector('open_router');
-    CATALOG.forEach(function (spec) { if (spec.dynamicModels && spec.id !== 'open_router') paintDynamicModelSelector(spec.id); });
+    CATALOG.forEach(function (spec) { if (spec.dynamicModels && spec.id !== 'open_router') paintDynamicModelSelector(spec.id); paintSimpleModelSelector(spec.id); });
   }
 
   function onHubClick(ev) {
@@ -11894,6 +11974,16 @@ el('routerForget').onclick=()=>{
       slEff.extra.effortCustomized = true;
       state.slots[id] = slEff;
     }
+    if ((id === 'one_x_ai' || id === 'iranrouter') && f === 'simple-model-select') {
+      if (!t.value) return; var simpleModel = card.querySelector('[data-f="model"]'); if (simpleModel) simpleModel.value = t.value;
+      state.slots[id].modelCustomized = true; readCard(id); save(); syncPrimary(); paintStatus(); return;
+    }
+    if (id === 'open_router' && f === 'openrouter-manual') {
+      var manualOpenRouter = cleanAsciiToken(t.value);
+      if (!/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i.test(manualOpenRouter)) { logLine('شناسهٔ OpenRouter باید به شکل provider/model باشد.'); return; }
+      var openModelField = card.querySelector('[data-f="model"]'); if (openModelField) openModelField.value = manualOpenRouter;
+      state.slots[id].modelCustomized = true; readCard(id); save(); syncPrimary(); paintModelSelector(id); paintStatus(); return;
+    }
     if (id === 'open_router' && f === 'model-select') {
       var modelInput = card.querySelector('[data-f="model"]');
       if (modelInput && t.value) modelInput.value = t.value;
@@ -11957,10 +12047,11 @@ el('routerForget').onclick=()=>{
     var box = document.createElement('div');
     box.id = 'hesabrasiAiHub';
     box.innerHTML =
-      '<h3>هستهٔ هوش مصنوعی حسابرسی · اتصال OpenRouter، 1xAi و ایران‌روتر</h3>' +
+      '<h3>هستهٔ هوش مصنوعی حسابرسی · مدیریت ارائه‌دهندگان</h3>' +
       '<p class="aihub-note">برای 1xAi اتصال مستقیماً از مرورگر به https://1xai.ir/v1 برقرار می‌شود. کلید API و شناسهٔ مدل را در کارت 1xAi وارد کنید و «آزمایش اتصال» را بزنید. در این نسخه هیچ Worker یا پراکسی واسطی استفاده نمی‌شود.</p>' +
       '<div id="aihubFeatured"></div>' +
-      '<div id="aihubRest" hidden></div>' +
+      '<details><summary>سایر ارائه‌دهندگان و سرویس سفارشی</summary><div id="aihubRest"></div></details>' +
+      '<label><input type="checkbox" id="aihubFailover"' + (state.failover ? ' checked' : '') + '> سوییچ خودکار پس از خطای سهمیه یا اختلال صریح سرویس (با تأیید هر عملیات)</label><p class="aihub-note">کلیدها در حافظهٔ محلی مرورگر ذخیره می‌شوند و رمزگذاری نشده‌اند. ارسال مجدد می‌تواند هزینه ایجاد کند و دادهٔ حسابرسی را به سرویس دیگری بفرستد. محدودیت CORS یا شبکه ممکن است اتصال مستقیم را ناممکن کند.</p>' +
       '<div class="aihub-toolbar">' +
         '<button type="button" id="aihubSaveAll">ذخیرهٔ همه</button>' +
         '<button type="button" id="aihubTestChain">آزمایش زنجیره</button>' +
@@ -12007,6 +12098,7 @@ el('routerForget').onclick=()=>{
       });
     }
 
+    document.getElementById('aihubFailover').onchange = function (ev) { state.failover = !!ev.target.checked; save(); };
     document.getElementById('aihubSaveAll').onclick = function () {
       collectAll();
       enabledIds();
@@ -12029,7 +12121,8 @@ el('routerForget').onclick=()=>{
     document.getElementById('aihubExport').onclick = function () {
       collectAll();
       save();
-      var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      var exported = JSON.parse(JSON.stringify(state)); Object.keys(exported.slots).forEach(function (id) { exported.slots[id].key = ''; exported.slots[id].lastError = '';  });
+      var blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'hesabrasi-ai-core.json';
@@ -12090,12 +12183,6 @@ el('routerForget').onclick=()=>{
     var providerId = primary ? primary.id : 'open_router';
     var activeModel = primary ? primary.model : (typeof ROUTER_MODEL === 'string' && ROUTER_MODEL ? ROUTER_MODEL : 'inclusionai/ling-3.0-flash');
     var list = getDisplayModels(providerId);
-    if (providerId === 'open_router') {
-      /* The cached list is already filtered against the complete live catalog. */
-      if (list.length && !list.some(function (m) { return m.id.toLowerCase() === String(activeModel).toLowerCase(); })) {
-        activeModel = list[0].id;
-      }
-    }
     var out = [];
     var seen = {};
     if (activeModel) {
@@ -12123,8 +12210,6 @@ el('routerForget').onclick=()=>{
     var slots = readySlots();
     var primary = slots[0] || null;
     if ((!primary || primary.id === 'open_router') && !/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i.test(clean)) return false;
-    if ((!primary || primary.id === 'open_router') && modelCache.open_router && modelCache.open_router.raw &&
-        !modelCache.open_router.textModels.some(function (m) { return m.id.toLowerCase() === clean.toLowerCase(); })) return false;
     if (primary && state.slots[primary.id]) {
       state.slots[primary.id].model = clean;
       state.slots[primary.id].modelCustomized = true;
@@ -12180,6 +12265,8 @@ el('routerForget').onclick=()=>{
     noteFail: noteFail,
     noteOk: noteOk,
     fallbackProfile: fallbackProfile,
+    failoverEnabled: function () { return state.failover === true; },
+    snapshotMatches: function (candidate) { var sl = state.slots[candidate.id]; return !!(sl && sl.enabled && sl.key === candidate.key && sl.model === candidate.originalModel && JSON.stringify(sl.extra || {}) === candidate.extraSnapshot); },
     hasReady: hasReady,
     badgeText: badgeText,
     syncPrimary: syncPrimary,
