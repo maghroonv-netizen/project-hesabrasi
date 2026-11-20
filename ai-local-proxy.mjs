@@ -55,6 +55,16 @@ function upstreamFor(id, action, params) {
     if (!/^[a-zA-Z0-9._:-]{1,200}$/.test(model)) throw new Error('invalid model');
     return base + '/models/' + encodeURIComponent(model) + (action === 'chat' ? ':generateContent' : '');
   }
+  if (id === 'cohere' && action === 'models') {
+    const token = params.get('page_token');
+    if (token && !/^[a-zA-Z0-9._~+\/=-]{1,512}$/.test(token)) throw new Error('invalid page token');
+    return 'https://api.cohere.com/v1/models' + (token ? '?page_token=' + encodeURIComponent(token) : '');
+  }
+  if (id === 'anthropic' && action === 'models') {
+    const cursor = params.get('after_id');
+    if (cursor && !/^[a-zA-Z0-9._:-]{1,200}$/.test(cursor)) throw new Error('invalid cursor');
+    return base + '/models' + (cursor ? '?after_id=' + encodeURIComponent(cursor) : '');
+  }
   if (id === 'kilo' && action === 'models') return 'https://api.kilo.ai/api/gateway/models';
   if (action === 'quota') return id === 'open_router' ? base.replace(/\/+$/, '') + '/key' : null;
   if (action === 'model') return null;

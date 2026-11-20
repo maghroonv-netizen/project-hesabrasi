@@ -2,7 +2,7 @@
   "name": "hesabrasi-tests",
   "private": true,
   "scripts": {
-    "test:ai": "node --test tests/ai-failover.test.cjs tests/ai-operation-e2e.test.cjs tests/ai-wire-failover.test.cjs tests/ai-providers-ui.test.cjs tests/openrouter-catalog.test.cjs tests/one-xai-provider.test.cjs tests/ai-registry-ui.test.cjs tests/ai-bridge-ui.test.cjs tests/ai-bridge-e2e.test.cjs tests/ai-local-bridge.test.mjs tests/ai-tooken-current.test.cjs tests/tooken-local-proxy.test.mjs",
+    "test:ai": "node --test tests/ai-model-discovery.test.cjs tests/ai-failover.test.cjs tests/ai-operation-e2e.test.cjs tests/ai-wire-failover.test.cjs tests/ai-providers-ui.test.cjs tests/openrouter-catalog.test.cjs tests/one-xai-provider.test.cjs tests/ai-registry-ui.test.cjs tests/ai-bridge-ui.test.cjs tests/ai-bridge-e2e.test.cjs tests/ai-local-bridge.test.mjs tests/ai-tooken-current.test.cjs tests/tooken-local-proxy.test.mjs",
     "test:existing": "node --test tests/*.test.cjs tests/*.test.mjs",
     "test:ui": "node tests/ui-theme.test.cjs"
   },
