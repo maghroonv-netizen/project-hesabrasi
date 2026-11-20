@@ -39,6 +39,11 @@ try {
   assert.equal(page.status, 200);
   assert.match(await page.text(), /HESABRASI_TOOKEN_LOCAL_PROXY = true/);
 
+  const font = await fetch(origin + '/assets/fonts/Vazirmatn-variable.woff2', { headers });
+  assert.equal(font.status, 200);
+  assert.match(font.headers.get('content-type'), /font\/woff2/);
+  assert.equal((await fetch(origin + '/assets/fonts/OFL-Vazirmatn.txt', { headers })).status, 404);
+
   const models = await fetch(origin + '/api/tooken/models', { headers });
   assert.equal(models.status, 200);
   assert.deepEqual(await models.json(), { data: [{ id: 'gpt-6.1-sol' }] });

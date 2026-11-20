@@ -1,0 +1,30 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const {JSDOM,VirtualConsole}=require('jsdom');
+const html=fs.readFileSync('audit-google-auto.html','utf8'),calls=[],errors=[];
+const vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
+const dom=new JSDOM(html,{runScripts:'dangerously',url:'http://127.0.0.1:8788/',pretendToBeVisual:true,virtualConsole:vc,beforeParse(w){
+ w.TextEncoder=require('node:util').TextEncoder;w.TextDecoder=require('node:util').TextDecoder;w.scrollTo=()=>{};w.HESABRASI_AI_PROXY=true;
+ w.fetch=async(url,init={})=>{url=String(url);calls.push({url,init});let data;
+  if(url.includes('/gemini/models')) data=url.includes('pageToken=')?{models:[{name:'models/gemini-b',supportedGenerationMethods:['generateContent'],inputTokenLimit:10000,outputTokenLimit:1000}]}:{models:[{name:'models/gemini-a',supportedGenerationMethods:['generateContent'],inputTokenLimit:10000,outputTokenLimit:1000}],nextPageToken:'second-page'};
+  else if(url.includes('/cloudflare/models')) data=url.includes('page=2')?{success:true,result:[{name:'@cf/meta/llama-2',task:{name:'Text Generation'}}]}:{success:true,result_info:{total_pages:2},result:[{name:'@cf/meta/llama-1',task:{name:'Text Generation'}},{name:'@cf/baai/embeddings',task:{name:'Text Embeddings'}}]};
+  else if(url.includes('/open_router/quota')) data={data:{free_model_daily_requests:{remaining:8,limit:50},effective_budget:{resets_at:'2026-12-01T00:00:00Z'},limit_remaining:3.5}};
+  else data={data:[{id:'vendor/model-free'}]};
+  return {ok:true,status:200,headers:{get:()=> 'application/json'},json:async()=>data};
+ };
+}});
+(async()=>{
+ await new Promise(r=>setTimeout(r,100));const w=dom.window,api=w.HesabrasiAI;
+ let catalog=await api.fetchModelsCatalog('tokenrouter','sample-key',true);
+ assert.equal(catalog.textModels[0].id,'vendor/model-free');assert.equal(calls.at(-1).url,'/api/ai/tokenrouter/models');assert.equal(calls.at(-1).init.headers['X-Hesabrasi-Proxy'],'1');assert.equal(calls.at(-1).init.headers.Authorization,'Bearer sample-key');
+ assert.equal(api.chatUrl({provider:'tokenrouter',slotId:'tokenrouter',model:'vendor/model-free'}),'/api/ai/tokenrouter/chat');
+ catalog=await api.fetchModelsCatalog('gemini','google-key',true);assert.deepEqual(Array.from(catalog.textModels,m=>m.id),['gemini-a','gemini-b']);
+ const googleCalls=calls.filter(x=>x.url.includes('/gemini/models'));assert.equal(googleCalls.length,2);assert.equal(googleCalls[1].url,'/api/ai/gemini/models?pageToken=second-page');assert(googleCalls.every(x=>x.init.headers['X-Hesabrasi-Proxy']==='1'&&x.init.headers['x-goog-api-key']==='google-key'));
+ assert.equal(api.modelsUrl({provider:'google',model:'gemini-a'}),'/api/ai/gemini/model?model=gemini-a');assert.equal(api.chatUrl({provider:'google',slotId:'gemini',model:'gemini-a'}),'/api/ai/gemini/chat?model=gemini-a');
+ assert.equal(await api.fetchModelsCatalog('cloudflare','cf-key',true),null);
+ const card=w.document.querySelector('[data-aihub-card="cloudflare"]'),field=card.querySelector('[data-f="account"]');field.value='a'.repeat(32);field.dispatchEvent(new w.Event('change',{bubbles:true}));
+ catalog=await api.fetchModelsCatalog('cloudflare','cf-key',true);assert.deepEqual(Array.from(catalog.textModels,m=>m.id),['@cf/meta/llama-1','@cf/meta/llama-2']);
+ const cfCalls=calls.filter(x=>x.url.includes('/cloudflare/models'));assert.equal(cfCalls.length,2);assert.match(cfCalls[1].url,/account=a{32}&page=2/);assert.equal(api.chatUrl({provider:'cloudflare',slotId:'cloudflare',model:'@cf/meta/llama-1'}),'/api/ai/cloudflare/chat?account='+'a'.repeat(32));
+ const orCard=w.document.querySelector('[data-aihub-card="open_router"]'), orKey=orCard.querySelector('[data-f="key"]');orKey.value='or-key';orKey.dispatchEvent(new w.Event('change',{bubbles:true}));orCard.querySelector('[data-act="openrouter-quota"]').click();await new Promise(r=>setTimeout(r,30));assert.match(orCard.querySelector('[data-openrouter-quota]').textContent,/8 از 50/);assert.match(orCard.querySelector('[data-openrouter-quota]').textContent,/2026-12-01/);assert.equal(calls.find(x=>x.url==='/api/ai/open_router/quota').init.headers.Authorization,'Bearer or-key');
+ assert.equal(errors.length,0,errors.join('\n'));console.log('Bridge UI: same-origin transport, Gemini pagination, Cloudflare account and pagination PASS');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>dom.window.close());

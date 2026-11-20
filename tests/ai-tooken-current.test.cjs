@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM,VirtualConsole}=require('jsdom');
+const calls=[],errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
+const dom=new JSDOM(fs.readFileSync('audit-google-auto.html','utf8'),{runScripts:'dangerously',url:'http://127.0.0.1:8787/',pretendToBeVisual:true,virtualConsole:vc,beforeParse(w){
+ w.TextEncoder=require('node:util').TextEncoder;w.TextDecoder=require('node:util').TextDecoder;w.scrollTo=()=>{};w.HESABRASI_TOOKEN_LOCAL_PROXY=true;
+ w.fetch=async(url,init={})=>{calls.push({url:String(url),init});return {ok:true,status:200,headers:{get:()=> 'application/json'},json:async()=>({data:[{id:'paid-model',pricing:{prompt:'0.0001',completion:'0.0001'}}]})};};
+}});
+(async()=>{const w=dom.window;await new Promise(r=>setTimeout(r,150));const api=w.HesabrasiAI,card=w.document.querySelector('[data-aihub-card="tooken_club"]');assert(card);assert(card.querySelector('[data-f="key"]').disabled);assert.equal(api.readySlots().some(x=>x.id==='tooken_club'),false);assert.equal(api.modelsUrl({provider:'tooken_club'}),'/api/tooken/models');assert.equal(api.chatUrl({provider:'tooken_club',slotId:'tooken_club',model:'paid-model'}),'/api/tooken/chat/completions');assert(calls.length);assert(calls.every(c=>!c.init.headers.Authorization));
+ const sel=card.querySelector('[data-f="dynamic-model-select"]');assert.match(sel.textContent,/نرخ توکن غیرصفر/);sel.value='paid-model';sel.dispatchEvent(new w.Event('change',{bubbles:true}));assert(api.readySlots().some(x=>x.id==='tooken_club'));const result=await api.testSlot('tooken_club');assert.equal(result.ok,true);assert(calls.every(c=>c.init.method!=='POST'));assert.match(card.querySelector('.aihub-log').textContent,/تأیید نشده/);assert.equal(errors.length,0,errors.join('\n'));console.log('Tooken local UI: explicit paid model, no browser key and no generation during catalog test PASS');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>dom.window.close());

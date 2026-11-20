@@ -75,6 +75,12 @@ export function createHesabrasiLocalProxyServer({
         return res.end(html);
       }
 
+      if (req.method === 'GET' && pathname === '/assets/fonts/Vazirmatn-variable.woff2') {
+        const font = await readFile(resolve(HERE, 'assets/fonts/Vazirmatn-variable.woff2'));
+        res.writeHead(200, {'Content-Type':'font/woff2', 'Cache-Control':'public, max-age=86400', 'X-Content-Type-Options':'nosniff'});
+        return res.end(font);
+      }
+
       const isTookenModels = req.method === 'GET' && pathname === '/api/tooken/models';
       const isTookenChat = req.method === 'POST' && pathname === '/api/tooken/chat/completions';
       const isOneXaiChat = req.method === 'POST' && pathname === '/api/one-xai/chat/completions';
