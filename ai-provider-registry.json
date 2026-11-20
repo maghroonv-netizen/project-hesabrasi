@@ -1,0 +1,696 @@
+{
+  "version": 1,
+  "sources": [
+    "https://github.com/Ashokkunchala/free-claude-code/blob/main/src/free_claude_code/config/provider_catalog.py",
+    "https://www.tokenrouter.com/docs/zcode-setup/",
+    "https://nextrouter.me/",
+    "https://nextrouter.justscriptzz.workers.dev/",
+    "https://tooken.club/",
+    "https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/",
+    "https://github.com/tashfeenahmed/freellmapi/blob/main/server/src/providers/index.ts"
+  ],
+  "providers": [
+    {
+      "id": "cline_pass",
+      "name": "ClinePass",
+      "base": "https://api.cline.bot/api/v1",
+      "kind": "openai",
+      "site": "https://cline.bot/",
+      "keys": "https://app.cline.bot",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "xai",
+      "name": "xAI (Grok)",
+      "base": "https://api.x.ai/v1",
+      "kind": "openai",
+      "site": "https://x.ai/",
+      "keys": "https://console.x.ai/team/default/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "alibaba_cloud",
+      "name": "Alibaba Cloud",
+      "base": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "kind": "openai",
+      "site": "https://www.alibabacloud.com/en/product/modelstudio",
+      "keys": "https://www.alibabacloud.com/help/en/model-studio/get-api-key",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "qwencloud",
+      "name": "QwenCloud Token Plan",
+      "base": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+      "kind": "openai",
+      "site": "https://qwencloud.com/",
+      "keys": "https://home.qwencloud.com/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "qwencloud_coding",
+      "name": "QwenCloud Coding Plan",
+      "base": "https://coding-intl.dashscope.aliyuncs.com/v1",
+      "kind": "openai",
+      "site": "https://qwencloud.com/",
+      "keys": "https://home.qwencloud.com/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "together",
+      "name": "Together AI",
+      "base": "https://api.together.ai/v1",
+      "kind": "openai",
+      "site": "https://www.together.ai/",
+      "keys": "https://api.together.ai/settings/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "deepinfra",
+      "name": "DeepInfra",
+      "base": "https://api.deepinfra.com/v1/openai",
+      "kind": "openai",
+      "site": "https://deepinfra.com/",
+      "keys": "https://deepinfra.com/dash/api_keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "siliconflow",
+      "name": "SiliconFlow",
+      "base": "https://api.siliconflow.com/v1",
+      "kind": "openai",
+      "site": "https://siliconflow.com/",
+      "keys": "https://cloud.siliconflow.com/account/ak",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "nebius",
+      "name": "Nebius Token Factory",
+      "base": "https://api.tokenfactory.nebius.com/v1",
+      "kind": "openai",
+      "site": "https://tokenfactory.nebius.com/",
+      "keys": "https://tokenfactory.nebius.com/project/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "chutes",
+      "name": "Chutes",
+      "base": "https://llm.chutes.ai/v1",
+      "kind": "openai",
+      "site": "https://chutes.ai/",
+      "keys": "https://chutes.ai/docs/getting-started/authentication",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "featherless",
+      "name": "Featherless AI",
+      "base": "https://api.featherless.ai/v1",
+      "kind": "openai",
+      "site": "https://featherless.ai/",
+      "keys": "https://featherless.ai/account/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "agnes",
+      "name": "Agnes AI",
+      "base": "https://apihub.agnes-ai.com/v1",
+      "kind": "openai",
+      "site": "https://agnes-ai.com/",
+      "keys": "https://agnes-ai.com/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "zenmux",
+      "name": "ZenMux",
+      "base": "https://zenmux.ai/api/v1",
+      "kind": "openai",
+      "site": "https://zenmux.ai/",
+      "keys": "https://zenmux.ai/platform/pay-as-you-go",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "wandb",
+      "name": "W&B Inference",
+      "base": "https://api.inference.wandb.ai/v1",
+      "kind": "openai",
+      "site": "https://wandb.ai/site/inference/",
+      "keys": "https://wandb.ai/settings",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "mistral_codestral",
+      "name": "Mistral Codestral",
+      "base": "https://codestral.mistral.ai/v1",
+      "kind": "openai",
+      "site": "https://mistral.ai/",
+      "keys": "https://console.mistral.ai/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "opencode_zen",
+      "name": "OpenCode Zen",
+      "base": "https://opencode.ai/zen/v1",
+      "kind": "openai",
+      "site": "https://opencode.ai/zen",
+      "keys": "https://opencode.ai/auth",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "opencode_go",
+      "name": "OpenCode Go",
+      "base": "https://opencode.ai/zen/go/v1",
+      "kind": "openai",
+      "site": "https://opencode.ai/go",
+      "keys": "https://opencode.ai/auth",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel AI Gateway",
+      "base": "https://ai-gateway.vercel.sh/v1",
+      "kind": "openai",
+      "site": "https://vercel.com/ai-gateway",
+      "keys": "https://vercel.com/docs/ai-gateway",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "bedrock",
+      "name": "Amazon Bedrock",
+      "base": "https://bedrock-mantle.us-east-1.api.aws/v1",
+      "kind": "openai",
+      "site": "https://aws.amazon.com/bedrock/",
+      "keys": "https://console.aws.amazon.com/bedrock/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "huggingface",
+      "name": "Hugging Face",
+      "base": "https://router.huggingface.co/v1",
+      "kind": "openai",
+      "site": "https://huggingface.co/",
+      "keys": "https://huggingface.co/settings/tokens",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "cohere",
+      "name": "Cohere",
+      "base": "https://api.cohere.ai/compatibility/v1",
+      "kind": "openai",
+      "site": "https://cohere.com/",
+      "keys": "https://dashboard.cohere.com/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "wafer",
+      "name": "Wafer",
+      "base": "https://pass.wafer.ai/v1",
+      "kind": "openai",
+      "site": "https://www.wafer.ai/",
+      "keys": "https://www.wafer.ai/pass",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "base": "https://api.moonshot.ai/v1",
+      "kind": "openai",
+      "site": "https://www.kimi.com/",
+      "keys": "https://platform.moonshot.cn/console/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "kimi_code",
+      "name": "Kimi Code",
+      "base": "https://api.kimi.com/coding/v1",
+      "kind": "openai",
+      "site": "https://www.kimi.com/code",
+      "keys": "https://www.kimi.com/code/console",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "kilo",
+      "name": "Kilo.ai",
+      "base": "https://api.kilo.ai/api/gateway/v1",
+      "kind": "openai",
+      "site": "https://kilo.ai/",
+      "keys": "https://app.kilo.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "base": "https://api.minimax.io/v1",
+      "kind": "openai",
+      "site": "https://www.minimax.io/",
+      "keys": "https://platform.minimax.io/user-center/basic-information/interface-key",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "sambanova",
+      "name": "SambaNova",
+      "base": "https://api.sambanova.ai/v1",
+      "kind": "openai",
+      "site": "https://sambanova.ai/",
+      "keys": "https://cloud.sambanova.ai/apis",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "fireworks",
+      "name": "Fireworks",
+      "base": "https://api.fireworks.ai/inference/v1",
+      "kind": "openai",
+      "site": "https://fireworks.ai/",
+      "keys": "https://fireworks.ai/account/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "novita",
+      "name": "Novita AI",
+      "base": "https://api.novita.ai/openai/v1",
+      "kind": "openai",
+      "site": "https://novita.ai/",
+      "keys": "https://novita.ai/settings/key-management",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "zai",
+      "name": "Z.ai Coding Plan",
+      "base": "https://api.z.ai/api/coding/paas/v4",
+      "kind": "openai",
+      "site": "https://z.ai/",
+      "keys": "https://z.ai/manage-apikey/apikey-list",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "zai_api",
+      "name": "Z.ai API",
+      "base": "https://api.z.ai/api/paas/v4",
+      "kind": "openai",
+      "site": "https://z.ai/",
+      "keys": "https://z.ai/manage-apikey/apikey-list",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "tokenrouter",
+      "name": "TokenRouter",
+      "base": "https://api.tokenrouter.com/v1",
+      "kind": "openai",
+      "site": "https://www.tokenrouter.com/",
+      "keys": "https://www.tokenrouter.com/",
+      "model": "",
+      "dynamicModels": true,
+      "featured": true
+    },
+    {
+      "id": "nararoute",
+      "name": "NaraRoute",
+      "base": "https://router.bynara.id/v1",
+      "kind": "openai",
+      "site": "https://router.bynara.id/",
+      "keys": "https://router.bynara.id/keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "poolside",
+      "name": "Poolside AI",
+      "base": "https://inference.poolside.ai/v1",
+      "kind": "openai",
+      "site": "https://poolside.ai/",
+      "keys": "https://platform.poolside.ai/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "llm7",
+      "name": "LLM7.io",
+      "base": "https://api.llm7.io/v1",
+      "kind": "openai",
+      "site": "https://llm7.io/",
+      "keys": "https://dash.llm7.io/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "scaleway",
+      "name": "Scaleway",
+      "base": "https://api.scaleway.ai/v1",
+      "kind": "openai",
+      "site": "https://www.scaleway.com/",
+      "keys": "https://console.scaleway.com/iam/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "lightning",
+      "name": "Lightning AI",
+      "base": "https://lightning.ai/api/v1",
+      "kind": "openai",
+      "site": "https://lightning.ai/",
+      "keys": "https://lightning.ai/lightning-ai/model-apis/models",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "experiential",
+      "name": "Experiential Labs",
+      "base": "https://api.experientiallabs.ai/v1",
+      "kind": "openai",
+      "site": "https://www.experientiallabs.ai/",
+      "keys": "https://platform.experientiallabs.ai/settings/api-keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "cheaperinference",
+      "name": "Cheaper Inference",
+      "base": "https://api.cheaperinference.com/v1",
+      "kind": "openai",
+      "site": "https://cheaperinference.com/",
+      "keys": "https://cheaperinference.com/signup",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "orcarouter",
+      "name": "OrcaRouter",
+      "base": "https://api.orcarouter.ai/v1",
+      "kind": "openai",
+      "site": "https://www.orcarouter.ai/",
+      "keys": "https://www.orcarouter.ai/console",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "xkiro",
+      "name": "xKiro",
+      "base": "https://api.xkiro.com/v1",
+      "kind": "openai",
+      "site": "https://xkiro.com/",
+      "keys": "https://xkiro.com/dashboard/api/keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "opper",
+      "name": "Opper",
+      "base": "https://api.opper.ai/v3/compat",
+      "kind": "openai",
+      "site": "https://opper.ai/",
+      "keys": "https://platform.opper.ai/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "ollama_cloud",
+      "name": "Ollama Cloud",
+      "base": "https://ollama.com/v1",
+      "kind": "openai",
+      "site": "https://ollama.com/",
+      "keys": "https://ollama.com/settings/keys",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "next_router",
+      "name": "NextRouter.me",
+      "base": "https://nextrouter.me/v1",
+      "kind": "openai",
+      "site": "https://nextrouter.me/",
+      "keys": "https://nextrouter.me/",
+      "model": "",
+      "dynamicModels": true,
+      "featured": true
+    },
+    {
+      "id": "next_router_justscriptzz",
+      "name": "NextRouter (JustScriptzz)",
+      "base": "https://nextrouter.justscriptzz.workers.dev/api/v1",
+      "kind": "openai",
+      "site": "https://nextrouter.justscriptzz.workers.dev/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "tooken_club",
+      "name": "Tooken Club",
+      "base": "https://tooken.club/v1",
+      "kind": "openai",
+      "site": "https://tooken.club/",
+      "keys": "https://tooken.club/",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare Workers AI",
+      "base": "https://api.cloudflare.com/client/v4",
+      "kind": "openai",
+      "site": "https://developers.cloudflare.com/workers-ai/",
+      "keys": "https://dash.cloudflare.com/profile/api-tokens",
+      "model": "",
+      "dynamicModels": true,
+      "extra": "account"
+    },
+    {
+      "id": "lmstudio",
+      "name": "LM Studio (محلی)",
+      "base": "http://localhost:1234/v1",
+      "kind": "openai",
+      "site": "https://lmstudio.ai/",
+      "model": "",
+      "dynamicModels": true,
+      "local": true
+    },
+    {
+      "id": "llamacpp",
+      "name": "llama.cpp (محلی)",
+      "base": "http://localhost:8080/v1",
+      "kind": "openai",
+      "site": "https://github.com/ggml-org/llama.cpp",
+      "model": "",
+      "dynamicModels": true,
+      "local": true
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (محلی)",
+      "base": "http://localhost:11434/v1",
+      "kind": "openai",
+      "site": "https://ollama.com/",
+      "model": "",
+      "dynamicModels": true,
+      "local": true
+    },
+    {
+      "id": "bai",
+      "name": "B.AI",
+      "base": "https://api.b.ai/v1",
+      "kind": "openai",
+      "site": "https://api.b.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "anyapi",
+      "name": "AnyAPI",
+      "base": "https://api.anyapi.ai/v1",
+      "kind": "openai",
+      "site": "https://api.anyapi.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "powertokens",
+      "name": "PowerTokens",
+      "base": "https://api.powertokens.ai/v1",
+      "kind": "openai",
+      "site": "https://api.powertokens.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "cheapllm",
+      "name": "cheapllm.shop",
+      "base": "https://cheapllm.shop/v1",
+      "kind": "openai",
+      "site": "https://cheapllm.shop",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "radeon",
+      "name": "AMD Radeon Cloud",
+      "base": "https://developer.amd.com.cn/radeon/api/v1",
+      "kind": "openai",
+      "site": "https://developer.amd.com.cn/radeon/api",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "routeway",
+      "name": "Routeway",
+      "base": "https://api.routeway.ai/v1",
+      "kind": "openai",
+      "site": "https://api.routeway.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "bazaarlink",
+      "name": "BazaarLink",
+      "base": "https://bazaarlink.ai/api/v1",
+      "kind": "openai",
+      "site": "https://bazaarlink.ai/api",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "ainative",
+      "name": "AINative Studio",
+      "base": "https://api.ainative.studio/api/v1",
+      "kind": "openai",
+      "site": "https://api.ainative.studio/api",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "aion",
+      "name": "Aion Labs",
+      "base": "https://api.aionlabs.ai/v1",
+      "kind": "openai",
+      "site": "https://api.aionlabs.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "requesty",
+      "name": "Requesty",
+      "base": "https://router.requesty.ai/v1",
+      "kind": "openai",
+      "site": "https://router.requesty.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "navy",
+      "name": "NavyAI",
+      "base": "https://api.navy/v1",
+      "kind": "openai",
+      "site": "https://api.navy",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "sealion",
+      "name": "SEA-LION",
+      "base": "https://api.sea-lion.ai/v1",
+      "kind": "openai",
+      "site": "https://api.sea-lion.ai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "unorouter",
+      "name": "UnoRouter",
+      "base": "https://api.unorouter.com/v1",
+      "kind": "openai",
+      "site": "https://api.unorouter.com",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "qianfan",
+      "name": "Baidu Qianfan",
+      "base": "https://qianfan.baidubce.com/v2",
+      "kind": "openai",
+      "site": "https://qianfan.baidubce.com/v2",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "volcengine",
+      "name": "Volcengine Ark",
+      "base": "https://ark.cn-beijing.volces.com/api/v3",
+      "kind": "openai",
+      "site": "https://ark.cn-beijing.volces.com/api/v3",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "longcat",
+      "name": "LongCat",
+      "base": "https://api.longcat.chat/openai/v1",
+      "kind": "openai",
+      "site": "https://api.longcat.chat/openai",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "xfyun",
+      "name": "iFlytek Spark",
+      "base": "https://spark-api-open.xf-yun.com/v1",
+      "kind": "openai",
+      "site": "https://spark-api-open.xf-yun.com",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "iteracompute",
+      "name": "IteraCompute",
+      "base": "https://api.iteracompute.com/v1",
+      "kind": "openai",
+      "site": "https://api.iteracompute.com",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "router9",
+      "name": "Router9",
+      "base": "https://api.router9.com/v1",
+      "kind": "openai",
+      "site": "https://api.router9.com",
+      "model": "",
+      "dynamicModels": true
+    },
+    {
+      "id": "pollinations",
+      "name": "Pollinations",
+      "base": "https://gen.pollinations.ai/v1",
+      "kind": "openai",
+      "site": "https://gen.pollinations.ai",
+      "model": "",
+      "dynamicModels": true
+    }
+  ]
+}
