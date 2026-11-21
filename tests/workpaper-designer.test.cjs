@@ -34,16 +34,17 @@ test('print dimensions, page overflow, structural operations and isolated layout
  assert.equal(t.errors.length,0,t.errors.join('\n'));assert(!html.includes('https://'));assert.match(html,/data:font\/woff2;base64/);
  }finally{t.close()}
 });
-test('manual margins, exact colors and keyboard guides persist in the exported design',async()=>{
+test('row height is directly editable and page top/bottom stay fixed, colors remain manual',async()=>{
  const t=setup();try{const {w}=t;
- change(w,'marginTop','52.4');change(w,'marginRight','18.7');
- assert.equal(w.document.getElementById('sheet').style.paddingTop,'52.4mm');
- assert.equal(w.document.querySelector('[data-margin="right"]').getAttribute('aria-valuenow'),'18.7');
- const handle=w.document.querySelector('[data-margin="right"]');handle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));
- assert.equal(w.document.getElementById('marginRight').value,'19.7');
- cell(w,5,2).click();change(w,'textColorHex','#12ab34');change(w,'backgroundHex','#f0e1d2');change(w,'borderColorHex','#112233');
- assert.equal(cell(w,5,2).style.color,'rgb(18, 171, 52)');change(w,'textColorHex','red');assert.match(w.document.getElementById('status').textContent,/کد رنگ/);assert.equal(w.document.getElementById('textColorHex').value,'#12ab34');
- let show=w.document.getElementById('showMargins');show.checked=false;show.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(w.document.querySelector('.margin-guides'),null);show.checked=true;show.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(w.document.querySelectorAll('.margin-handle').length,4);
- click(w,'saveFile');const saved=JSON.parse(await t.blob().text());assert.equal(saved.page.margins.top,52.4);assert.equal(saved.page.margins.right,19.7);assert.equal(saved.cells[5][2].style.background,'#f0e1d2');assert.equal(saved.cells[5][2].style.borderColor,'#112233');
+ assert.equal(w.document.getElementById('marginTop').readOnly,true);assert.equal(w.document.getElementById('marginBottom').readOnly,true);
+ cell(w,5,2).click();assert.equal(w.document.querySelector('[data-row-resize]').dataset.rowResize,'5');
+ let handle=w.document.querySelector('[data-row-resize]');handle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert.equal(w.document.getElementById('rowHeight').value,'9');
+ handle=w.document.querySelector('[data-row-resize]');handle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowUp',shiftKey:true,bubbles:true}));assert.equal(w.document.getElementById('rowHeight').value,'8.9');
+ change(w,'textColorHex','#12ab34');change(w,'backgroundHex','#f0e1d2');change(w,'borderColorHex','#112233');assert.equal(cell(w,5,2).style.color,'rgb(18, 171, 52)');change(w,'textColorHex','red');assert.match(w.document.getElementById('status').textContent,/کد رنگ/);
+ let show=w.document.getElementById('showRowHandle');show.checked=false;show.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(w.document.querySelector('.row-guide'),null);show.checked=true;show.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(w.document.querySelectorAll('.row-resizer').length,1);
+ click(w,'saveFile');let saved=JSON.parse(await t.blob().text());assert.equal(saved.page.margins.top,10);assert.equal(saved.page.margins.bottom,10);assert.equal(saved.rows[5].heightMm,8.9);assert.equal(saved.cells[5][2].style.background,'#f0e1d2');
+ // Previously exported custom margins are retained, not silently overwritten on import.
+ saved.page.margins.top=21.3;saved.page.margins.bottom=19.2;const field=w.document.getElementById('fileInput');Object.defineProperty(field,'files',{configurable:true,value:[{size:200,text:async()=>JSON.stringify(saved)}]});field.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();
+ assert.equal(w.document.getElementById('marginTop').value,'21.3');assert.equal(w.document.getElementById('marginBottom').value,'19.2');cell(w,5,2).click();change(w,'rowHeight','13.5');click(w,'saveFile');saved=JSON.parse(await t.blob().text());assert.equal(saved.page.margins.top,21.3);assert.equal(saved.page.margins.bottom,19.2);assert.equal(saved.rows[5].heightMm,13.5);
  }finally{t.close();}
 });

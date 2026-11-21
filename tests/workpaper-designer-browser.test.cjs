@@ -19,31 +19,33 @@ test('mobile file editing, JSON download/import and A4 PDF', {skip:!executablePa
   assert.equal(errors.length,0,errors.join('\n'));await page.close();await other.close();
  } finally {await browser.close();await fs.rm(dir,{recursive:true,force:true});}
 });
-test('mobile touch dragging and manual margin changes are saved and hidden in print',{skip:!executablePath && 'Set CHROMIUM_PATH to a Chromium executable'},async()=>{
+test('mobile touch resizes the selected row without changing page margins',{skip:!executablePath && 'Set CHROMIUM_PATH to a Chromium executable'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
   const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,deviceScaleFactor:1,acceptDownloads:true});const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('file://'+path.resolve('workpaper-designer.html'));await page.evaluate(()=>document.fonts.ready);
-  const top=page.locator('[data-margin="top"]');await top.scrollIntoViewIfNeeded();const box=await top.boundingBox();const cdp=await context.newCDPSession(page);const x=box.x+box.width/2,y=box.y+box.height/2;
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+30}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-  const topValue=Number(await page.locator('#marginTop').inputValue());assert(topValue>18&&topValue<23,'top drag should change physical mm: '+topValue);
-  await page.locator('#marginLeft').fill('45.8');await page.locator('#marginLeft').dispatchEvent('change');assert.equal(await page.locator('[data-margin="left"]').getAttribute('aria-valuenow'),'45.8');
-  const left=page.locator('[data-margin="left"]');await left.scrollIntoViewIfNeeded();const leftBox=await left.boundingBox(),lx=leftBox.x+leftBox.width/2,ly=leftBox.y+leftBox.height/2;
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:lx,y:ly}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:lx+20,y:ly}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
-  assert.equal(await page.locator('#marginLeft').inputValue(),'45.8','cancel restores the old value');
-  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('hesabrasi.variance.designer.v1')));assert.equal(stored.page.margins.top,topValue);assert.equal(stored.page.margins.left,45.8);
-  await page.emulateMedia({media:'print'});assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.margin-guides')).display),'none');assert.equal(errors.length,0,errors.join('\n'));await context.close();
+  await page.locator('td[data-row="5"][data-column="2"]').click();const handle=page.locator('[data-row-resize="5"]');
+  for(const fraction of [0,1]){await page.locator('.preview-scroll').evaluate((el,f)=>{el.scrollLeft=(el.scrollWidth-el.clientWidth)*f;},fraction);await page.waitForTimeout(40);const bounds=await page.evaluate(()=>{const h=document.querySelector('[data-row-resize="5"]').getBoundingClientRect(),v=document.querySelector('.preview-scroll').getBoundingClientRect();return {left:h.left,right:h.right,viewLeft:v.left,viewRight:v.right}});assert(bounds.left>=bounds.viewLeft-2 && bounds.right<=bounds.viewRight+2,'handle should stay visible while horizontally scrolling');}
+  await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox();const cdp=await context.newCDPSession(page),x=box.x+box.width/2,y=box.y+box.height/2;
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+20}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  const rowValue=Number(await page.locator('#rowHeight').inputValue());assert(rowValue>14&&rowValue<16,'row drag should change physical mm: '+rowValue);
+  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('hesabrasi.variance.designer.v1')));assert.equal(stored.rows[5].heightMm,rowValue);assert.equal(stored.rows[6].heightMm,8);assert.equal(stored.page.margins.top,10);assert.equal(stored.page.margins.bottom,10);
+  const retry=page.locator('[data-row-resize="5"]');await retry.scrollIntoViewIfNeeded();const retryBox=await retry.boundingBox(),rx=retryBox.x+retryBox.width/2,ry=retryBox.y+retryBox.height/2;
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:rx,y:ry}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:rx,y:ry+20}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});assert.equal(Number(await page.locator('#rowHeight').inputValue()),rowValue);
+  assert.equal(await page.locator('#marginTop').getAttribute('readonly'),'');assert.equal(await page.locator('#marginBottom').getAttribute('readonly'),'');
+  await page.emulateMedia({media:'print'});assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.row-guide')).display),'none');assert.equal(errors.length,0,errors.join('\n'));await context.close();
  }finally{await browser.close()}
 });
-test('all four margin guides drag in the expected directions', {skip:!executablePath && 'Set CHROMIUM_PATH to a Chromium executable'},async()=>{
+test('dragging uses physical dimensions across page orientation and preview zoom', {skip:!executablePath && 'Set CHROMIUM_PATH to a Chromium executable'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
   const page=await browser.newPage({viewport:{width:1600,height:1100}});await page.goto('file://'+path.resolve('workpaper-designer.html'));
-  assert.equal(await page.locator('.margin-guide.mg-top').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
-  for(const [side,dx,dy,id,initial] of [['top',0,15,'marginTop',10],['bottom',0,-15,'marginBottom',10],['left',15,0,'marginLeft',12],['right',-15,0,'marginRight',12]]){
-   const handle=page.locator('[data-margin="'+side+'"]');await handle.scrollIntoViewIfNeeded();const b=await handle.boundingBox();const x=b.x+b.width/2,y=b.y+b.height/2;
-   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:3});await page.mouse.up();
-   const actual=Number(await page.locator('#'+id).inputValue());assert(actual>initial+4&&actual<initial+7,side+' margin: '+actual);
+  for(const [orientation,zoom] of [['landscape',75],['portrait',50],['landscape',125]]){
+   await page.locator('#orientation').selectOption(orientation);await page.locator('#zoom').fill(String(zoom));await page.locator('#zoom').dispatchEvent('change');
+   await page.locator('td[data-row="5"][data-column="2"]').click();await page.locator('#rowHeight').fill('8');await page.locator('#rowHeight').dispatchEvent('change');
+   const handle=page.locator('[data-row-resize="5"]');await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2,move=10*(96/25.4)*zoom/100;
+   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x,y+move,{steps:3});await page.mouse.up();const actual=Number(await page.locator('#rowHeight').inputValue());assert(Math.abs(actual-18)<0.3,orientation+' / '+zoom+': '+actual);
+   assert.equal(await page.locator('#marginTop').inputValue(),'10');assert.equal(await page.locator('#marginBottom').inputValue(),'10');
   }
   await page.close();
  }finally{await browser.close();}
