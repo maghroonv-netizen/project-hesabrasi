@@ -6432,6 +6432,7 @@ function usageStart(messages,meta={}){
   return entry;
 }
 async function usageFetch(url,options,meta={}){
+  if(window.HesabrasiAI && typeof window.HesabrasiAI.prepareTokenRouterRelay === 'function') { const relay=window.HesabrasiAI.prepareTokenRouterRelay(url,options,meta); url=relay.url; options=relay.options; }
   if(typeof url==='string'&&url.startsWith('/api/ai/'))options={...options,headers:{...(options.headers||{}),'X-Hesabrasi-Proxy':'1'}};
   const body=typeof options?.body==='string'?options.body:'',messages=Array.isArray(meta.messages)?meta.messages:[],{beforeFetch,...recordMeta}=meta;
   const entry=usageStart(messages,{...recordMeta,requestChars:body.length,requestUtf8Bytes:new TextEncoder().encode(body).length});
@@ -10847,6 +10848,14 @@ el('routerForget').onclick=()=>{
   var COOL_DEFAULT = 60000;
   var TEST_PROMPT = 'Reply with exactly OK.';
   var CATALOG_TTL_MS = 900000; // 15 minutes
+  // Experimental relay is opt-in and held in memory only, never exported or persisted.
+  var tokenRouterRelay = null;
+  function prepareTokenRouterRelay(url, options, meta) {
+    if (!tokenRouterRelay || !meta || meta.provider !== 'tokenrouter' || typeof url !== 'string') return {url:url, options:options};
+    var prefix = 'https://api.tokenrouter.com/v1';
+    if (url !== prefix + '/models' && url !== prefix + '/chat/completions') return {url:url, options:options};
+    return {url:tokenRouterRelay.origin + '/v1' + url.slice(prefix.length), options:Object.assign({},options,{redirect:'error',headers:Object.assign({},options.headers || {},{'X-Hesabrasi-Bridge-Key':tokenRouterRelay.key})})};
+  }
 
   function iranChat() {
     return typeof AI_ENDPOINT === 'string' && AI_ENDPOINT
@@ -12826,6 +12835,10 @@ el('routerForget').onclick=()=>{
           '<label>' + (spec.id === 'one_x_ai' ? 'شناسهٔ مدل در 1xAi' : 'مدل') + '<input data-f="model" dir="ltr" value="' + esc(sl.model) + '" placeholder="' + (spec.id === 'one_x_ai' ? 'gpt-4o-mini یا شناسهٔ مدل از پنل' : '') + '"></label>' +
         '</div>');
 
+    if (spec.id === 'tokenrouter' && global.HESABRASI_AI_PROXY !== true) {
+      extra += '<details class="aihub-relay"><summary>واسط آزمایشی TokenRouter (اختیاری)</summary><p>فقط از واسطی که خودتان راه‌اندازی کرده‌اید استفاده کنید؛ کلید API و متن درخواست از Cloudflare عبور می‌کنند. کد واسط فقط تا بستن یا بازبارگذاری صفحه در حافظه می‌ماند.</p><label>نشانی HTTPS واسط<input data-f="relay-origin" dir="ltr" type="url" placeholder="https://your-worker.example" value="' + esc(tokenRouterRelay ? tokenRouterRelay.origin : '') + '"></label><label>کد دسترسی واسط<input data-f="relay-key" type="password" dir="ltr" autocomplete="off" placeholder="کد جداگانهٔ واسط"></label><button type="button" data-act="relay-enable">فعال‌سازی واسط برای این نشست</button> <button type="button" data-act="relay-disable">غیرفعال‌کردن</button><small data-relay-status>' + (tokenRouterRelay ? 'واسط فعال است.' : 'واسط غیرفعال است؛ اتصال مستقیم است.') + '</small></details>';
+    }
+
     return (
       '<article class="aihub-card' + (spec.id === 'open_router' ? ' aihub-card-primary' : '') + (sl.lastOk ? ' ok' : '') + (isCool(spec.id) ? ' cool' : '') + '" data-aihub-card="' + spec.id + '">' +
         '<div class="aihub-head">' +
@@ -12889,6 +12902,22 @@ el('routerForget').onclick=()=>{
     var id = card.getAttribute('data-aihub-card');
     var act = btn.getAttribute('data-act');
     ev.preventDefault();
+    if (id === 'tokenrouter' && (act === 'relay-enable' || act === 'relay-disable')) {
+      if (act === 'relay-enable') {
+        var address = card.querySelector('[data-f="relay-origin"]').value.trim(), relayKey = card.querySelector('[data-f="relay-key"]').value;
+        var parsed;
+        try { parsed = new URL(address); } catch (e) { logLine('نشانی واسط HTTPS معتبر نیست.'); return; }
+        if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash || relayKey.length < 32 || relayKey.length > 512 || !/^[\x21-\x7e]+$/.test(relayKey)) { logLine('فقط نشانی ریشهٔ HTTPS و کد دسترسی ۳۲ تا ۵۱۲ نویسه‌ای معتبر است.'); return; }
+        if (!confirm('واسط «' + parsed.origin + '» کلید TokenRouter و داده‌های ارسالی را دریافت می‌کند. فقط در صورت اعتماد به مالک واسط ادامه دهید. فعال شود؟')) return;
+        tokenRouterRelay = {origin:parsed.origin,key:relayKey};
+      } else tokenRouterRelay = null;
+      clearTimeout(keyFetchTimers[id]); catalogSequence[id] = (catalogSequence[id] || 0) + 1; delete modelCache[id];
+      card.querySelector('[data-f="relay-key"]').value = '';
+      card.querySelector('[data-relay-status]').textContent = tokenRouterRelay ? 'واسط فعال است؛ برای دریافت فهرست دکمهٔ بروزرسانی را بزنید.' : 'واسط غیرفعال است؛ اتصال مستقیم است.';
+      paintDynamicModelSelector(id);
+      logLine(tokenRouterRelay ? 'واسط TokenRouter برای این نشست فعال شد.' : 'واسط TokenRouter غیرفعال شد.');
+      return;
+    }
     if (act === 'openrouter-quota' && id === 'open_router') { readCard(id); btn.disabled = true; readOpenRouterQuota().finally(function () { btn.disabled = false; }); return; }
     if (act === 'remove-custom' && BY_ID[id].userDefined) { if (!confirm('این ارائه‌دهنده و کلید ذخیره‌شدهٔ آن حذف شود؟')) return; collectAll(); delete state.slots[id]; state.order = state.order.filter(function (x) { return x !== id; }); state.customProviders = state.customProviders.filter(function (x) { return x.id !== id; }); delete modelCache[id]; delete BY_ID[id]; var ci = CATALOG.findIndex(function (x) { return x.id === id; }); if (ci >= 0) CATALOG.splice(ci,1); save(); renderCards(); syncPrimary(); return; }
     if (act === 'select-free-router' && id === 'open_router') { var field = card.querySelector('[data-f="model"]'); if (field) field.value = 'openrouter/free'; state.slots[id].modelCustomized = true; readCard(id); save(); syncPrimary(); paintModelSelector(id); paintStatus(); logLine('روتر مدل‌های رایگان انتخاب شد؛ سهمیه و قابلیت مدل در OpenRouter را بررسی کنید.'); }
@@ -12912,6 +12941,7 @@ el('routerForget').onclick=()=>{
       btn.disabled = true;
       testSlot(id).finally(function () { btn.disabled = false; });
     } else if (act === 'clear') {
+      if (id === 'tokenrouter') tokenRouterRelay = null;
       clearTimeout(keyFetchTimers[id]); catalogSequence[id] = (catalogSequence[id] || 0) + 1; delete modelCache[id];
       state.slots[id] = emptySlot(id);
       save();
@@ -13136,6 +13166,9 @@ el('routerForget').onclick=()=>{
     document.getElementById('aihubWipe').onclick = function () {
       if (!confirm('همهٔ کلیدهای ذخیره‌شده در این مرورگر پاک شوند؟')) return;
       state = defaultState();
+      tokenRouterRelay = null;
+      Object.keys(keyFetchTimers).forEach(function (id) { clearTimeout(keyFetchTimers[id]); catalogSequence[id] = (catalogSequence[id] || 0) + 1; });
+      modelCache = {};
       coolUntil = {};
       save();
       renderCards();
@@ -13265,6 +13298,7 @@ el('routerForget').onclick=()=>{
 
   global.HesabrasiAI = {
     catalog: CATALOG,
+    prepareTokenRouterRelay: prepareTokenRouterRelay,
     presets: ANALYTICAL_PRESETS,
     isTextOnlyModel: isTextOnlyModel,
     filterAndSortTextModels: filterAndSortTextModels,
