@@ -6432,6 +6432,7 @@ function usageStart(messages,meta={}){
   return entry;
 }
 async function usageFetch(url,options,meta={}){
+  if(window.HesabrasiAI && typeof window.HesabrasiAI.prepareTokenRouterRelay === 'function') { const relay=window.HesabrasiAI.prepareTokenRouterRelay(url,options,meta); url=relay.url; options=relay.options; }
   if(typeof url==='string'&&url.startsWith('/api/ai/'))options={...options,headers:{...(options.headers||{}),'X-Hesabrasi-Proxy':'1'}};
   const body=typeof options?.body==='string'?options.body:'',messages=Array.isArray(meta.messages)?meta.messages:[],{beforeFetch,...recordMeta}=meta;
   const entry=usageStart(messages,{...recordMeta,requestChars:body.length,requestUtf8Bytes:new TextEncoder().encode(body).length});
@@ -10847,6 +10848,14 @@ el('routerForget').onclick=()=>{
   var COOL_DEFAULT = 60000;
   var TEST_PROMPT = 'Reply with exactly OK.';
   var CATALOG_TTL_MS = 900000; // 15 minutes
+  // Experimental relay is opt-in and held in memory only, never exported or persisted.
+  var tokenRouterRelay = null;
+  function prepareTokenRouterRelay(url, options, meta) {
+    if (!tokenRouterRelay || !meta || meta.provider !== 'tokenrouter' || typeof url !== 'string') return {url:url, options:options};
+    var prefix = 'https://api.tokenrouter.com/v1';
+    if (url !== prefix + '/models' && url !== prefix + '/chat/completions') return {url:url, options:options};
+    return {url:tokenRouterRelay.origin + '/v1' + url.slice(prefix.length), options:Object.assign({},options,{redirect:'error',headers:Object.assign({},options.headers || {},{'X-Hesabrasi-Bridge-Key':tokenRouterRelay.key})})};
+  }
 
   function iranChat() {
     return typeof AI_ENDPOINT === 'string' && AI_ENDPOINT
@@ -11666,13 +11675,13 @@ el('routerForget').onclick=()=>{
   }
 
   function filterAndSortTextModels(catalogJson, provider) {
-    var rows = (catalogJson && Array.isArray(catalogJson.data)) ? catalogJson.data : [];
+    var rows = Array.isArray(catalogJson) ? catalogJson : (catalogJson && Array.isArray(catalogJson.data)) ? catalogJson.data : [];
     var seen = {};
     var out = [];
     var rejectedCount = 0;
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      if (!isTextOnlyModel(r)) {
+      if ((provider === 'together' && r && /^(?:embedding|embeddings|image|audio|video|rerank|moderation|transcribe)$/i.test(String(r.type || ''))) || !isTextOnlyModel(r)) {
         rejectedCount++;
         continue;
       }
@@ -11734,7 +11743,7 @@ el('routerForget').onclick=()=>{
 
   function getCachedCatalog(provider, key) {
     var c = modelCache[provider];
-    if (c && c.raw && (typeof key !== 'string' || c.keyFp === (key || 'anon')) && (Date.now() - c.fetchedAt) < CATALOG_TTL_MS) return c.raw;
+    if (c && c.raw && (typeof key !== 'string' || c.keyFp === ((key || 'anon') + '|' + String((state.slots[provider] || {}).extra && state.slots[provider].extra.base || '') + '|' + String((state.slots[provider] || {}).extra && state.slots[provider].extra.account || ''))) && (Date.now() - c.fetchedAt) < CATALOG_TTL_MS) return c.raw;
     return null;
   }
 
@@ -11972,6 +11981,7 @@ el('routerForget').onclick=()=>{
     var bridgeId = provider === 'google' ? 'gemini' : provider;
     if (usesLocalBridge(bridgeId)) return bridgeUrl(bridgeId, bridgeId === 'gemini' ? 'model' : 'models', model);
     if (bridgeId === 'kilo') return 'https://api.kilo.ai/api/gateway/models';
+    if (bridgeId === 'cohere') return 'https://api.cohere.com/v1/models';
     if (provider === 'tooken_club' && global.HESABRASI_TOOKEN_LOCAL_PROXY === true) return '/api/tooken/models';
     if (provider === 'google') {
       var root = typeof AD_GOOGLE_ROOT === 'string' ? AD_GOOGLE_ROOT : 'https://generativelanguage.googleapis.com/v1beta/';
@@ -12023,7 +12033,7 @@ el('routerForget').onclick=()=>{
     if (!spec) return null;
     var sl = state.slots[providerId] || emptySlot(providerId);
     var key = cleanAsciiToken(typeof keyOverride === 'string' ? keyOverride : sl.key || '');
-    var keyFp = key || 'anon';
+    var keyFp = (key || 'anon') + '|' + String(sl.extra && sl.extra.base || '') + '|' + String(sl.extra && sl.extra.account || '');
     if (providerId === 'cloudflare' && !/^[a-f0-9]{32}$/i.test(String(sl.extra && sl.extra.account || ''))) { modelCache[providerId] = {textModels:[], error:'شناسهٔ حساب Cloudflare باید ۳۲ نویسهٔ هگزادسیمال باشد.'}; paintDynamicModelSelector(providerId); return null; }
     var existing = modelCache[providerId];
     if (!force && existing && existing.raw && existing.keyFp === keyFp && (Date.now() - existing.fetchedAt) < CATALOG_TTL_MS) {
@@ -12032,7 +12042,7 @@ el('routerForget').onclick=()=>{
     var sequence = catalogSequence[providerId] = (catalogSequence[providerId] || 0) + 1;
     var initialKey = sl.key, initialBase = sl.extra && sl.extra.base, initialAccount = sl.extra && sl.extra.account;
     var url = providerId === 'gemini' ? (usesLocalBridge('gemini') ? bridgeUrl('gemini', 'models') : 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000') : modelsUrl({ provider: providerId, key: key, model: sl.model });
-    if (!url) return null;
+    if (!url) { modelCache[providerId] = {textModels:[], error:'این سرویس مسیر فهرست مدل پشتیبانی‌شده ندارد؛ شناسهٔ مدل را دستی وارد کنید.'}; paintModelSelector(providerId); paintDynamicModelSelector(providerId); paintSimpleModelSelector(providerId); return null; }
 
     modelCache[providerId] = (existing && existing.keyFp === keyFp) ? existing : { raw: null, textModels: [], rejectedCount: 0, totalRaw: 0, fetchedAt: 0, loading: true, error: '', keyFp: keyFp };
     modelCache[providerId].loading = true;
@@ -12056,17 +12066,47 @@ el('routerForget').onclick=()=>{
       if (!resp.ok) {catalogAttempt.finish(null,'HTTP '+resp.status);throw new Error('HTTP ' + resp.status);}
       var json = await resp.json();catalogAttempt.finish(null,'catalog_received');
       if (providerId === 'gemini') {
-        var googleRows = Array.isArray(json.models) ? json.models : [];
+        if (!json || !Array.isArray(json.models)) throw new Error('پاسخ فهرست گوگل نامعتبر است.');
+        var googleRows = json.models.slice();
         var nextPage = json.nextPageToken, pages = 1;
         while (nextPage && pages++ < 20) {
+          if (catalogSequence[providerId] !== sequence || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase || ((state.slots[providerId] || {}).extra || {}).account !== initialAccount) return null;
           var pageUrl = usesLocalBridge('gemini') ? bridgeUrl('gemini', 'models') + '?pageToken=' + encodeURIComponent(nextPage) : 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&pageToken=' + encodeURIComponent(nextPage);
           var pageAttempt = await global.usageFetch(pageUrl, { method:'GET', headers:modelsHeaders({provider:providerId,key:key}), credentials:'omit', cache:'no-store', referrerPolicy:'no-referrer', signal:ctl.signal }, {purpose:'catalog',requestClass:'catalog',provider:providerId,model:'model-catalog',endpointFamily:'model-catalog',operationId:global.usageNewId('operation'),jobIndex:pages,attemptIndex:1,reason:'provider-model-page'});
           var page;
-          try { if (!pageAttempt.response.ok) throw new Error('HTTP ' + pageAttempt.response.status); page = await pageAttempt.response.json(); pageAttempt.finish(null,'catalog_received'); } catch (pageError) { pageAttempt.finish(null,'catalog_error'); throw pageError; }
+          try { if (!pageAttempt.response.ok) throw new Error('HTTP ' + pageAttempt.response.status); page = await pageAttempt.response.json(); if (!page || !Array.isArray(page.models)) throw new Error('پاسخ صفحهٔ گوگل نامعتبر است.'); pageAttempt.finish(null,'catalog_received'); } catch (pageError) { pageAttempt.finish(null,'catalog_error'); throw pageError; }
           googleRows = googleRows.concat(Array.isArray(page.models) ? page.models : []); nextPage = page.nextPageToken;
         }
         if (nextPage) throw new Error('فهرست گوگل بیش از حد صفحه داشت؛ فهرست ناقص کنار گذاشته شد.');
         json = {data:googleRows.filter(function (m) { return Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.indexOf('generateContent') >= 0; }).map(function (m) { return {id:String(m.name || '').replace(/^models\//,''),name:m.displayName || m.name, context_length:m.inputTokenLimit, top_provider:{max_completion_tokens:m.outputTokenLimit}, googleInfo:m}; })};
+      }
+      if (providerId === 'cohere') {
+        if (!json || !Array.isArray(json.models)) throw new Error('پاسخ فهرست Cohere نامعتبر است.');
+        var cohereRows = json.models.slice(), cohereToken = json.next_page_token, coherePages = 1, cohereSeen = {};
+        while (cohereToken) {
+          if (catalogSequence[providerId] !== sequence || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase || ((state.slots[providerId] || {}).extra || {}).account !== initialAccount) return null;
+          if (++coherePages > 20 || typeof cohereToken !== 'string' || !/^[a-zA-Z0-9._~+\/=-]{1,512}$/.test(cohereToken) || cohereSeen[cohereToken]) throw new Error('صفحه‌بندی Cohere نامعتبر یا بیش از حد ایمن است؛ فهرست ناقص کنار گذاشته شد.');
+          cohereSeen[cohereToken] = true;
+          var cohereUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'page_token=' + encodeURIComponent(cohereToken);
+          var cohereAttempt = await global.usageFetch(cohereUrl, {method:'GET',headers:modelsHeaders({provider:providerId,key:key}),credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:ctl.signal}, {purpose:'catalog',requestClass:'catalog',provider:providerId,model:'model-catalog',endpointFamily:'model-catalog',operationId:global.usageNewId('operation'),jobIndex:coherePages,attemptIndex:1,reason:'provider-model-page'});
+          try { if (!cohereAttempt.response.ok) throw new Error('HTTP ' + cohereAttempt.response.status); json = await cohereAttempt.response.json(); if (!json || !Array.isArray(json.models)) throw new Error('پاسخ صفحهٔ Cohere نامعتبر است.'); cohereAttempt.finish(null,'catalog_received'); } catch (cohereError) { cohereAttempt.finish(null,'catalog_error'); throw cohereError; }
+          cohereRows = cohereRows.concat(json.models); cohereToken = json.next_page_token;
+        }
+        json = {data:cohereRows.filter(function (m) { return m && Array.isArray(m.endpoints) && m.endpoints.indexOf('chat') >= 0; }).map(function (m) { return {id:m.name,name:m.name,context_length:m.context_length}; })};
+      }
+      if (providerId === 'anthropic') {
+        if (!json || !Array.isArray(json.data) || typeof json.has_more !== 'boolean') throw new Error('پاسخ فهرست Anthropic نامعتبر است.');
+        var anthropicRows = json.data.slice(), afterId = json.last_id, anthPages = 1, seenCursors = {};
+        while (json.has_more) {
+          if (catalogSequence[providerId] !== sequence || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase || ((state.slots[providerId] || {}).extra || {}).account !== initialAccount) return null;
+          if (++anthPages > 20 || typeof afterId !== 'string' || !/^[a-zA-Z0-9._:-]{1,200}$/.test(afterId) || seenCursors[afterId]) throw new Error('صفحه‌بندی Anthropic نامعتبر یا بیش از حد ایمن است؛ فهرست ناقص کنار گذاشته شد.');
+          seenCursors[afterId] = true;
+          var anthUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'after_id=' + encodeURIComponent(afterId);
+          var anthAttempt = await global.usageFetch(anthUrl, {method:'GET',headers:modelsHeaders({provider:providerId,key:key}),credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:ctl.signal}, {purpose:'catalog',requestClass:'catalog',provider:providerId,model:'model-catalog',endpointFamily:'model-catalog',operationId:global.usageNewId('operation'),jobIndex:anthPages,attemptIndex:1,reason:'provider-model-page'});
+          try { if (!anthAttempt.response.ok) throw new Error('HTTP ' + anthAttempt.response.status); json = await anthAttempt.response.json(); if (!json || !Array.isArray(json.data) || typeof json.has_more !== 'boolean') throw new Error('پاسخ صفحهٔ Anthropic نامعتبر است.'); anthAttempt.finish(null,'catalog_received'); } catch (anthError) { anthAttempt.finish(null,'catalog_error'); throw anthError; }
+          anthropicRows = anthropicRows.concat(json.data); afterId = json.last_id;
+        }
+        json = {data:anthropicRows.filter(function (m) { return m && m.lifecycle !== 'retired'; }).map(function (m) { return Object.assign({},m,{name:m.display_name || m.name || m.id}); })};
       }
       if (catalogSequence[providerId] !== sequence || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase || ((state.slots[providerId] || {}).extra || {}).account !== initialAccount) return null;
       if (providerId === 'cloudflare') {
@@ -12074,6 +12114,7 @@ el('routerForget').onclick=()=>{
         var cfRows = json.result.slice(), cfPages = Number(json.result_info && json.result_info.total_pages) || 1;
         if (cfPages > 20) throw new Error('تعداد صفحات Cloudflare بیش از حد ایمن است؛ فهرست ناقص کنار گذاشته شد.');
         for (var cfPage = 2; cfPage <= cfPages; cfPage++) {
+          if (catalogSequence[providerId] !== sequence || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase || ((state.slots[providerId] || {}).extra || {}).account !== initialAccount) return null;
           var cfUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'page=' + cfPage;
           var cfAttempt = await global.usageFetch(cfUrl, {method:'GET',headers:modelsHeaders({provider:providerId,key:key}),credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:ctl.signal}, {purpose:'catalog',requestClass:'catalog',provider:providerId,model:'model-catalog',endpointFamily:'model-catalog',operationId:global.usageNewId('operation'),jobIndex:cfPage,attemptIndex:1,reason:'provider-model-page'});
           var cfData; try { if (!cfAttempt.response.ok) throw new Error('HTTP ' + cfAttempt.response.status); cfData = await cfAttempt.response.json(); if (cfData.success === false || !Array.isArray(cfData.result)) throw new Error('پاسخ نامعتبر'); cfAttempt.finish(null,'catalog_received'); } catch (cfError) { cfAttempt.finish(null,'catalog_error'); throw cfError; }
@@ -12081,6 +12122,8 @@ el('routerForget').onclick=()=>{
         }
         json = {data:cfRows.filter(function (m) { var task = m && m.task && m.task.name; return !task || /text[ -]generation/i.test(String(task)); }).map(function (m) { return {id:String(m.name || m.id || ''), name:m.name || m.id}; })};
       }
+      if (catalogSequence[providerId] !== sequence || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase || ((state.slots[providerId] || {}).extra || {}).account !== initialAccount) return null;
+      if (!Array.isArray(json) && !(json && Array.isArray(json.data))) throw new Error('ساختار پاسخ فهرست مدل‌ها نامعتبر است.');
       var entry = storeCachedCatalog(providerId, json, keyFp);
       /* Preserve any current model in the full live catalog; otherwise choose a default text/chat model. */
       if (providerId === 'open_router' && entry.textModels.length) {
@@ -12100,7 +12143,7 @@ el('routerForget').onclick=()=>{
       return entry;
     } catch (err) {
       if(catalogAttempt)catalogAttempt.finish(null,err&&err.name==='AbortError'?'timeout_usage_unknown':'catalog_error');
-      if (catalogSequence[providerId] !== sequence || !modelCache[providerId]) return null;
+      if (catalogSequence[providerId] !== sequence || !modelCache[providerId] || (state.slots[providerId] || {}).key !== initialKey || ((state.slots[providerId] || {}).extra || {}).base !== initialBase || ((state.slots[providerId] || {}).extra || {}).account !== initialAccount) return null;
       modelCache[providerId].loading = false;
       modelCache[providerId].error = err && err.name === 'AbortError' ? 'مهلت دریافت فهرست مدل‌ها تمام شد.' : ('عدم دریافت فهرست زنده (' + (err && err.message ? err.message : 'خطای شبکه') + ')' + (providerId === 'open_router' ? ' — فهرست پیشنهادی OpenRouter باقی می‌ماند.' : ' — مدل زنده برای این سرویس تأیید نشد.'));
       paintModelSelector(providerId);
@@ -12395,9 +12438,10 @@ el('routerForget').onclick=()=>{
     if (manualWrap) manualWrap.hidden = false;
     if (status) {
       if (cache && cache.loading) status.textContent = 'در حال دریافت فهرست مدل‌ها…';
-      else if (cache && cache.error && /Failed to fetch/i.test(cache.error)) status.textContent = cache.error + ' ممکن است محدودیت CORS، شبکه یا دسترسی به endpoint باشد؛ این پیام به‌تنهایی نامعتبر بودن کلید را ثابت نمی‌کند. فهرست زیر از کاتالوگی است که کاربر ارائه کرده، نه پاسخ زندهٔ API؛ شناسه را انتخاب کنید اما دسترسی هر مدل هنوز زنده تأیید نشده است.';
+      else if (cache && cache.error && /Failed to fetch/i.test(cache.error)) status.textContent = cache.error + ' ممکن است محدودیت CORS، شبکه یا دسترسی به endpoint باشد؛ این پیام به‌تنهایی نامعتبر بودن کلید را ثابت نمی‌کند. در صورت اطمینان شناسه را از پنل سرویس دستی وارد کنید؛ فهرست زنده تأیید نشده است.';
       else if (cache && cache.error) status.textContent = cache.error + ' فهرست زنده تأیید نشد؛ در صورت اطمینان از شناسهٔ مدل در پنل سرویس، می‌توانید آن را دستی وارد کنید.';
       else if (models.length) status.textContent = models.length.toLocaleString('fa-IR') + ' شناسهٔ احتمالی متن دریافت شد؛ در دسترس بودن و هزینهٔ واقعی را در حساب ارائه‌دهنده بررسی کنید.';
+      else if (cache && cache.raw) status.textContent = 'فهرست دریافت شد، اما مدل متنی قابل تشخیص در آن نبود؛ شناسه را از پنل سرویس دستی وارد کنید.';
       else status.textContent = 'کلید را وارد کنید تا مدل‌های حساب بارگذاری شوند.';
     }
   }
@@ -12556,6 +12600,7 @@ el('routerForget').onclick=()=>{
   }
 
   async function testSlot(id) {
+    clearTimeout(keyFetchTimers[id]);
     readCard(id);
     var spec = BY_ID[id];
     var sl = state.slots[id];
@@ -12576,6 +12621,13 @@ el('routerForget').onclick=()=>{
       save(); paintStatus();
       return { ok: false, detail: sl.lastError };
     }
+    if (!sl.model && spec.dynamicModels && id !== 'tooken_club') {
+      var discovered = await fetchModelsCatalog(id, sl.key, true);
+      if (!discovered) { sl.lastOk = false; sl.lastError = 'فهرست دریافت نشد؛ وضعیت کارت را ببینید یا شناسهٔ مدل را دستی وارد کنید.'; save(); paintStatus(); return {ok:false,detail:sl.lastError}; }
+      sl.lastOk = false; sl.lastError = 'فهرست دریافت شد؛ مدل را انتخاب و سپس اتصال را آزمایش کنید. دریافت فهرست صحت کلید یا دسترسی به گفت‌وگو را تأیید نمی‌کند.';
+      save(); paintStatus(); logLine(sl.lastError);
+      return {ok:false,detail:sl.lastError};
+    }
     if (!sl.model && id !== 'tooken_club') { sl.lastOk = false; sl.lastError = 'شناسهٔ مدل لازم است؛ آن را دستی یا از فهرست انتخاب کنید.'; save(); paintStatus(); return { ok: false, detail: sl.lastError }; }
     sl.enabled = true;
     var testCard = document.querySelector('#hesabrasiAiHub [data-aihub-card="' + id + '"] [data-f="enabled"]'); if (testCard) testCard.checked = true;
@@ -12584,11 +12636,11 @@ el('routerForget').onclick=()=>{
       var tookenCatalog = await fetchModelsCatalog(id, sl.key, true);
       if (!tookenCatalog || !tookenCatalog.textModels || !tookenCatalog.textModels.length) {
         sl.lastOk = false;
-        sl.lastError = 'فهرست مدل‌های Tooken Club با این کلید خوانده نشد؛ کلید و دسترسی API را بررسی کنید.';
+        sl.lastError = 'فهرست Tooken Club دریافت نشد یا مدل متنی نداشت؛ وضعیت کارت، شبکه و دسترسی API را بررسی کنید.';
         save(); paintStatus();
         return { ok: false, detail: sl.lastError };
       }
-      noteOk(id); syncPrimary();
+      sl.lastOk = false; sl.lastError = 'فهرست خوانده شد؛ اعتبار کلید و دسترسی تولید تأیید نشده است.'; save(); paintStatus(); syncPrimary();
       logLine('فهرست Tooken Club خوانده شد: ' + tookenCatalog.textModels.length + ' مدل متنی. این پاسخ الزاماً صحت کلید یا دسترسی به چت را ثابت نمی‌کند؛ تولیدی ارسال نشد.');
       return { ok: true, text: 'OpenAI-compatible model catalog loaded.' };
     }
@@ -12783,6 +12835,10 @@ el('routerForget').onclick=()=>{
           '<label>' + (spec.id === 'one_x_ai' ? 'شناسهٔ مدل در 1xAi' : 'مدل') + '<input data-f="model" dir="ltr" value="' + esc(sl.model) + '" placeholder="' + (spec.id === 'one_x_ai' ? 'gpt-4o-mini یا شناسهٔ مدل از پنل' : '') + '"></label>' +
         '</div>');
 
+    if (spec.id === 'tokenrouter' && global.HESABRASI_AI_PROXY !== true) {
+      extra += '<details class="aihub-relay"><summary>واسط آزمایشی TokenRouter (اختیاری)</summary><p>فقط از واسطی که خودتان راه‌اندازی کرده‌اید استفاده کنید؛ کلید API و متن درخواست از Cloudflare عبور می‌کنند. کد واسط فقط تا بستن یا بازبارگذاری صفحه در حافظه می‌ماند.</p><label>نشانی HTTPS واسط<input data-f="relay-origin" dir="ltr" type="url" placeholder="https://your-worker.example" value="' + esc(tokenRouterRelay ? tokenRouterRelay.origin : '') + '"></label><label>کد دسترسی واسط<input data-f="relay-key" type="password" dir="ltr" autocomplete="off" placeholder="کد جداگانهٔ واسط"></label><button type="button" data-act="relay-enable">فعال‌سازی واسط برای این نشست</button> <button type="button" data-act="relay-disable">غیرفعال‌کردن</button><small data-relay-status>' + (tokenRouterRelay ? 'واسط فعال است.' : 'واسط غیرفعال است؛ اتصال مستقیم است.') + '</small></details>';
+    }
+
     return (
       '<article class="aihub-card' + (spec.id === 'open_router' ? ' aihub-card-primary' : '') + (sl.lastOk ? ' ok' : '') + (isCool(spec.id) ? ' cool' : '') + '" data-aihub-card="' + spec.id + '">' +
         '<div class="aihub-head">' +
@@ -12846,6 +12902,22 @@ el('routerForget').onclick=()=>{
     var id = card.getAttribute('data-aihub-card');
     var act = btn.getAttribute('data-act');
     ev.preventDefault();
+    if (id === 'tokenrouter' && (act === 'relay-enable' || act === 'relay-disable')) {
+      if (act === 'relay-enable') {
+        var address = card.querySelector('[data-f="relay-origin"]').value.trim(), relayKey = card.querySelector('[data-f="relay-key"]').value;
+        var parsed;
+        try { parsed = new URL(address); } catch (e) { logLine('نشانی واسط HTTPS معتبر نیست.'); return; }
+        if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash || relayKey.length < 32 || relayKey.length > 512 || !/^[\x21-\x7e]+$/.test(relayKey)) { logLine('فقط نشانی ریشهٔ HTTPS و کد دسترسی ۳۲ تا ۵۱۲ نویسه‌ای معتبر است.'); return; }
+        if (!confirm('واسط «' + parsed.origin + '» کلید TokenRouter و داده‌های ارسالی را دریافت می‌کند. فقط در صورت اعتماد به مالک واسط ادامه دهید. فعال شود؟')) return;
+        tokenRouterRelay = {origin:parsed.origin,key:relayKey};
+      } else tokenRouterRelay = null;
+      clearTimeout(keyFetchTimers[id]); catalogSequence[id] = (catalogSequence[id] || 0) + 1; delete modelCache[id];
+      card.querySelector('[data-f="relay-key"]').value = '';
+      card.querySelector('[data-relay-status]').textContent = tokenRouterRelay ? 'واسط فعال است؛ برای دریافت فهرست دکمهٔ بروزرسانی را بزنید.' : 'واسط غیرفعال است؛ اتصال مستقیم است.';
+      paintDynamicModelSelector(id);
+      logLine(tokenRouterRelay ? 'واسط TokenRouter برای این نشست فعال شد.' : 'واسط TokenRouter غیرفعال شد.');
+      return;
+    }
     if (act === 'openrouter-quota' && id === 'open_router') { readCard(id); btn.disabled = true; readOpenRouterQuota().finally(function () { btn.disabled = false; }); return; }
     if (act === 'remove-custom' && BY_ID[id].userDefined) { if (!confirm('این ارائه‌دهنده و کلید ذخیره‌شدهٔ آن حذف شود؟')) return; collectAll(); delete state.slots[id]; state.order = state.order.filter(function (x) { return x !== id; }); state.customProviders = state.customProviders.filter(function (x) { return x.id !== id; }); delete modelCache[id]; delete BY_ID[id]; var ci = CATALOG.findIndex(function (x) { return x.id === id; }); if (ci >= 0) CATALOG.splice(ci,1); save(); renderCards(); syncPrimary(); return; }
     if (act === 'select-free-router' && id === 'open_router') { var field = card.querySelector('[data-f="model"]'); if (field) field.value = 'openrouter/free'; state.slots[id].modelCustomized = true; readCard(id); save(); syncPrimary(); paintModelSelector(id); paintStatus(); logLine('روتر مدل‌های رایگان انتخاب شد؛ سهمیه و قابلیت مدل در OpenRouter را بررسی کنید.'); }
@@ -12869,6 +12941,8 @@ el('routerForget').onclick=()=>{
       btn.disabled = true;
       testSlot(id).finally(function () { btn.disabled = false; });
     } else if (act === 'clear') {
+      if (id === 'tokenrouter') tokenRouterRelay = null;
+      clearTimeout(keyFetchTimers[id]); catalogSequence[id] = (catalogSequence[id] || 0) + 1; delete modelCache[id];
       state.slots[id] = emptySlot(id);
       save();
       renderCards();
@@ -12883,39 +12957,19 @@ el('routerForget').onclick=()=>{
     if (!card) return;
     var id = card.getAttribute('data-aihub-card');
     var f = t.getAttribute('data-f');
-    if (id === 'open_router' && f === 'key') {
-      var val = cleanAsciiToken(t.value);
-      if (t.value && t.value !== val) t.value = val;
-      if (val.length >= 12) {
-        var sl = state.slots.open_router || emptySlot('open_router');
-        sl.key = val;
-        sl.enabled = true;
-        var enBox = card.querySelector('[data-f="enabled"]');
-        if (enBox) enBox.checked = true;
-        state.slots.open_router = sl;
-        save();
-        syncPrimary();
-        clearTimeout(keyFetchTimers.open_router);
-        keyFetchTimers.open_router = setTimeout(function () {
-          fetchModelsCatalog('open_router', val, true);
-        }, 420);
-      }
-      return;
-    }
-    if (id !== 'open_router' && BY_ID[id] && BY_ID[id].dynamicModels && f === 'key') {
+    if (BY_ID[id] && BY_ID[id].dynamicModels && f === 'key') {
       var dynamicKey = cleanAsciiToken(t.value);
-      if (t.value && t.value !== dynamicKey) t.value = dynamicKey;
-      if (dynamicKey.length >= 12) {
-        var dynamicSlot = state.slots[id] || emptySlot(id);
-        dynamicSlot.key = dynamicKey;
-        dynamicSlot.enabled = true;
-        var dynamicEnabled = card.querySelector('[data-f="enabled"]');
-        if (dynamicEnabled) dynamicEnabled.checked = true;
+      if (t.value !== dynamicKey) t.value = dynamicKey;
+      var dynamicSlot = state.slots[id] || emptySlot(id);
+      if (dynamicSlot.key !== dynamicKey) {
+        catalogSequence[id] = (catalogSequence[id] || 0) + 1;
+        delete modelCache[id];
+        dynamicSlot.key = dynamicKey; dynamicSlot.lastOk = false;
         state.slots[id] = dynamicSlot;
-        save(); syncPrimary();
-        clearTimeout(keyFetchTimers[id]);
-        keyFetchTimers[id] = setTimeout(function () { fetchModelsCatalog(id, dynamicKey, true); }, 420);
+        save(); syncPrimary(); paintModelSelector(id); paintDynamicModelSelector(id); paintStatus();
       }
+      clearTimeout(keyFetchTimers[id]);
+      if (dynamicKey.length >= 12) keyFetchTimers[id] = setTimeout(function () { fetchModelsCatalog(id, dynamicKey, true); }, 420);
       return;
     }
     if (id === 'open_router' && f === 'model') {
@@ -12982,9 +13036,11 @@ el('routerForget').onclick=()=>{
       paintStatus();
       return;
     }
+    if (f === 'base' || f === 'account') { clearTimeout(keyFetchTimers[id]); catalogSequence[id] = (catalogSequence[id] || 0) + 1; delete modelCache[id]; }
     readCard(id);
     save();
     syncPrimary();
+    if (f === 'base' || f === 'account') { paintDynamicModelSelector(id); paintSimpleModelSelector(id); }
     if (id === 'open_router') paintModelSelector('open_router');
     paintStatus();
   }
@@ -13040,7 +13096,7 @@ el('routerForget').onclick=()=>{
       '<p class="aihub-note">'+CATALOG.length+' سرویس و رابط قابل تنظیم. بسیاری رایگان نیستند یا سهمیهٔ روزانه/آزمایشی دارند؛ ظرفیت و زمان ریست برای حساب شما تضمین نمی‌شود. نرخ مدل و شرایط ارسال داده را در پنل سرویس بررسی کنید.</p><label>جست‌وجوی ارائه‌دهنده<input id="aihubSearch" type="search" placeholder="TokenRouter، NextRouter، Groq، ..."></label><p id="aihubSearchCount" role="status"></p>' +
       '<div id="aihubFeatured"></div>' +
       '<details id="aihubOther"><summary>سایر ارائه‌دهندگان و سرویس سفارشی</summary><div id="aihubRest"></div></details>' +
-      '<label><input type="checkbox" id="aihubFailover"' + (state.failover ? ' checked' : '') + '> سوییچ خودکار پس از خطای سهمیه یا اختلال صریح سرویس (با تأیید هر عملیات)</label><p class="aihub-note">کلیدها در حافظهٔ محلی مرورگر ذخیره می‌شوند و رمزگذاری نشده‌اند. ارسال مجدد می‌تواند هزینه ایجاد کند و دادهٔ حسابرسی را به سرویس دیگری بفرستد. محدودیت CORS یا شبکه ممکن است اتصال مستقیم را ناممکن کند.</p>' +
+      '<label><input type="checkbox" id="aihubFailover"' + (state.failover ? ' checked' : '') + '> سوییچ خودکار پس از خطای سهمیه یا اختلال صریح سرویس (با تأیید هر عملیات)</label><p class="aihub-note">آزمایش اتصال پس از انتخاب مدل می‌تواند درخواست تولیدی بفرستد و هزینه ایجاد کند؛ دریافت فهرست به‌تنهایی اعتبار کلید و دسترسی به مدل‌ها را ثابت نمی‌کند. کلیدها در حافظهٔ محلی مرورگر ذخیره می‌شوند و رمزگذاری نشده‌اند. ارسال مجدد می‌تواند هزینه ایجاد کند و دادهٔ حسابرسی را به سرویس دیگری بفرستد. محدودیت CORS یا شبکه ممکن است اتصال مستقیم را ناممکن کند.</p>' +
       '<div class="aihub-toolbar"><label>نام ارائه‌دهندهٔ سفارشی<input id="aihubCustomName" maxlength="80" placeholder="نام سرویس"></label><button type="button" id="aihubAddCustom">افزودن ارائه‌دهندهٔ سفارشی</button></div>' +
       '<div class="aihub-toolbar">' +
         '<button type="button" id="aihubSaveAll">ذخیرهٔ همه</button>' +
@@ -13110,6 +13166,9 @@ el('routerForget').onclick=()=>{
     document.getElementById('aihubWipe').onclick = function () {
       if (!confirm('همهٔ کلیدهای ذخیره‌شده در این مرورگر پاک شوند؟')) return;
       state = defaultState();
+      tokenRouterRelay = null;
+      Object.keys(keyFetchTimers).forEach(function (id) { clearTimeout(keyFetchTimers[id]); catalogSequence[id] = (catalogSequence[id] || 0) + 1; });
+      modelCache = {};
       coolUntil = {};
       save();
       renderCards();
@@ -13239,6 +13298,7 @@ el('routerForget').onclick=()=>{
 
   global.HesabrasiAI = {
     catalog: CATALOG,
+    prepareTokenRouterRelay: prepareTokenRouterRelay,
     presets: ANALYTICAL_PRESETS,
     isTextOnlyModel: isTextOnlyModel,
     filterAndSortTextModels: filterAndSortTextModels,

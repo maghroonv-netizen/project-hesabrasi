@@ -9,7 +9,7 @@ const dom=new JSDOM(html,{runScripts:'dangerously',url:'https://example.test/',p
  w.TextEncoder=require('util').TextEncoder;w.TextDecoder=require('util').TextDecoder;w.scrollTo=()=>{};
  w.fetch=async(url,init={})=>{calls.push({url:String(url),init});let data;
   if(String(url).includes('generativelanguage'))data={models:[{name:'models/gemini-test',displayName:'Gemini test',supportedGenerationMethods:['generateContent'],inputTokenLimit:12000,outputTokenLimit:1000}]};
-  else data={data:[{id:'example-model',context_length:12000,top_provider:{max_completion_tokens:1000}}]};
+  else data={data:[{id:'example-model',context_length:12000,top_provider:{max_completion_tokens:1000}}],has_more:false,last_id:null};
   return {ok:true,status:200,headers:{get:()=> 'application/json'},json:async()=>data};
  };
 }});
