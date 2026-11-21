@@ -50,3 +50,18 @@ test('dragging uses physical dimensions across page orientation and preview zoom
   await page.close();
  }finally{await browser.close();}
 });
+test('portrait default fits the physical page and touch changes the selected column', {skip:!executablePath && 'Set CHROMIUM_PATH to a Chromium executable'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,deviceScaleFactor:1,acceptDownloads:true});const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('file://'+path.resolve('workpaper-designer.html'));await page.evaluate(()=>document.fonts.ready);await page.locator('#orientation').selectOption('portrait');
+  const size=await page.evaluate(()=>{const s=document.querySelector('#sheet').getBoundingClientRect(),t=document.querySelector('#sheet table').getBoundingClientRect();return {sLeft:s.left,sRight:s.right,tLeft:t.left,tRight:t.right}});assert(size.tLeft>=size.sLeft && size.tRight<=size.sRight,JSON.stringify(size));
+  await page.locator('td[data-row="5"][data-column="2"]').click();const handle=page.locator('[data-column-resize="2"]');await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2,cdp=await context.newCDPSession(page);const old=Number(await page.locator('#columnWidth').inputValue());
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x-20,y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  const value=Number(await page.locator('#columnWidth').inputValue());assert(value>old+6&&value<old+8,'left drag increases width '+value);
+  const data=await page.evaluate(()=>JSON.parse(localStorage.getItem('hesabrasi.variance.designer.v1')));assert.equal(data.columns[2].widthMm,value);assert.equal(data.page.margins.top,10);assert.equal(data.page.margins.bottom,10);
+  const retry=page.locator('[data-column-resize="2"]');await retry.scrollIntoViewIfNeeded();const rb=await retry.boundingBox(),rx=rb.x+rb.width/2,ry=rb.y+rb.height/2;
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:rx,y:ry}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:rx+15,y:ry}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});assert.equal(Number(await page.locator('#columnWidth').inputValue()),value);
+  await page.locator('#fitColumns').click();const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert.equal(pdf.getPageCount(),1);const p=pdf.getPage(0).getSize();assert(Math.abs(p.width-595.28)<2&&Math.abs(p.height-841.89)<2);assert.equal(errors.length,0,errors.join('\n'));await context.close();
+ }finally{await browser.close()}
+});
