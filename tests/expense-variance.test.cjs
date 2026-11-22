@@ -150,7 +150,7 @@ function dispatchFile(input, file) {
     assert.equal(adminSubtotal.querySelector('td:first-child').colSpan, 3, 'the subtotal label merges row, code, and account-name cells into one continuous cell');
     assert.equal(adminSubtotal.querySelector('td:first-child').textContent.trim(), 'جمع');
     assert.deepEqual([...adminSubtotal.querySelectorAll('td.vamount')].map(cell => cell.textContent), ['۱٬۹۹۹٬۶۰۰٬۰۰۰', '۱٬۰۰۰٬۶۰۰٬۰۰۰', '۹۹۹٬۰۰۰٬۰۰۰'], 'subtotal sums amount columns without separating the label cell');
-    assert.equal(adminSubtotal.querySelector('td.vpct').textContent, '۹۹٫۸٪', 'subtotal percentage is calculated from group totals');
+    assert.equal(adminSubtotal.querySelector('td.vpct').textContent, '', 'subtotal percentage is intentionally blank');
     const summaryRows = [...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')];
     assert.deepEqual([...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary-table col')].map(col => parseFloat(col.style.width)), [30, 17.5, 17.5, 17.5, 17.5], 'the summary account-information column is narrower and numeric columns remain balanced');
     assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5, 5], 'each summary row contains no fluctuation count');
@@ -236,7 +236,7 @@ function dispatchFile(input, file) {
     const stressSubtotal = lines.find(line => line.classList.contains('variance-workpaper-subtotal')).cloneNode(true);
     stressSubtotal.dataset.vsubtotalcurrent = '0'; stressSubtotal.dataset.vsubtotalprior = '0';
     stressSubtotal.querySelectorAll('td.vamount').forEach(cell => { cell.textContent = '۰'; });
-    stressSubtotal.querySelector('td.vpct').textContent = '—';
+    stressSubtotal.querySelector('td.vpct').textContent = '';
     w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-paper-table tbody').append(stressTitle, ...stressRows, stressSubtotal);
     printed = null;
     w.document.querySelector('#varianceV4 [data-vprint]').click();
