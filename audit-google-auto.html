@@ -2182,6 +2182,20 @@ body.meta-stage-active .wrap{display:none!important;}
 }
 
 
+/* Account balance pickers use the same floating window as sampling. */
+.balance-picker-launch{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin:12px 0}
+.balance-picker-launch strong,.balance-picker-launch .variance-selection-summary{display:block}.balance-picker-launch .variance-selection-summary{margin-top:4px;color:var(--muted);font-size:.85rem}
+.balance-picker-launch button{min-height:var(--tap)}
+.balance-picker-overlay{z-index:150;padding:12px}
+.balance-picker-overlay .modal-box{max-width:1050px;max-height:min(90dvh,900px);color:var(--ink)}
+.balance-picker-overlay .modal-head{flex:none;gap:12px}
+.balance-picker-overlay .modal-close{min-width:44px;min-height:44px}
+.balance-picker-overlay .balance-picker-content{display:flex;flex-direction:column;min-height:0;padding:12px 16px 16px;overflow:auto;overscroll-behavior:contain}
+.balance-picker-overlay .sr-tb-card{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;padding:0;margin:0;border:0;box-shadow:none;background:transparent}
+.balance-picker-overlay .sr-tb-scroll{flex:1 1 auto;min-height:80px;max-height:50dvh;overflow:auto;overscroll-behavior:contain}
+.balance-picker-overlay .sr-tb-table{background:var(--panel);color:var(--ink)}
+.balance-picker-overlay .sr-tb-titlebar,.balance-picker-overlay .sr-tb-toolbar,.balance-picker-overlay .sr-tb-period,.balance-picker-overlay .sr-tb-footer{flex:none}.balance-picker-overlay .sr-tb-footer{gap:10px}.balance-picker-overlay .sr-tb-footer button{min-height:var(--tap)}
+@media(max-width:700px){.balance-picker-overlay{padding:8px}.balance-picker-overlay .modal-box{max-height:92dvh}.balance-picker-overlay .balance-picker-content{padding:10px}.balance-picker-launch button{width:100%}}
 /* Visual identity shared by the account-analysis and aged workpapers. */
 .audit-template.sheet,.audit-template.sheet *{font-family:workpaper-lotus,serif!important}
 .audit-template.sheet .head{display:flex!important;direction:rtl!important;align-items:center!important;gap:0!important;min-height:68pt!important;padding:3pt 7pt!important;background:#fff!important}
@@ -3230,6 +3244,18 @@ function renderAccountStep(rows){
   renderLevelBoxes();
   renderWorksheetAccountsChips();
   renderStepper();
+}
+
+// Floating account balances share the sampling modal appearance without changing selection semantics.
+function bindBalancePicker(root,{initialOpen=false,onOpenChange=()=>{}}={}){
+  const overlay=root.querySelector('[data-balance-dialog]'),trigger=root.querySelector('[data-balance-open]');
+  if(!overlay||!trigger)return {open:()=>{},close:()=>{}};
+  const setOpen=(open,focus=true)=>{overlay.classList.toggle('open',open);trigger.setAttribute('aria-expanded',String(open));onOpenChange(open);if(focus){if(open)overlay.querySelector('[data-balance-close]')?.focus();else trigger.focus();}};
+  trigger.onclick=()=>setOpen(true);
+  overlay.querySelector('[data-balance-close]').onclick=()=>setOpen(false);
+  overlay.onclick=e=>{if(e.target===overlay)setOpen(false);};
+  overlay.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();setOpen(false);return;}if(e.key!=='Tab')return;const items=[...overlay.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')].filter(el=>el.getClientRects().length);if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}};
+  setOpen(initialOpen,false);return {open:()=>setOpen(true),close:()=>setOpen(false)};
 }
 
 function buildPathLabel(levelIdx, code, title){
@@ -4877,7 +4903,7 @@ function openAnalysisAccountModal(levelIdx){
   const list=anaLevelOptions(levelIdx);
   if(!document.getElementById('anaAcctModal')){
     const wrap=document.createElement('div');
-    wrap.innerHTML=`<div class="modal-overlay" id="anaAcctModal"><div class="modal-box ana-account-modal">
+    wrap.innerHTML=`<div class="modal-overlay" id="anaAcctModal" role="dialog" aria-modal="true" aria-labelledby="anaAcctModalTitle"><div class="modal-box ana-account-modal">
       <div class="modal-head"><div><span class="eyebrow">انتخاب در ساختار حساب‌ها</span><h2 id="anaAcctModalTitle"></h2></div><button type="button" class="modal-close" id="anaAcctModalClose" aria-label="بستن">×</button></div>
       <div class="ana-sort-note">برای مرتب‌سازی روی عنوان هر ستون مالی کلیک کنید.</div>
       <div class="scrollx modal-body"><table class="tbl ana-account-table"><thead><tr>
@@ -4945,7 +4971,7 @@ function closeAnalysisAccountModal(){
 
 function renderAnalysisSelectedAccounts(){
   const host=document.getElementById('anaSelectedAccounts'); if(!host) return;
-  host.innerHTML=ANA.accounts.length?`<div class="ana-selected-list"><div class="ana-selected-heading"><b>נבחרו ${fa(ANA.accounts.length)} חשבון</b><span>برای حذف هر حساب، × را بزنید</span></div><div>${ANA.accounts.map((a,i)=>
+  host.innerHTML=ANA.accounts.length?`<div class="ana-selected-list"><div class="ana-selected-heading"><b>${fa(ANA.accounts.length)} حساب انتخاب شده</b><span>برای حذف هر حساب، × را بزنید</span></div><div>${ANA.accounts.map((a,i)=>
     `<span class="ana-account-chip"><span>${esc(a.pathLabel||a.title)}</span><button type="button" data-ana-remove="${i}" aria-label="حذف حساب">×</button></span>`).join('')}</div></div>`
     :'<div class="ana-empty-selected"><span>＋</span><div><b>هنوز حسابی انتخاب نشده</b><small>یک سطح را باز کنید و تیک حساب یا حساب‌های موردنظر را بزنید.</small></div></div>';
   host.querySelectorAll('[data-ana-remove]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -14243,6 +14269,7 @@ function paginateWorkpaperPreview(host){
 
 function bindReport(){
   const r=$('srReport'); if(!r) return;
+  const balancePicker=bindBalancePicker(r);
   const groups=srTrialBalanceData(),allAccounts=groups.flatMap(g=>g.accounts.map(a=>a.id));
   const currentSelection=()=>SR.view.accountSelection instanceof Set?new Set(SR.view.accountSelection):new Set(allAccounts);
   const syncSelectionUI=()=>{
@@ -14270,7 +14297,7 @@ function bindReport(){
     SR.view.accountSelection=selected.size===allAccounts.length?null:selected;SR.view.selectionConfirmed=true;
     const preview=r.querySelector('#srFinalPreview');if(preview){preview.classList.remove('sr-stale-preview');preview.innerHTML=workpaperHtml();paginateWorkpaperPreview(preview);}
     const print=$('srPrint'),xlsx=$('srXlsx');if(print)print.disabled=false;if(xlsx)xlsx.disabled=false;
-    syncSelectionUI();
+    syncSelectionUI();balancePicker.close();
   };
   applyTrialBalanceFilter(r);syncSelectionUI();
   if(SR.view.selectionConfirmed){const preview=r.querySelector('#srFinalPreview');if(preview&&preview.querySelector('.sr-workpaper-source'))paginateWorkpaperPreview(preview);}
@@ -14499,13 +14526,14 @@ function trialBalancePreviewHtml(){
     const children=g.accounts.map(a=>`<tr class="sr-tb-moein" data-tb-kind="moein" data-tb-account="${e_(a.id)}" data-tb-kol="${e_(g.kol)}" data-search="${searchText(g.kol,g.kolT,a.moein,a.moeinT)}"><td><input type="checkbox" data-pick-account="${e_(a.id)}" aria-label="انتخاب معین ${fa(e_(a.moein))}" ${selected.has(a.id)?'checked':''}></td><td>معین</td><td class="sr-tb-code">${fa(e_(a.moein))}</td><td class="sr-tb-title">${e_(a.moeinT)}</td><td>${bal(a.openingDebit,a.openingCredit)}</td><td class="num">${num(a.debit)}</td><td class="num">${num(a.credit)}</td><td>${bal(a.openingDebit+a.debit,a.openingCredit+a.credit)}</td></tr>`).join('');
     return `<tr class="sr-tb-kol" data-tb-kind="kol" data-search="${searchText(g.kol,g.kolT)}"><td><input type="checkbox" data-pick-kol="${e_(g.kol)}" aria-label="انتخاب همهٔ حساب‌های معین کل ${fa(e_(g.kol))}" ${n===ids.length&&ids.length?'checked':''}></td><td>کل</td><td class="sr-tb-code">${fa(e_(g.kol))}</td><td class="sr-tb-title"><b>${e_(g.kolT)}</b><small class="sr-tree-count">${fa(n)} از ${fa(ids.length)} معین</small></td><td>${bal(g.total.openingDebit,g.total.openingCredit)}</td><td class="num">${num(g.total.debit)}</td><td class="num">${num(g.total.credit)}</td><td>${bal(g.total.openingDebit+g.total.debit,g.total.openingCredit+g.total.credit)}</td></tr>${children}`;
   }).join('');
-  return `<section class="sr-tb-card" aria-label="تراز شناور و انتخاب حساب‌ها">
-    <div class="sr-tb-titlebar"><div><b>تراز شناور سال جاری — ${e_(srCurrentYearLabel())}</b><small>سطوح کل و معین</small></div><span class="sr-chip" id="srTbSelectedCount">${fa(selectedCount)} از ${fa(all.length)} حساب معین انتخاب شده</span></div>
+  return `<div class="balance-picker-launch"><div><strong>انتخاب حساب از تراز سال جاری — ${e_(srCurrentYearLabel())}</strong><span class="sr-chip" id="srTbSelectedCount">${fa(selectedCount)} از ${fa(all.length)} حساب معین انتخاب شده</span></div><button type="button" class="btn" data-balance-open aria-haspopup="dialog" aria-controls="srBalanceDialog" aria-expanded="false">نمایش تراز و انتخاب حساب‌ها</button></div>
+  <div class="modal-overlay balance-picker-overlay" id="srBalanceDialog" data-balance-dialog role="dialog" aria-modal="true" aria-labelledby="srBalanceTitle"><div class="modal-box"><div class="modal-head"><span id="srBalanceTitle">انتخاب حساب — تراز سال جاری</span><button type="button" class="modal-close" data-balance-close aria-label="بستن تراز">×</button></div><div class="balance-picker-content"><section class="sr-tb-card" aria-label="تراز شناور و انتخاب حساب‌ها">
+    <div class="sr-tb-titlebar"><div><b>تراز شناور سال جاری — ${e_(srCurrentYearLabel())}</b><small>سطوح کل و معین</small></div></div>
     <div class="sr-tb-toolbar"><label class="sr-tb-selectall"><input type="checkbox" id="srTbSelectAll" ${all.length&&selectedCount===all.length?'checked':''}> انتخاب همهٔ حساب‌های معین</label><input class="sr-search" id="srTbFilter" placeholder="جست‌وجوی کد یا عنوان کل و معین" value="${e_(SR.view.tbFilter||'')}"></div>
     <div class="sr-tb-period"><span>مانده ابتدای سال</span><b>${bal(total.openingDebit,total.openingCredit)}</b><span>گردش بدهکار</span><b>${num(total.debit)||'۰'}</b><span>گردش بستانکار</span><b>${num(total.credit)||'۰'}</b><span>مانده پایان</span><b>${bal(total.openingDebit+total.debit,total.openingCredit+total.credit)}</b></div>
     <div class="sr-tb-scroll" id="srTbScroll"><table class="sr-tb-table" id="srTbTable"><thead><tr><th>انتخاب</th><th>سطح</th><th>کد</th><th>عنوان حساب</th><th>مانده ابتدا</th><th>گردش بدهکار</th><th>گردش بستانکار</th><th>مانده پایان</th></tr></thead><tbody>${rows||'<tr><td colspan="8">ردیف حسابی برای تراز پیدا نشد.</td></tr>'}<tr class="sr-tb-total"><td></td><td colspan="3">جمع کل تراز</td><td>${bal(total.openingDebit,total.openingCredit)}</td><td class="num">${num(total.debit)||'۰'}</td><td class="num">${num(total.credit)||'۰'}</td><td>${bal(total.openingDebit+total.debit,total.openingCredit+total.credit)}</td></tr></tbody></table></div>
     <div class="sr-tb-footer"><span id="srTbSelectionHint" aria-live="polite">${SR.view.selectionConfirmed?'حساب‌ها تأیید شده‌اند. با تغییر انتخاب، دوباره تأیید کنید.':'همهٔ حساب‌های معین به‌طور پیش‌فرض انتخاب شده‌اند؛ تیک هر «کل» همهٔ معین‌های زیرمجموعه را تغییر می‌دهد. برای ساخت/به‌روزرسانی کاربرگ، تأیید را بزنید.'}</span><button type="button" class="confirm" id="srConfirmAccounts" ${all.length?'':'disabled'}>تأیید حساب‌ها و ساخت کاربرگ</button></div>
-  </section>`;
+  </section></div></div></div>`;
 }
 
 function tabHtml(tab){
@@ -14513,7 +14541,7 @@ function tabHtml(tab){
   if(tab==='work'){
     return `<section class="sr-report-output" dir="rtl">
       ${trialBalancePreviewHtml()}
-      <section id="srFinalPreview" class="sr-final-preview">${SR.view.selectionConfirmed?workpaperHtml():`<div class="sr-confirm-panel"><b>حساب‌های موردنظر را در تراز بالا انتخاب کنید.</b><span>پس از زدن «تأیید حساب‌ها و ساخت کاربرگ»، پیش‌نمایش صفحه‌بندی‌شده ساخته می‌شود.</span></div>`}</section>
+      <section id="srFinalPreview" class="sr-final-preview">${SR.view.selectionConfirmed?workpaperHtml():`<div class="sr-confirm-panel"><b>برای انتخاب حساب‌های موردنظر، تراز را باز کنید.</b><span>پس از زدن «تأیید حساب‌ها و ساخت کاربرگ»، پیش‌نمایش صفحه‌بندی‌شده ساخته می‌شود.</span></div>`}</section>
     </section>`;
   }
   if(tab==='exc'){
@@ -14989,6 +15017,7 @@ document.head.appendChild(css);
 /* ================= کاربرگ نوسانات هزینه ================= */
 (()=>{
 'use strict';
+let vBalancePickerOpen=false;
 const V={files:[null,null], units:['rial','rial'], currentSource:null, selected:new Set(), filter:'', rows:[], notes:{}, busy:false, includeDescriptions:true, orientation:'landscape', years:[null,null], result:null};
 const VSTAGES=['v1','v2','v3','v4'];
 const vx=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -15090,18 +15119,19 @@ function vUpdateSelectionUI(){
  h.querySelectorAll('[data-vaccount]').forEach(el=>{el.checked=V.selected.has(el.dataset.vaccount);});
  h.querySelectorAll('[data-vkol]').forEach(el=>{const list=visible.filter(a=>(a.kol.code||a.kol.title)===el.dataset.vkol),n=list.filter(a=>V.selected.has(a.id)).length;el.checked=list.length>0&&n===list.length;el.indeterminate=n>0&&n<list.length;});
  const n=visible.filter(a=>V.selected.has(a.id)).length,all=h.querySelector('#vSelectVisible');if(all){all.checked=visible.length>0&&n===visible.length;all.indeterminate=n>0&&n<visible.length;}
- const totals=vSelectionTotal(),summary=h.querySelector('.variance-selection-summary');if(summary)summary.textContent=`انتخاب‌شده: ${V.selected.size} · جمع سال جاری ${vdigits(V.years[1]||'—')}: ${vmoney(totals[1])}${totals[1]===null?' (ناقص؛ حسابی در فایل یافت نشد)':''} · جمع سال قبل ${vdigits(V.years[0]||'—')}: ${vmoney(totals[0])}${totals[0]===null?' (ناقص؛ حسابی در فایل یافت نشد)':''}`;
- const confirm=h.querySelector('[data-vconfirm]');if(confirm)confirm.disabled=!V.selected.size;
+ const totals=vSelectionTotal(),summaries=h.querySelectorAll('.variance-selection-summary');summaries.forEach(summary=>summary.textContent=`انتخاب‌شده: ${V.selected.size} · جمع سال جاری ${vdigits(V.years[1]||'—')}: ${vmoney(totals[1])}${totals[1]===null?' (ناقص؛ حسابی در فایل یافت نشد)':''} · جمع سال قبل ${vdigits(V.years[0]||'—')}: ${vmoney(totals[0])}${totals[0]===null?' (ناقص؛ حسابی در فایل یافت نشد)':''}`);
+ h.querySelectorAll('[data-vconfirm]').forEach(confirm=>confirm.disabled=!V.selected.size);
 }
 function vRender3(){
  const h=document.getElementById('varianceV3');if(!V.rows.length){h.innerHTML='<h1>انتخاب حساب</h1><div class="card">پس از تأیید نگاشت ستون‌ها، حساب‌ها نمایش داده می‌شوند.</div>';return;}
  const visible=vVisibleRows(),byKol=new Map();visible.forEach(a=>{const k=a.kol.code||a.kol.title;if(!byKol.has(k))byKol.set(k,[]);byKol.get(k).push(a);});
- h.innerHTML=`<h1>تراز نوسانات هزینه</h1><p class="sub">مبنای انتخاب و نمایش، تراز سال جاری (${vx(V.years[1]||'—')}) است؛ ستون سال قبل فقط برای مقایسه کنار آن آمده است. می‌توانید همهٔ معین‌های یک حساب کل یا هر معین را جداگانه انتخاب کنید. مبلغ خالی یا حسابِ بدون ردیف در آن سال به‌صورت ۰ نمایش داده می‌شود؛ درصد فقط وقتی مبلغ سال قبل صفر باشد «—» است.</p>${V.files.some(f=>f.invalidAmounts||f.missingAccounts||f.ignoredMajorTotals||f.ignoredClosing)?`<div class="variance-note">کنترل بارگذاری: ${V.files.map((f,i)=>`${vFileLabel(i)} — اسناد بستن/اختتامیهٔ حساب موقت یا دائمِ کنارگذاشته‌شده: ${f.ignoredClosing||0} ردیف؛ مبالغ نامعتبرِ کنارگذاشته‌شده: ${f.invalidAmounts||0}؛ ردیف‌های بدون کد/عنوان حساب: ${f.missingAccounts||0}؛ ردیف‌های جمع کلِ حذف‌شده برای جلوگیری از دوباره‌شماری: ${f.ignoredMajorTotals||0}`).join(' · ')}. پیش از نهایی‌کردن کاربرگ، موارد غیر از اسناد اختتامیه را در فایل مبدأ بررسی کنید.</div>`:''}<div class="sr-tb-card variance-tb"><div class="sr-tb-titlebar"><div><b>تراز مقایسه‌ای بر مبنای سال جاری</b><small>${V.rows.length.toLocaleString('fa-IR')} حساب قابل انتخاب</small></div><button class="btn ghost" type="button" data-vclear>پاک‌کردن انتخاب</button></div><div class="sr-tb-period"><span>سال جاری:</span> <b>${vx(V.years[1]||'—')}</b><span>سال قبل:</span> <b>${vx(V.years[0]||'—')}</b></div><div class="sr-tb-toolbar"><input class="sr-search" id="vAccountSearch" value="${vx(V.filter)}" placeholder="جست‌وجو در کد یا عنوان کل و معین"><label class="sr-tb-selectall"><input type="checkbox" id="vSelectVisible" ${visible.length&&visible.every(a=>V.selected.has(a.id))?'checked':''}> انتخاب همهٔ نتایج</label></div><div class="sr-tb-scroll variance-scroll"><table class="sr-tb-table variance-tb-table"><thead><tr><th>انتخاب</th><th>کد معین</th><th>عنوان کل / معین</th><th>سال جاری ${vx(V.years[1]||'')} (ریال)</th><th>سال قبل ${vx(V.years[0]||'')} (ریال)</th></tr></thead><tbody>${[...byKol.entries()].map(([key,list])=>{const groupSelected=list.every(a=>V.selected.has(a.id)),kg=[vGroupSum(list,0),vGroupSum(list,1)];return `<tr class="sr-tb-kol variance-kol"><td><input type="checkbox" data-vkol="${vx(key)}" ${groupSelected?'checked':''}></td><td>${vx(list[0].kol.code||'')}</td><td class="sr-tb-title">${vx(list[0].kol.title||list[0].kol.code||'حساب کل')}</td><td class="num">${vmoney(kg[1])}</td><td class="num">${vmoney(kg[0])}</td></tr>${list.map(a=>`<tr class="sr-tb-moein"><td><input type="checkbox" data-vaccount="${vx(a.id)}" ${V.selected.has(a.id)?'checked':''}></td><td class="sr-tb-code">${vx(a.sub.code||'')}</td><td class="sr-tb-title">${vx(a.sub.title||a.sub.code||'')}</td><td class="num">${vmoney(vAmount(a,1))}</td><td class="num">${vmoney(vAmount(a,0))}</td></tr>`).join('')}`;}).join('')||'<tr><td colspan="5">حسابی با این جست‌وجو پیدا نشد.</td></tr>'}</tbody></table></div><div class="sr-tb-footer"><span class="variance-selection-summary"></span><button class="confirm" type="button" data-vconfirm ${V.selected.size?'':'disabled'}>تأیید حساب‌ها و ساخت کاربرگ ←</button></div></div><div class="sr-nav"><button class="btn ghost" type="button" data-vback="v2">→ نگاشت ستون‌ها</button></div>`;
+ h.innerHTML=`<h1>تراز نوسانات هزینه</h1><p class="sub">مبنای انتخاب و نمایش، تراز سال جاری (${vx(V.years[1]||'—')}) است؛ ستون سال قبل فقط برای مقایسه کنار آن آمده است. می‌توانید همهٔ معین‌های یک حساب کل یا هر معین را جداگانه انتخاب کنید. مبلغ خالی یا حسابِ بدون ردیف در آن سال به‌صورت ۰ نمایش داده می‌شود؛ درصد فقط وقتی مبلغ سال قبل صفر باشد «—» است.</p>${V.files.some(f=>f.invalidAmounts||f.missingAccounts||f.ignoredMajorTotals||f.ignoredClosing)?`<div class="variance-note">کنترل بارگذاری: ${V.files.map((f,i)=>`${vFileLabel(i)} — اسناد بستن/اختتامیهٔ حساب موقت یا دائمِ کنارگذاشته‌شده: ${f.ignoredClosing||0} ردیف؛ مبالغ نامعتبرِ کنارگذاشته‌شده: ${f.invalidAmounts||0}؛ ردیف‌های بدون کد/عنوان حساب: ${f.missingAccounts||0}؛ ردیف‌های جمع کلِ حذف‌شده برای جلوگیری از دوباره‌شماری: ${f.ignoredMajorTotals||0}`).join(' · ')}. پیش از نهایی‌کردن کاربرگ، موارد غیر از اسناد اختتامیه را در فایل مبدأ بررسی کنید.</div>`:''}<div class="balance-picker-launch"><div><strong>انتخاب حساب از تراز نوسانات</strong><span class="variance-selection-summary" aria-live="polite"></span></div><button type="button" class="btn" data-balance-open aria-haspopup="dialog" aria-controls="varianceBalanceDialog" aria-expanded="false">نمایش تراز و انتخاب حساب‌ها</button><button class="confirm" type="button" data-vconfirm ${V.selected.size?'':'disabled'}>تأیید حساب‌ها و ساخت کاربرگ ←</button></div><div class="modal-overlay balance-picker-overlay" id="varianceBalanceDialog" data-balance-dialog role="dialog" aria-modal="true" aria-labelledby="varianceBalanceTitle"><div class="modal-box"><div class="modal-head"><span id="varianceBalanceTitle">انتخاب حساب — تراز نوسانات هزینه</span><button type="button" class="modal-close" data-balance-close aria-label="بستن تراز">×</button></div><div class="balance-picker-content"><div class="sr-tb-card variance-tb"><div class="sr-tb-titlebar"><div><b>تراز مقایسه‌ای بر مبنای سال جاری</b><small>${V.rows.length.toLocaleString('fa-IR')} حساب قابل انتخاب</small></div><button class="btn ghost" type="button" data-vclear>پاک‌کردن انتخاب</button></div><div class="sr-tb-period"><span>سال جاری:</span> <b>${vx(V.years[1]||'—')}</b><span>سال قبل:</span> <b>${vx(V.years[0]||'—')}</b></div><div class="sr-tb-toolbar"><input class="sr-search" id="vAccountSearch" value="${vx(V.filter)}" placeholder="جست‌وجو در کد یا عنوان کل و معین"><label class="sr-tb-selectall"><input type="checkbox" id="vSelectVisible" ${visible.length&&visible.every(a=>V.selected.has(a.id))?'checked':''}> انتخاب همهٔ نتایج</label></div><div class="sr-tb-scroll variance-scroll"><table class="sr-tb-table variance-tb-table"><thead><tr><th>انتخاب</th><th>کد معین</th><th>عنوان کل / معین</th><th>سال جاری ${vx(V.years[1]||'')} (ریال)</th><th>سال قبل ${vx(V.years[0]||'')} (ریال)</th></tr></thead><tbody>${[...byKol.entries()].map(([key,list])=>{const groupSelected=list.every(a=>V.selected.has(a.id)),kg=[vGroupSum(list,0),vGroupSum(list,1)];return `<tr class="sr-tb-kol variance-kol"><td><input type="checkbox" data-vkol="${vx(key)}" ${groupSelected?'checked':''}></td><td>${vx(list[0].kol.code||'')}</td><td class="sr-tb-title">${vx(list[0].kol.title||list[0].kol.code||'حساب کل')}</td><td class="num">${vmoney(kg[1])}</td><td class="num">${vmoney(kg[0])}</td></tr>${list.map(a=>`<tr class="sr-tb-moein"><td><input type="checkbox" data-vaccount="${vx(a.id)}" ${V.selected.has(a.id)?'checked':''}></td><td class="sr-tb-code">${vx(a.sub.code||'')}</td><td class="sr-tb-title">${vx(a.sub.title||a.sub.code||'')}</td><td class="num">${vmoney(vAmount(a,1))}</td><td class="num">${vmoney(vAmount(a,0))}</td></tr>`).join('')}`;}).join('')||'<tr><td colspan="5">حسابی با این جست‌وجو پیدا نشد.</td></tr>'}</tbody></table></div><div class="sr-tb-footer"><span class="variance-selection-summary"></span><button class="confirm" type="button" data-vconfirm ${V.selected.size?'':'disabled'}>تأیید حساب‌ها و ساخت کاربرگ ←</button></div></div></div></div></div><div class="sr-nav"><button class="btn ghost" type="button" data-vback="v2">→ نگاشت ستون‌ها</button></div>`;
+ bindBalancePicker(h,{initialOpen:vBalancePickerOpen,onOpenChange:open=>{vBalancePickerOpen=open;}});
  h.querySelector('#vAccountSearch').oninput=e=>{const scroll=h.querySelector('.variance-scroll')?.scrollTop||0;V.filter=e.target.value;vRender3();const s=h.querySelector('.variance-scroll');if(s)s.scrollTop=scroll;const x=h.querySelector('#vAccountSearch');if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length);}};
  h.querySelector('#vSelectVisible').onchange=e=>{visible.forEach(a=>e.target.checked?V.selected.add(a.id):V.selected.delete(a.id));vUpdateSelectionUI();};
  h.querySelectorAll('[data-vkol]').forEach(el=>el.onchange=()=>{const key=el.dataset.vkol;V.rows.filter(a=>(a.kol.code||a.kol.title)===key).forEach(a=>el.checked?V.selected.add(a.id):V.selected.delete(a.id));vUpdateSelectionUI();});
  h.querySelectorAll('[data-vaccount]').forEach(el=>el.onchange=()=>{el.checked?V.selected.add(el.dataset.vaccount):V.selected.delete(el.dataset.vaccount);vUpdateSelectionUI();});
- h.querySelector('[data-vclear]').onclick=()=>{V.selected.clear();vUpdateSelectionUI();};h.querySelector('[data-vconfirm]').onclick=()=>{vRender4();gotoStep('v4');};h.querySelector('[data-vback]').onclick=()=>gotoStep('v2');vUpdateSelectionUI();
+ h.querySelector('[data-vclear]').onclick=()=>{V.selected.clear();vUpdateSelectionUI();};h.querySelectorAll('[data-vconfirm]').forEach(button=>button.onclick=()=>{vBalancePickerOpen=false;vRender4();gotoStep('v4');});h.querySelector('[data-vback]').onclick=()=>{vBalancePickerOpen=false;gotoStep('v2');};vUpdateSelectionUI();
 }
 function vRows(){return V.rows.filter(a=>V.selected.has(a.id));}
 function vEvidenceTexts(a){
