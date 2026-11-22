@@ -1681,7 +1681,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 @page samplingLandscape{size:A4 landscape;margin:0!important}
 .sheet.sampling-template{--sample-red:#9e0000;--sample-gold:#fff2cc;--sample-gold2:#fbe3a0;--sample-blue:#005a9e;--sample-ink:#111827;--sample-mute:#4b5563;--sample-line:#475569;--sample-zebra:#fffcf2;--bad:#9e0000;page:samplingLandscape;width:var(--sample-paper-width,268mm);min-width:var(--sample-paper-width,268mm);max-width:none;margin:10px auto;background:#fff;border:1.8px solid var(--sample-red);border-radius:15px;padding:4px;box-shadow:0 6px 24px #00000022;direction:rtl;color:var(--sample-ink);font-size:11px;line-height:1.42;box-sizing:border-box}
 .sheet.sampling-template[data-sample-orientation="portrait"]{page:samplingPortrait}
-.sheet.sampling-template,.sheet.sampling-template *{-webkit-text-size-adjust:100%;text-size-adjust:100%;font-family:"B Nazanin","Vazirmatn","Tahoma",sans-serif!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}
+.sheet.sampling-template,.sheet.sampling-template *{-webkit-text-size-adjust:100%;text-size-adjust:100%;font-family:workpaper-lotus,serif!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}
 .sampling-template .inner{border:1.2px solid #64748b;border-radius:12px;padding:5px}
 .sampling-template .frame{border:1.5px solid var(--sample-red);border-radius:10px;overflow:hidden;width:calc(var(--sample-table-width,261mm) + 3px);margin-inline:auto}
 .sampling-template table{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;margin:0}
@@ -1793,6 +1793,17 @@ body.is-col-resizing,body.is-col-resizing *{cursor:col-resize!important;user-sel
 .sheet.sampling-template[data-sample-density="compact"] .sub{font-size:8.8px;line-height:1.24;margin-top:0}
 .sheet.sampling-template[data-sample-density="compact"] .cp .p{margin-bottom:1px;padding-bottom:.5px}
 .sheet.sampling-template[data-sample-density="compact"] td.num{font-size:9.4px;line-height:13.5px}
+/* Match the expense-variance workpaper: Lotus, right-aligned bold metadata,
+   a compact dotted separator and a rounded reference box. Height grows for long account paths. */
+.sheet.sampling-template .meta,.sheet.sampling-template[data-sample-density="compact"] .meta{display:flex;direction:rtl;align-items:center;gap:0;min-height:68pt;padding:3pt 7pt;text-align:right}
+.sheet.sampling-template .meta .ref-oval,.sheet.sampling-template[data-sample-density="compact"] .meta .ref-oval{flex:none;width:50.2pt;height:39.4pt;border:.8pt solid #c00000;border-radius:5pt;margin-left:5pt}
+.sheet.sampling-template .meta .sample-meta-main{flex:1;min-width:0;padding:0 5pt 0 0;text-align:right}
+.sheet.sampling-template .meta .big,.sheet.sampling-template[data-sample-density="compact"] .meta .big{font-size:9.2pt;font-weight:700;line-height:13.2pt;margin:1.5pt 0;padding:0;white-space:normal;overflow-wrap:anywhere}
+.sheet.sampling-template .meta .sample-meta-prep,.sheet.sampling-template[data-sample-density="compact"] .meta .sample-meta-prep{flex:none;align-self:center;align-items:stretch;width:150pt;margin-right:10pt;padding:0;border-right:1.3pt dotted #a8a8a8;gap:0;font-size:9.2pt;font-weight:700;line-height:13.2pt;text-align:right}
+.sheet.sampling-template[data-sample-orientation="portrait"] .meta .sample-meta-prep{width:116pt}
+.sheet.sampling-template .meta .sample-meta-prep>div{display:block;padding:0 8pt 0 0;overflow-wrap:anywhere}
+.sheet.sampling-template .meta .sample-meta-prep .v{font-weight:700}
+
 .sampling-template .sample-number-overflow{outline:2px solid #9e0000}
 
 @media print{
@@ -7238,6 +7249,12 @@ function samplePositionEvidence(root){
 function sampleRenderOnScreenPages(viewEl){
  if(!viewEl)return;
  const canvas=viewEl.querySelector('[data-sheet-canvas]');if(!canvas)return;
+ // Pagination must measure the embedded Lotus font, not a temporary fallback.
+ if(document.fonts&&!document.fonts.check('12px workpaper-lotus')){
+  canvas.dataset.paginated='0';const badge=viewEl.querySelector('[data-page-badge]');if(badge)badge.textContent='در حال آماده‌سازی فونت کاربرگ…';
+  if(!canvas._sampleFontPending){canvas._sampleFontPending=true;document.fonts.load('12px workpaper-lotus').then(faces=>{if(!faces.length||!document.fonts.check('12px workpaper-lotus'))throw new Error('Lotus font unavailable');canvas._sampleFontPending=false;if(canvas.isConnected&&!viewEl.classList.contains('hide'))sampleRenderOnScreenPages(viewEl);}).catch(()=>{canvas._sampleFontPending=false;if(canvas.isConnected&&badge)badge.textContent='فونت کاربرگ آماده نشد؛ چاپ متوقف است.';});}
+  return;
+ }
  const viewIdx=Number(viewEl.dataset.view);
  const ws=Number.isFinite(viewIdx)&&SHEET_OUT[viewIdx]?SHEET_OUT[viewIdx].w:null;
  const lay=samplePrintLayout(ws);
