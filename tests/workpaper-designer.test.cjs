@@ -28,8 +28,8 @@ test('import validates input without injecting markup and preserves layout on fa
  }finally{t.close()}
 });
 test('print dimensions, page overflow, structural operations and isolated layout',()=>{
- const t=setup();try{const {w}=t;change(w,'orientation','portrait');assert.match(w.document.getElementById('printPageRule').textContent,/A4 portrait/);assert.doesNotMatch(w.document.getElementById('warn').textContent,/عرض جدول/);change(w,'columnWidth','200');assert.match(w.document.getElementById('warn').textContent,/عرض جدول/);click(w,'fitColumns');assert.doesNotMatch(w.document.getElementById('warn').textContent,/عرض جدول/);
- const before=w.document.querySelectorAll('#sheet tbody tr').length;click(w,'addRow');assert.equal(w.document.querySelectorAll('#sheet tbody tr').length,before+1);click(w,'removeRow');assert.equal(w.document.querySelectorAll('#sheet tbody tr').length,before);
+ const t=setup();try{const {w}=t;change(w,'orientation','portrait');assert.match(w.document.getElementById('printPageRule').textContent,/A4 portrait/);assert.doesNotMatch(w.document.getElementById('warn').textContent,/عرض جدول/);change(w,'columnWidth','200');assert.match(w.document.getElementById('status').textContent,/محدودهٔ امن/);click(w,'fitColumns');assert.doesNotMatch(w.document.getElementById('warn').textContent,/عرض جدول/);
+ cell(w,5,2).click();change(w,'columnWidth','3');const before=w.document.querySelectorAll('#sheet tbody tr').length;click(w,'addRow');assert.equal(w.document.querySelectorAll('#sheet tbody tr').length,before+1);click(w,'removeRow');assert.equal(w.document.querySelectorAll('#sheet tbody tr').length,before);
  click(w,'addColumn');assert.equal(w.document.querySelectorAll('#sheet col').length,9);click(w,'removeColumn');assert.equal(w.document.querySelectorAll('#sheet col').length,8);
  assert.equal(t.errors.length,0,t.errors.join('\n'));assert(!html.includes('https://'));assert.match(html,/data:font\/woff2;base64/);
  }finally{t.close()}
@@ -51,9 +51,19 @@ test('row height is directly editable and page top/bottom stay fixed, colors rem
 
 test('orientation fitting preserves proportions, margins and explicit manual edits',async()=>{
  const t=setup();try{const {w}=t;cell(w,5,2).click();change(w,'columnWidth','52');click(w,'saveFile');let saved=JSON.parse(await t.blob().text());const before=saved.columns.map(c=>c.widthMm);
- change(w,'orientation','portrait');assert.match(w.document.getElementById('status').textContent,/متناسب/);click(w,'saveFile');saved=JSON.parse(await t.blob().text());const after=saved.columns.map(c=>c.widthMm);assert(after.reduce((a,b)=>a+b,0)<=186);assert(after.every(x=>x>=3));assert(Math.abs(after[2]/before[2]-after[3]/before[3])<.002);assert.equal(saved.page.margins.top,10);assert.equal(saved.page.margins.bottom,10);
- change(w,'orientation','landscape');click(w,'saveFile');saved=JSON.parse(await t.blob().text());assert.deepEqual(saved.columns.map(c=>c.widthMm),after);click(w,'fitColumns');click(w,'saveFile');saved=JSON.parse(await t.blob().text());assert(saved.columns.reduce((a,c)=>a+c.widthMm,0)<=273);
- let handle=w.document.querySelector('[data-column-resize="2"]');const value=saved.columns[2].widthMm;handle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',shiftKey:true,bubbles:true}));assert.equal(Number(w.document.getElementById('columnWidth').value),Math.round((value+.1)*10)/10);
- change(w,'marginLeft','100');change(w,'marginRight','100');change(w,'orientation','portrait');assert.match(w.document.getElementById('status').textContent,/کافی نیست/);click(w,'saveFile');assert.ok(JSON.parse(await t.blob().text()).columns.every(c=>c.widthMm>=3));
+ change(w,'orientation','portrait');assert.match(w.document.getElementById('status').textContent,/متناسب/);click(w,'saveFile');saved=JSON.parse(await t.blob().text());const after=saved.columns.map(c=>c.widthMm);assert(after.reduce((a,b)=>a+b,0)<=178);assert(after.every(x=>x>=3));assert(Math.abs(after[2]/before[2]-after[3]/before[3])<.002);assert.equal(saved.page.margins.top,10);assert.equal(saved.page.margins.bottom,10);
+ change(w,'orientation','landscape');click(w,'saveFile');saved=JSON.parse(await t.blob().text());assert.deepEqual(saved.columns.map(c=>c.widthMm),after);click(w,'fitColumns');click(w,'saveFile');saved=JSON.parse(await t.blob().text());assert(saved.columns.reduce((a,c)=>a+c.widthMm,0)<=265);
+ change(w,'columnWidth','20');let handle=w.document.querySelector('[data-column-resize="2"]');const value=20;handle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft',shiftKey:true,bubbles:true}));assert.equal(Number(w.document.getElementById('columnWidth').value),Math.round((value+.1)*10)/10);
+ change(w,'marginLeft','100');change(w,'marginRight','100');change(w,'orientation','portrait');assert.match(w.document.getElementById('status').textContent,/محدودهٔ امن|اندازه‌ها حفظ/);click(w,'saveFile');assert.ok(JSON.parse(await t.blob().text()).columns.every(c=>c.widthMm>=3));
+ }finally{t.close()}
+});
+test('safe punch margins, dimension limits, and linked row types survive export and import',async()=>{
+ const t=setup();try{const {w}=t;
+ click(w,'saveFile');let data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,20);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265);
+ change(w,'marginLeft','12');assert.equal(w.document.getElementById('marginLeft').value,'20');change(w,'marginRight','5');assert.equal(w.document.getElementById('marginRight').value,'12');
+ cell(w,5,2).click();change(w,'rowHeight','20');click(w,'saveFile');data=JSON.parse(await t.blob().text());assert.deepEqual(data.rows.slice(5,8).map(r=>r.heightMm),[20,20,20]);assert.equal(data.rows[8].heightMm,8);
+ change(w,'rowHeight','200');click(w,'saveFile');data=JSON.parse(await t.blob().text());assert(data.rows.reduce((a,r)=>a+r.heightMm,0)<=190+1e-7);assert.equal(data.rows[5].heightMm,data.rows[7].heightMm);
+ change(w,'columnWidth','290');click(w,'saveFile');data=JSON.parse(await t.blob().text());assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265+1e-7);
+ data.page.margins.left=0;data.page.margins.top=0;data.page.margins.bottom=0;data.columns[2].widthMm=200;const f=w.document.getElementById('fileInput');Object.defineProperty(f,'files',{configurable:true,value:[{size:200,text:async()=>JSON.stringify(data)}]});f.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();click(w,'saveFile');data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,20);assert.equal(data.page.margins.top,10);assert.equal(data.page.margins.bottom,10);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265+1e-7);
  }finally{t.close()}
 });
