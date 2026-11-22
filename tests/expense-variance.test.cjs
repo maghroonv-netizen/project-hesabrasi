@@ -115,7 +115,7 @@ function dispatchFile(input, file) {
     assert.deepEqual([...paper.querySelectorAll('col')].map(col => parseFloat(col.style.width)), [3, 6, 17, 13, 13, 13, 8, 27], 'subtotal label span uses the slightly narrower row/code/account columns');
     assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary thead th').length, 5, 'summary contains only major account and year/change totals');
     assert.ok(!w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-summary').textContent.includes('نوسان بیش از حد'), 'the fluctuation-count metric is removed from the summary');
-    assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr').length, 2, 'the summary has one row for each major-account group');
+    assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr:not(.variance-grand-total)').length, 2, 'the summary has one row for each major-account group');
     assert.ok(paper.tBodies[0].rows[0].textContent.includes('هزینه‌های اداری'), 'group heading comes from the major account title');
     assert.ok([...paper.tBodies[0].rows].some(row => row.classList.contains('variance-group-title') && row.textContent.includes('هزینه مالی')), 'a second major account becomes a separate group automatically');
     assert.equal(w.document.querySelectorAll('#varianceV4 [data-vnote]').length, 10, 'notes are editable in both the source table and paginated preview');
@@ -153,7 +153,7 @@ function dispatchFile(input, file) {
     assert.equal(adminSubtotal.querySelector('td.vpct').textContent, '۹۹٫۸٪', 'subtotal percentage is calculated from group totals');
     const summaryRows = [...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr')];
     assert.deepEqual([...w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary-table col')].map(col => parseFloat(col.style.width)), [30, 17.5, 17.5, 17.5, 17.5], 'the summary account-information column is narrower and numeric columns remain balanced');
-    assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5], 'each summary row contains no fluctuation count');
+    assert.deepEqual(summaryRows.map(row => row.querySelectorAll('td').length), [5, 5, 5], 'each summary row contains no fluctuation count');
     assert.ok(!paper.textContent.includes('کنترل‌های حسابرسی') && !paper.textContent.includes('یادداشت حسابرس'));
     let printed = null;
     w.print = () => { printed = [...w.document.querySelectorAll('#printHost .variance-print-page')].map(page => ({
@@ -241,10 +241,11 @@ function dispatchFile(input, file) {
     printed = null;
     w.document.querySelector('#varianceV4 [data-vprint]').click();
     assert.ok(printed.length >= 2, 'additional account rows paginate across pages');
-    assert.ok(printed.slice(0, -1).every(page => page.carryOut.length === 1 && page.fullFrame), 'every non-final page has the full 541.7pt frame and ends with a cumulative page total');
-    assert.ok(printed.every(page => page.carryIn.length === 0), 'no page contains a transfer-from-previous-page bar');
-    assert.ok(printed.slice(1).every(page => page.carryIn.length === 0), 'continuation pages do not show a transfer-from-previous-page bar');
-    assert.equal(printed.at(-1).carryOut.length, 0, 'the final page has no page-total row');
+    assert.ok(printed.slice(0, -1).every(page => page.fullFrame), 'non-final pages have a full frame');
+    assert.ok(printed.some(page => page.carryOut.length === 1), 'a split group transfers its own cumulative amount');
+    assert.ok(printed.some(page => page.carryIn.length === 1), 'the continued group shows a transfer from the preceding page');
+    assert.equal(printed.at(-1).carryOut.length, 0, 'the final page has no transfer out');
+    assert.equal(w.document.querySelectorAll('#printHost .variance-grand-total').length, 1, 'grand total appears exactly once');
     assert.ok(w.document.querySelector('#printHost .variance-paper-table tbody').rows.length >= 20, 'each measured page uses its available height for more account rows');
     const summaryPage = printed.at(-1);
     const lastPrintPage = w.document.querySelectorAll('#printHost .variance-print-page').item(printed.length - 1);
