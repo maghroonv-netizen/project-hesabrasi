@@ -59,11 +59,18 @@ test('orientation fitting preserves proportions, margins and explicit manual edi
 });
 test('safe punch margins, dimension limits, and linked row types survive export and import',async()=>{
  const t=setup();try{const {w}=t;
- click(w,'saveFile');let data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,20);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265);
- change(w,'marginLeft','12');assert.equal(w.document.getElementById('marginLeft').value,'20');change(w,'marginRight','5');assert.equal(w.document.getElementById('marginRight').value,'12');
+ click(w,'saveFile');let data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,20);assert.equal(data.page.margins.right,20);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265);
+ change(w,'marginLeft','12');assert.equal(w.document.getElementById('marginLeft').value,'20');change(w,'marginRight','5');assert.equal(w.document.getElementById('marginRight').value,'20');
  cell(w,5,2).click();change(w,'rowHeight','20');click(w,'saveFile');data=JSON.parse(await t.blob().text());assert.deepEqual(data.rows.slice(5,8).map(r=>r.heightMm),[20,20,20]);assert.equal(data.rows[8].heightMm,8);
  change(w,'rowHeight','200');click(w,'saveFile');data=JSON.parse(await t.blob().text());assert(data.rows.reduce((a,r)=>a+r.heightMm,0)<=190+1e-7);assert.equal(data.rows[5].heightMm,data.rows[7].heightMm);
  change(w,'columnWidth','290');click(w,'saveFile');data=JSON.parse(await t.blob().text());assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265+1e-7);
- data.page.margins.left=0;data.page.margins.top=0;data.page.margins.bottom=0;data.columns[2].widthMm=200;const f=w.document.getElementById('fileInput');Object.defineProperty(f,'files',{configurable:true,value:[{size:200,text:async()=>JSON.stringify(data)}]});f.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();click(w,'saveFile');data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,20);assert.equal(data.page.margins.top,10);assert.equal(data.page.margins.bottom,10);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265+1e-7);
+ data.page.margins.left=0;data.page.margins.top=0;data.page.margins.bottom=0;data.columns[2].widthMm=200;const f=w.document.getElementById('fileInput');Object.defineProperty(f,'files',{configurable:true,value:[{size:200,text:async()=>JSON.stringify(data)}]});f.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();click(w,'saveFile');data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,20);assert.equal(data.page.margins.right,20);assert.equal(data.page.margins.top,10);assert.equal(data.page.margins.bottom,10);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=265+1e-7);
+ }finally{t.close()}
+});
+
+test('side margins stay equal on either input, orientation changes, and old imports',async()=>{
+ const t=setup();try{const {w}=t;change(w,'marginLeft','28.5');assert.equal(w.document.getElementById('marginRight').value,'28.5');change(w,'marginRight','24.2');assert.equal(w.document.getElementById('marginLeft').value,'24.2');
+ change(w,'orientation','portrait');click(w,'saveFile');let data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,24.2);assert.equal(data.page.margins.right,24.2);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=210-48.4-1+1e-7);
+ data.page.margins.left=20;data.page.margins.right=35;let f=w.document.getElementById('fileInput'),asked='';w.confirm=msg=>{asked=msg;return false};Object.defineProperty(f,'files',{configurable:true,value:[{size:200,text:async()=>JSON.stringify(data)}]});f.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();assert.match(asked,/حاشیه/);assert.equal(w.document.getElementById('marginLeft').value,'24.2');w.confirm=()=>true;f.dispatchEvent(new w.Event('change',{bubbles:true}));await settle();click(w,'saveFile');data=JSON.parse(await t.blob().text());assert.equal(data.page.margins.left,35);assert.equal(data.page.margins.right,35);assert(data.columns.reduce((a,c)=>a+c.widthMm,0)<=139+1e-7);
  }finally{t.close()}
 });
