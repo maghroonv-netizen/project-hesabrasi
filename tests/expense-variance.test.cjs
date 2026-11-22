@@ -112,7 +112,7 @@ function dispatchFile(input, file) {
     const paper = w.document.querySelector('#varianceV4 .variance-paper-table');
     assert.equal(paper.querySelectorAll('thead th').length, 8, 'main table has exactly eight columns');
     assert.equal([...paper.querySelectorAll('col')].reduce((total, col) => total + parseFloat(col.style.width), 0), 100, 'responsive column percentages fill the printable width exactly');
-    assert.deepEqual([...paper.querySelectorAll('col')].map(col => parseFloat(col.style.width)), [3, 6, 17, 13, 13, 13, 8, 27], 'subtotal label span uses the slightly narrower row/code/account columns');
+    assert.deepEqual([...paper.querySelectorAll('col')].map(col => parseFloat(col.style.width)), [4.5, 6, 15.5, 13, 13, 13, 8, 27], 'row number column is wide enough while the label span stays compact');
     assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary thead th').length, 5, 'summary contains only major account and year/change totals');
     assert.ok(!w.document.querySelector('#varianceV4 .variance-workpaper-source .variance-summary').textContent.includes('نوسان بیش از حد'), 'the fluctuation-count metric is removed from the summary');
     assert.equal(w.document.querySelectorAll('#varianceV4 .variance-workpaper-source .variance-summary tbody tr:not(.variance-grand-total)').length, 2, 'the summary has one row for each major-account group');
