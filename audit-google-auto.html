@@ -2181,6 +2181,29 @@ body.meta-stage-active .wrap{display:none!important;}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 }
 
+
+/* Visual identity shared by the account-analysis and aged workpapers. */
+.audit-template.sheet,.audit-template.sheet *{font-family:workpaper-lotus,serif!important}
+.audit-template.sheet .head{display:flex!important;direction:rtl!important;align-items:center!important;gap:0!important;min-height:68pt!important;padding:3pt 7pt!important;background:#fff!important}
+.audit-template.sheet .head .refbox{box-sizing:border-box!important;flex:none!important;width:50.2pt!important;height:39.4pt!important;margin-left:5pt!important;border:.8pt solid #c00000!important;border-radius:5pt!important;background:#fff!important}
+.audit-template.sheet .head .hl.right{flex:1!important;min-width:0!important;padding:0 5pt 0 0!important;text-align:right!important}
+.audit-template.sheet .head .hl:not(.right){box-sizing:border-box!important;flex:none!important;align-self:center!important;width:116pt!important;margin-right:10pt!important;padding:0 8pt 0 0!important;border-right:1.3pt dotted #a8a8a8!important;text-align:right!important}
+.audit-template.sheet .head .hl div{padding:0!important;margin:1.5pt 0!important;border:0!important;font-size:9.2pt!important;font-weight:700!important;line-height:13.2pt!important;text-align:right!important;white-space:normal!important;overflow-wrap:anywhere!important}
+.audit-template.sheet .head .meta-label{color:#005a9e!important}.audit-template.sheet .head .meta-value{color:#111827!important}
+.sheet.sampling-template.sr-aged-page-sheet,.sheet.sampling-template.sr-aged-page-sheet *{font-family:workpaper-lotus,serif!important}
+.sheet.sampling-template.sr-aged-page-sheet{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:none!important;padding:0!important;border:1.5px solid #1f2937!important;border-radius:10pt!important;overflow:hidden!important}
+.sheet.sampling-template.sr-aged-page-sheet>.inner{padding:0!important;border:0!important;border-radius:0!important;overflow:visible!important}
+.sheet.sampling-template.sr-aged-page-sheet.sr-aged-page-full>.inner{height:100%!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid{display:flex!important;direction:rtl!important;align-items:center!important;gap:0!important;min-height:68pt!important;padding:3pt 7pt!important;background:#fff!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-refbox{flex:none!important;box-sizing:border-box!important;width:50.2pt!important;height:39.4pt!important;margin-left:5pt!important;border:.8pt solid #c00000!important;border-radius:5pt!important;background:#fff!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-company{flex:1!important;min-width:0!important;padding:0 5pt 0 0!important;text-align:right!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{box-sizing:border-box!important;flex:none!important;align-self:center!important;width:150pt!important;max-width:none!important;margin-right:10pt!important;padding:0 8pt 0 0!important;border-right:1.3pt dotted #a8a8a8!important;gap:0!important;align-items:stretch!important;text-align:right!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:9.2pt!important;font-weight:700!important;line-height:13.2pt!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-company>div,.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-prep>div{display:block!important;margin:1.5pt 0!important;padding:0!important;text-align:right!important;white-space:normal!important;overflow-wrap:normal!important;line-height:13.2pt!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-prep .k,.sheet.sampling-template.sr-aged-page-sheet .sr-meta-grid .sr-head-prep .v{white-space:normal!important;overflow-wrap:normal!important;font-weight:700!important}
+.sheet.sampling-template.sr-aged-page-sheet .sr-aged-page-number{font-family:workpaper-lotus,serif!important}
+/* Keep row height stable when review-only remove buttons disappear in print. */
+.sheet.sampling-template.sr-aged-page-sheet .sr-paper-table tr.sr-data-row td{height:22.25px!important}
 </style>
 </head>
 <body class="meta-stage-active">
@@ -6553,14 +6576,16 @@ function auditTemplateAlign(root){
 function auditTemplatePaint(o,host){
   const root=auditTemplateRoot(),A=o.A,cfg=typeof SHEET_CFG!=='undefined'?SHEET_CFG:{},edits=o.templateEdits||{};
   const text=(field,value)=>{root.querySelector(`[data-field="${field}"]`).textContent=value;};
-  text('company','شرکت مورد رسیدگی : '+(cfg.company||'—'));
-  text('subject','کاربرگ تعیین ماهیت حساب و آنالیز '+(o.a.title||A.title||A.عنوان||'—'));
-  text('fiscal-year','دوره مالی : '+String(cfg.year??''));
-  text('prepared-date','تاریخ تهیه : '+String(cfg.date??''));text('preparer','تهیه کننده : '+(cfg.prep||'—'));text('reviewer','بررسی کننده : '+(cfg.rev||'—'));
+  const meta=(field,label,value)=>{const el=root.querySelector(`[data-field="${field}"]`),key=document.createElement('span'),val=document.createElement('span');key.className='meta-label';key.textContent=label+' : ';val.className='meta-value';val.textContent=String(value??'');el.replaceChildren(key,val);};
+  meta('company','نام واحد مورد رسیدگی',cfg.company||'—');
+  meta('subject','موضوع','کاربرگ تعیین ماهیت حساب و آنالیز '+(o.a.title||A.title||A.عنوان||'—'));
+  meta('fiscal-year','سال مالی مورد رسیدگی',cfg.year??'');
+  meta('prepared-date','تاریخ تهیه',cfg.date??'');meta('preparer','تهیه‌کننده',cfg.prep||'—');meta('reviewer','بررسی‌کننده',cfg.rev||'—');
   text('nature',String(o.sec['ماهیت']?.text||''));
   for(const field of ['ref-box','follow-up','issues','conclusion'])text(field,edits[field]??'');
   root.querySelector('.grid').replaceWith(auditTemplateGrid(o,auditTemplateRows(o)));
   host.replaceChildren(root);auditTemplateAlign(root);
+  if(document.fonts&&!document.fonts.check('12px workpaper-lotus'))document.fonts.load('12px workpaper-lotus').then(()=>{if(root.isConnected)auditTemplateAlign(root);}).catch(()=>{});
   root.querySelectorAll('[data-report-ref]').forEach(button=>button.onclick=()=>reportOpenReference(button.dataset.reportRef));
   root.querySelectorAll('[contenteditable]').forEach(e=>{
     e.addEventListener('input',()=>{
@@ -6610,6 +6635,7 @@ function auditTemplatePrintPages(o,source,target){
 function auditTemplatePrint(host){
   if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
   const o=ANA.out[ANA.active],source=host.querySelector('.audit-template'),target=document.getElementById('printHost');if(!o||!source)return;if(source.querySelector('[aria-invalid="true"]')){alert('ابتدا مبلغ نامعتبر را اصلاح کنید.');return;}
+  if(document.fonts&&!document.fonts.check('12px workpaper-lotus')){document.fonts.load('12px workpaper-lotus').then(faces=>{if(!faces.length||!document.fonts.check('12px workpaper-lotus'))throw new Error('Lotus font unavailable');if(source.isConnected)auditTemplatePrint(host);}).catch(()=>alert('فونت کاربرگ آماده نشد؛ چاپ متوقف است.'));return;}
   let rule,done=false;const title=document.title;const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=title;document.body.classList.remove('printing');target.classList.remove('template-measuring');target.innerHTML='';if(rule)rule.remove();window.removeEventListener('afterprint',restore);};
   try{auditTemplatePrintPages(o,source,target);rule=document.createElement('style');rule.textContent='@page{size:A4 portrait;margin:0!important}@media print{body.printing #printHost{padding:6mm!important;box-sizing:border-box!important}}';document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';schedulePrintRestore(restore);window.print();}catch(error){restore();alert(error.message);}
 }
@@ -14167,6 +14193,10 @@ function paginateMeasuredWorkpaperGroups({groups,maxBodyHeight,carryHeight,carry
 window.paginateMeasuredWorkpaperGroups=paginateMeasuredWorkpaperGroups;
 function paginateWorkpaperPreview(host){
   const source=host?.querySelector('.sr-workpaper-source'),sourceTable=source?.querySelector('.sr-paper-table');if(!source||!sourceTable)return;
+  if(document.fonts&&!document.fonts.check('12px workpaper-lotus')){
+    if(!host._srFontPending){host._srFontPending=true;document.fonts.load('12px workpaper-lotus').then(faces=>{if(!faces.length||!document.fonts.check('12px workpaper-lotus'))throw new Error('Lotus font unavailable');host._srFontPending=false;if(source.isConnected)paginateWorkpaperPreview(host);}).catch(()=>{host._srFontPending=false;if(source.isConnected)host.innerHTML='<div class="sr-pagination-error" role="alert">فونت کاربرگ آماده نشد؛ چاپ متوقف است.</div>';});}
+    return;
+  }
   const body=sourceTable.tBodies[0];if(!body)return;
   const rows=[...body.rows].map(row=>row.cloneNode(true)),groups=[];let group=null,grandTotal=null;
   rows.forEach(row=>{
@@ -14625,18 +14655,19 @@ function printReport(){
       html,body{width:100%!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important}
       body.printing>*:not(#printHost){display:none!important}
       body.printing #printHost{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;overflow:visible!important}
-      .sr-aged-page{page:srAgedLandscape!important;display:block!important;box-sizing:border-box!important;width:297mm!important;min-width:297mm!important;max-width:297mm!important;height:210mm!important;min-height:210mm!important;max-height:210mm!important;margin:0!important;padding:13mm 7.5mm 11mm!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;overflow:hidden!important;break-before:auto!important;break-inside:avoid!important;page-break-inside:avoid!important;break-after:page!important;page-break-after:always!important}
+      .sr-aged-page{page:srAgedLandscape!important;display:block!important;box-sizing:border-box!important;width:297mm!important;min-width:297mm!important;max-width:297mm!important;height:210mm!important;min-height:210mm!important;max-height:210mm!important;margin:0!important;padding:26.8pt!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;overflow:hidden!important;break-before:auto!important;break-inside:avoid!important;page-break-inside:avoid!important;break-after:page!important;page-break-after:always!important}
       .sr-aged-page:last-child{break-after:auto!important;page-break-after:auto!important}
       .sr-workpaper-review-tools,.sr-workpaper-exclude{display:none!important}
-      .sr-aged-page-sheet{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:2mm!important;box-shadow:none!important;border:1.5px solid #9e0000!important;border-radius:10px!important;overflow:visible!important;font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:7pt!important}
-      .sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:1px solid #64748b!important;border-radius:7px!important;padding:2mm!important}
+      .sr-aged-page-sheet{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;box-shadow:none!important;border:1.5px solid #1f2937!important;border-radius:10pt!important;overflow:hidden!important;font-family:workpaper-lotus,serif!important;font-size:7pt!important}
+      .sr-aged-page-sheet>.inner{height:auto!important;min-height:0!important;overflow:visible!important;border:0!important;border-radius:0!important;padding:0!important}
+      .sr-aged-page-sheet.sr-aged-page-full>.inner{height:100%!important}
       .sr-aged-page-sheet .sr-rows-box{padding:1.5mm!important;overflow:visible!important;border:1.5px solid #9e0000!important;border-radius:7px!important;box-sizing:border-box!important}
       .sr-aged-page-sheet .sr-screen-head,.sr-aged-page-sheet .sr-report-title{display:none!important}
-      .sr-aged-page-sheet .sr-paper-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;border-spacing:0!important;border:1.2px solid #475569!important;page-break-inside:auto!important;break-inside:auto!important}
+      .sr-aged-page-sheet .sr-paper-table{width:768.1pt!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;border-spacing:0!important;border:0!important;page-break-inside:auto!important;break-inside:auto!important}
       .sr-aged-page-sheet .sr-paper-table thead{display:table-header-group!important}
       .sr-aged-page-sheet .sr-paper-table tbody{display:table-row-group!important}
-      .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:8pt!important;padding:1mm .6mm!important;line-height:1.22!important;overflow-wrap:anywhere!important}
-      .sr-aged-page-sheet .sr-paper-table td.num{font-size:7.8pt!important;white-space:nowrap!important;direction:ltr!important}
+      .sr-aged-page-sheet .sr-paper-table th,.sr-aged-page-sheet .sr-paper-table td{font-size:8pt!important;padding:1.6pt 2pt!important;line-height:1.2!important;overflow-wrap:anywhere!important}
+      .sr-aged-page-sheet .sr-paper-table td.num{font-size:8pt!important;white-space:nowrap!important;direction:ltr!important}
       .sr-aged-page-sheet .sr-meta-grid{display:grid!important;grid-template-columns:18mm minmax(0,1fr) minmax(0,92mm)!important;gap:2mm!important;align-items:center!important;min-height:19mm!important;padding:1.5mm 2.5mm!important;background:#fff!important;border-bottom:1px solid #64748b!important}
       .sr-aged-page-sheet .sr-meta-grid .sr-head-company,.sr-aged-page-sheet .sr-meta-grid .sr-head-prep{font-size:8pt!important;line-height:1.25!important}
       .sr-aged-page-sheet .sr-meta-grid .sr-head-prep{position:static!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;width:max-content!important;max-width:92mm!important;min-width:0!important;height:auto!important;justify-self:end!important;background:transparent!important;writing-mode:horizontal-tb!important;transform:none!important;display:flex!important;flex-direction:column!important;gap:.5mm!important;align-items:flex-start!important;border-left:0!important;border-right:1px dashed #a8a8a8!important;padding:0 2mm 0 0!important;text-align:right!important}
@@ -14651,7 +14682,7 @@ function printReport(){
       .sr-aged-page-sheet .sr-paper-table tbody tr.sr-workpaper-subtotal td{background:#edf2f7!important;font-weight:bold!important;border-top:1px solid #64748b!important}
       .sr-aged-page-sheet .sr-paper-table tbody tr.sr-workpaper-total{break-inside:avoid!important;page-break-inside:avoid!important}
       .sr-aged-page-sheet .sr-paper-table tbody tr.sr-workpaper-total td{background:#fff2cc!important;font-weight:bold!important;border-top:1.6px solid #9e0000!important}
-      .sr-aged-page-number{font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:10.5px!important;font-weight:700!important;line-height:1.25!important;padding-top:1mm!important;text-align:center!important;color:#111827!important}
+      .sr-aged-page-number{font-family:workpaper-lotus,serif!important;font-size:10.5px!important;font-weight:700!important;line-height:1.25!important;padding-top:2px!important;text-align:center!important;color:#111827!important}
     }`;
   const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=old;document.body.classList.remove('printing');ph.replaceChildren();rule.remove();};
   ph.replaceChildren(...pageNodes.map(node=>node.cloneNode(true)));
@@ -14925,7 +14956,7 @@ css.textContent=`
 `;
 css.textContent+=`
 /* مطابق دستورالعمل کاربرگ اقلام سنواتی و راکد */
-.sr-aged-page-sheet{max-height:541.7pt!important;padding:0!important;border:1.5px solid #1f2937!important;border-radius:10pt!important;overflow:hidden!important}.sample-paper-box.sr-aged-page{padding:26.8pt!important}.sr-aged-page-sheet.sr-aged-page-full{height:541.7pt!important}.sr-aged-page-sheet.sr-aged-page-short{height:auto!important;max-height:541.7pt!important}.sr-aged-page-overflow .sr-aged-page-sheet{height:auto!important;max-height:none!important;overflow:visible!important}.sr-aged-page-sheet.sr-aged-page-full .sr-paper-table{height:100%!important}.sr-aged-page-sheet .sr-paper-table tbody tr.sr-page-carry td{background:#fbe3a0!important;font-size:8.4pt!important;font-weight:700!important}.sr-aged-page-sheet .sr-paper-table tbody tr.sr-page-transfer td{background:#fff2cc!important;font-size:8.4pt!important;font-weight:700!important}.sr-pagination-error{padding:12px;border:1px solid #b91c1c;border-radius:8px;color:#9e0000;background:#fff7f7}
+.sr-aged-page-sheet{max-height:541.7pt!important;padding:0!important;border:1.5px solid #1f2937!important;border-radius:10pt!important;overflow:hidden!important}.sample-paper-box.sr-aged-page{padding:26.8pt!important}.sr-aged-page-sheet.sr-aged-page-full{height:541.7pt!important}.sr-aged-page-sheet.sr-aged-page-short{height:auto!important;max-height:541.7pt!important}.sr-aged-page-overflow .sr-aged-page-sheet{height:auto!important;max-height:none!important;overflow:visible!important}.sr-aged-page-sheet.sr-aged-page-full>.inner{display:flex!important;flex-direction:column!important;height:100%!important}.sr-aged-page-sheet.sr-aged-page-full .sr-paper-table{height:auto!important;flex:0 0 auto!important}.sr-aged-page-sheet.sr-aged-page-full .sr-aged-page-number{margin-top:auto!important}.sr-aged-page-sheet .sr-paper-table tbody tr.sr-page-carry td{background:#fbe3a0!important;font-size:8.4pt!important;font-weight:700!important}.sr-aged-page-sheet .sr-paper-table tbody tr.sr-page-transfer td{background:#fff2cc!important;font-size:8.4pt!important;font-weight:700!important}.sr-pagination-error{padding:12px;border:1px solid #b91c1c;border-radius:8px;color:#9e0000;background:#fff7f7}
 .sr-aged-page-sheet>.inner{padding:0!important;border:0!important;border-radius:0!important;overflow:visible!important}
 .sr-aged-page-sheet .sr-rows-box{padding:0!important;border:0!important;border-radius:0!important;margin:0!important}
 .sr-aged-page-sheet .sr-paper-table{width:768.1pt!important;max-width:100%!important;border:0!important;border-collapse:collapse!important;table-layout:fixed!important;direction:rtl!important}

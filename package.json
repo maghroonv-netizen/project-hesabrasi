@@ -6,7 +6,8 @@
     "test:existing": "node --test tests/*.test.cjs tests/*.test.mjs",
     "test:ui": "node tests/ui-theme.test.cjs",
     "test:designer": "node --test tests/workpaper-designer.test.cjs tests/workpaper-designer-browser.test.cjs",
-    "test:variance": "node --test tests/expense-variance.test.cjs tests/variance-workpaper.test.cjs tests/variance-workpaper-browser.test.cjs"
+    "test:variance": "node --test tests/expense-variance.test.cjs tests/variance-workpaper.test.cjs tests/variance-workpaper-browser.test.cjs",
+    "test:workpaper-styles": "node --test tests/other-workpapers-browser.test.cjs tests/sampling-preview.test.cjs tests/variance-workpaper-browser.test.cjs"
   },
   "devDependencies": {
     "jsdom": "26.1.0",

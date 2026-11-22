@@ -173,7 +173,7 @@ assert.match(html, /صفحه \$\{faNum\(i\+1\)\} از \$\{faNum\(pages\.length\)
   'sampling page numbers use the unified Persian wording without the small hamza');
 assert.match(html, /\.sr-aged-page-sheet \.sr-meta-grid \.sr-refbox\{[^}]*background:#fff!important/,
   'aged worksheet reference box remains white in print');
-assert.match(html, /\.sr-aged-page-number\{font-family:"B Nazanin","Vazirmatn",Tahoma,sans-serif!important;font-size:10\.5px!important/,
+assert.match(html, /\.sr-aged-page-number\{font-family:workpaper-lotus,serif!important;font-size:10\.5px!important/,
   'aged worksheet page number uses the unified font and size');
 assert.match(html, /grid-template-columns:18mm minmax\(0,1fr\) minmax\(0,92mm\)!important/,
   'aged worksheet preparation fields have a stable-width column at the left edge');
@@ -236,7 +236,7 @@ assert.match(html, /padding:1\.6pt 2pt!important;line-height:1\.2!important/,
   'aged-workpaper rows have a little extra vertical breathing room');
 assert.match(html, /td\.sr-account-title\{text-align:right!important;font-size:8pt!important\}/,
   'aged-workpaper account text is slightly larger for readability');
-assert.match(html, /font-size:8pt!important;padding:1mm \.6mm!important;line-height:1\.22!important/,
+assert.match(html, /font-size:8pt!important;padding:1\.6pt 2pt!important;line-height:1\.2!important/,
   'printed aged-workpaper rows use the same slightly roomier typography');
 assert.match(html, /width:768\.1pt!important/,
   'the printable table spans exactly 768.1 points');
