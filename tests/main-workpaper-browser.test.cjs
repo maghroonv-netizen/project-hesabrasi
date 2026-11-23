@@ -391,7 +391,7 @@ test("summary arithmetic is signed partial ledger data and invalid entries propa
     const amount=async label=>page.locator('.mw-paper-table tbody tr').filter({hasText:label}).first().getAttribute('data-mw-amount');
     assert.equal(await amount('جمع مانده دفتر سود / زیان ناخالص'),'600');
     assert.equal(await amount('جمع مانده دفتر سود / زیان عملیاتی'),'500');
-    assert.match(await page.locator('.mw-summary-note').first().innerText(),/بدهی، حقوق مالکانه و سود بستانکار مثبت/);
+    assert.equal(await page.locator('#mwPreview .mw-summary-note, #mwPreview .mw-balance-print').count(),0);
     assert.equal(await page.locator('#mwPrint').isEnabled(),true);
     await page.locator('[data-mw-view="A-73"]').click();
     assert.equal(await amount('جمع مانده دفتر A-72'),'500');
@@ -485,6 +485,8 @@ test("all A-family sheets use the A-70 layout and produce complete PDFs", {skip:
       const table=pages.first().locator('.mw-paper-table');assert.equal(await table.locator('col').count(),13);
       assert.equal((await table.locator('thead th').first().innerText()).trim(),'شرح');
       for(const term of terms)assert.match((await pages.allInnerTexts()).join(" "),new RegExp(term));
+      assert.equal(await pages.locator('.mw-summary-note, .mw-balance-print').count(),0);
+      assert.doesNotMatch((await pages.allInnerTexts()).join(' '),/برای A-73 و اسناد اختتامیه بررسی لازم است|پیش‌نمایش مانده‌های تخصیص‌یافته/);
       assert.equal(await page.locator('#mwPrint').isEnabled(),true);
       await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
       await page.emulateMedia({media:'print'});const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});
@@ -518,8 +520,9 @@ test('model titles, automatic mapping, review, debit-credit signs and honest bal
   await page.locator('[data-mw-view="A-71"]').click();
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'تسهیلات مالی'}).last().getAttribute('data-mw-amount'),'400');
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'سهام خزانه'}).last().getAttribute('data-mw-amount'),'-50');
-  assert.match(await page.locator('.mw-balance-print').first().innerText(),/تراز دفتر ۰/);
-  assert.match(await page.locator('.mw-balance-print').first().innerText(),/با مانده درآمد و هزینه ۰/);
+  assert.equal(await page.locator('#mwPreview .mw-summary-note, #mwPreview .mw-balance-print').count(),0);
+  assert.equal((await page.locator('[data-mw-ledger]').innerText()).trim(),'۰');
+  assert.equal((await page.locator('[data-mw-profit-equation]').innerText()).trim(),'۰');
   await page.locator('[data-mw-view="A-72"]').click();
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'درآمدهای عملیاتی'}).first().getAttribute('data-mw-amount'),'400');
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'بهای تمام‌شده درآمدهای عملیاتی'}).first().getAttribute('data-mw-amount'),'-100');
