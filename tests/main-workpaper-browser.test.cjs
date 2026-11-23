@@ -725,6 +725,8 @@ test('topic-first mobile selection, reassignment, deletion and restoration prese
   assert.equal(await row('پیش‌پرداخت‌ها').count(),0);
   assert.equal(await row('جمع کل').getAttribute('data-mw-amount'),'50');
   assert.match(await page.locator('.mw-balance-control').innerText(),/۳ معین بدون مقصد/);
+  assert.match(await page.locator('.mw-unresolved').innerText(),/نام اختصاصی/);
+  assert.match(await page.locator('.mw-unresolved').innerText(),/بانک/);
   await page.locator('#mwMatching summary').click();
   assert.equal(await page.locator('select[data-mw-map-link] option[value="A-70|1|0"]').count(),0);
   await page.locator('#mwPreview .mw-preview-tools summary').click();
@@ -781,7 +783,7 @@ test('intangible details, current and long-term names and conflicts are matched 
    ['بستانکاران تجاری','حساب های پرداختنی','A-71|2|0'],['بدهی های غیر جاری','پرداختنی بلند مدت','A-71|1|0'],
    ['بدهی های جاری','تسهیلات بلند مدت',''],['پرداختنی بلندمدت','پرداختنی جاری',''],
    ['دارایی های غیر جاری','موجودی نقد',''],['بدهی های جاری','دریافتنی تجاری',''],['بدهی های جاری','سرمایه',''],['دارایی های جاری','بستانکاران',''],['درآمد','درآمد فروش','A-72|0|0'],
-   ['دارایی نامشهود','فروش نرم افزار',''],['حساب نامشخص','نرم افزار',''],
+   ['دارایی نامشهود','فروش نرم افزار',''],['حساب نامشخص','نرم افزار','A-70|0|2'],
    ['هزینه کاهش ارزش مطالبات','هزینه مطالبات مشکوک الوصول','A-72|0|3'],['سایر درآمدهای عملیاتی','فروش ضایعات','A-72|0|4'],['سایر هزینه های غیرعملیاتی','سایر هزینه های غیرعملیاتی','A-72|0|7'],
    ['فروشندگان','فروشندگان','A-71|2|0'],['هزینه های پرداختنی','هزینه مالی پرداختنی','A-71|2|0'],['درآمد خدمات شرکت','درآمد خدمات مشاوره','A-72|0|0'],
    ['استهلاک انباشته ماشین آلات','استهلاک انباشته ماشین آلات','A-70|0|0']
@@ -847,6 +849,85 @@ test('all main and A workpapers print bold enlarged headers and centered amounts
    if(id==='A-70'){fs.writeFileSync('.arena/main-centered-print.pdf',pdf);fs.writeFileSync('.arena/main-centered-cell.json',JSON.stringify(centering));}
    await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
   }
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('keyword matching handles standalone intangible names, accounting context and equity aliases', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  const cases=[
+   ['دارایی ثابت','نامشهود','A-70|0|2'],['دارایی های ثابت','نام شهود','A-70|0|2'],['دارایی ثابت','غیر مشهود','A-70|0|2'],
+   ['دارائی های ثابت','نامشهود','A-70|0|2'],['نامشهود','نامشهود','A-70|0|2'],
+   ['دارایی ثابت مشهود','نامشهود',''],['هزینه های عمومی','نامشهود','A-72|0|2'],['دارایی نامشهود','هزینه نرم افزار',''],
+   ['دارایی های جاری','نامشهود',''],['حساب خاص','نرم افزار','A-70|0|2'],['هزینه اداری','نرم افزار','A-72|0|2'],
+   ['حساب خاص','نقد','A-70|1|5'],['حساب خاص','سرمایه ثبت شده','A-71|0|0'],
+   ['حساب خاص','افزایش سرمایه ثبت نشده','A-71|0|1'],['حساب خاص','صرف سهام خزانه شرکت','A-71|0|3'],
+   ['حساب خاص','سهام خزانه شرکت','A-71|0|8'],['حساب خاص','اندوخته احتیاطی','A-71|0|5'],
+   ['حساب خاص','بستانکاران بلند مدت','A-71|1|0'],['حساب خاص','دریافتنی کوتاه مدت','A-70|1|3'],
+   ['حساب خاص','دریافتنی و پرداختنی',''],['حساب خاص','پیش پرداخت مالیات','A-70|1|0']
+  ];
+  await page.evaluate(cases=>{ACCOUNT_ROWS=cases.map(([p,c],i)=>({'کد حساب کل':String(i+1),'عنوان حساب کل':p,'کد حساب معین':'1','عنوان حساب معین':c,'بدهکار':'100','بستانکار':''}));gotoModule('mainWorkpaper');},cases);
+  await page.locator('#mwMatching summary').click();
+  const values=await page.locator('[data-mw-map-link]').evaluateAll(els=>Object.fromEntries(els.map(el=>[el.dataset.mwMapLink,el.value])));
+  cases.forEach(([parent,child,expected],i)=>assert.equal(values[JSON.stringify([String(i+1),'1'])],expected,`${parent} / ${child}`));
+  await page.locator('[data-mw-view="A-70"]').click();
+  assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'دارایی‌های نامشهود'})}).getAttribute('data-mw-amount'),'600');
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('unresolved conclusion shows actual items, missing codes and invalid balances; updates after choosing from preview', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=[
+   {'کد حساب کل':'1','عنوان حساب کل':'دارایی ثابت','کد حساب معین':'1','عنوان حساب معین':'نامشهود','بدهکار':'120','بستانکار':''},
+   {'کد حساب کل':'2','عنوان حساب کل':'حساب خاص آلفا','کد حساب معین':'2','عنوان حساب معین':'مورد ناشناخته','بدهکار':'40','بستانکار':''},
+   {'کد حساب کل':'3','عنوان حساب کل':'موجودی نقد','کد حساب معین':'3','عنوان حساب معین':'بانک الف','بدهکار':'bad','بستانکار':''},
+   {'کد حساب کل':'4','عنوان حساب کل':'حساب مجهول','کد حساب معین':'4','عنوان حساب معین':'فاقد مقدار','بدهکار':'','بستانکار':''},
+   {'کد حساب کل':'','عنوان حساب کل':'کل بدون کد','کد حساب معین':'5','عنوان حساب معین':'معین بدون کل','بدهکار':'9','بستانکار':''}
+  ];gotoModule('mainWorkpaper');});
+  const report=page.locator('.mw-unresolved');assert(await report.isVisible());
+  assert.match(await report.innerText(),/۲ معین بدون مقصد/);assert.match(await report.innerText(),/۲ معین با مانده نامشخص/);assert.match(await report.innerText(),/۱ ردیف فاقد کد کل/);
+  assert.equal(await report.locator('[data-unresolved-item]').count(),4);
+  assert.match(await report.innerText(),/حساب خاص آلفا/);assert.match(await report.innerText(),/۴۰/);assert.match(await report.innerText(),/بانک الف/);
+  assert.match(await report.innerText(),/مقصد: A-70/);assert.match(await report.innerText(),/نامشخص/);assert.match(await report.innerText(),/کل بدون کد/);assert.match(await report.innerText(),/بدهکار: ۹/);
+  await report.locator('#mwUnresolvedSearch').fill('آلفا');assert.equal(await report.locator('[data-unresolved-item]').count(),1);
+  await page.locator('[data-mw-view="A-70"]').click();await page.locator('[data-mw-topic-choose="A-70|1|5"]').click();
+  const picker=page.locator('#mwTopicDialog');await picker.locator('#mwTopicSearch').fill('آلفا');await picker.locator('[data-topic-account]').check();await picker.locator('[data-topic-save]').click();
+  assert.equal(await report.locator('#mwUnresolvedSearch').inputValue(),'آلفا');assert.equal(await report.locator('[data-unresolved-item]').count(),0);
+  await report.locator('#mwUnresolvedSearch').fill('');assert.match(await report.innerText(),/۱ معین بدون مقصد/);assert.equal(await report.locator('[data-unresolved-item]').count(),3);
+  assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})}).getAttribute('data-mw-amount'),'');
+  assert.match(await page.locator('.mw-balance-control').innerText(),/ناقص/);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
+  assert.equal(await page.locator('#printHost .mw-unresolved').count(),0);await page.evaluate(()=>window.__activePrintRestore?.());
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('unresolved conclusion paginates, searches and resets on loading a new source', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:85},(_,i)=>({'کد حساب کل':String(i+1),'عنوان حساب کل':'حساب اختصاصی '+(i+1),'کد حساب معین':'1','عنوان حساب معین':'معین ناشناخته '+(i+1),'بدهکار':'1','بستانکار':''}));gotoModule('mainWorkpaper');});
+  const report=page.locator('.mw-unresolved');assert.match(await report.innerText(),/۸۵ معین بدون مقصد/);assert.equal(await report.locator('[data-unresolved-item]').count(),40);
+  await report.locator('[data-unresolved-next]').click();assert.equal(await report.locator('[data-unresolved-item]').count(),40);
+  await report.locator('[data-unresolved-next]').click();assert.equal(await report.locator('[data-unresolved-item]').count(),5);
+  await report.locator('#mwUnresolvedSearch').fill('اختصاصی 85');assert.equal(await report.locator('[data-unresolved-item]').count(),1);
+  await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'99','عنوان حساب کل':'موجودی نقد','کد حساب معین':'1','عنوان حساب معین':'بانک','بدهکار':'1','بستانکار':''}];gotoModule('mainWorkpaper');});
+  assert.equal(await report.locator('#mwUnresolvedSearch').inputValue(),'');assert.match(await report.innerText(),/۰ معین بدون مقصد/);assert.match(await report.innerText(),/اتصال‌های خودکار همچنان باید بازبینی شوند/);
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('unresolved conclusion remains available when all source rows have no account code', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'','عنوان حساب کل':'کل بی کد','کد حساب معین':'1','عنوان حساب معین':'نمونه بدون کد','بدهکار':'123','بستانکار':''}];gotoModule('mainWorkpaper');});
+  const report=page.locator('.mw-unresolved');assert(await report.isVisible());assert.match(await report.innerText(),/۱ ردیف فاقد کد کل/);assert.match(await report.innerText(),/نمونه بدون کد/);assert(await report.locator('[data-unresolved-preview]').isDisabled());assert.equal(await page.locator('#mwPreview').count(),0);
   assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
