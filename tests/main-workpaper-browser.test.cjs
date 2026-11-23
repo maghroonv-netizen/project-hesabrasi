@@ -460,7 +460,7 @@ test("A-70 current and noncurrent asset headings fit on one real PDF page", { sk
     const boxes=await pages.locator('.mw-control-items > div').evaluateAll(els=>els.map(e=>({top:Math.round(e.getBoundingClientRect().top),bottom:e.getBoundingClientRect().bottom,height:e.getBoundingClientRect().height,scroll:e.scrollHeight})));
     assert.equal(new Set(boxes.map(b=>b.top)).size,2);
     assert(boxes.every(b=>b.scroll<=b.height+1));
-    assert((await pages.locator('tbody tr:not(.mw-group):not(.mw-total)').first().evaluate(el=>el.getBoundingClientRect().height)) >= 21.5);
+    assert((await pages.locator('tbody tr:not(.mw-group):not(.mw-total)').first().evaluate(el=>el.getBoundingClientRect().height)) >= 23);
     assert.match(await pages.innerText(),/دارایی‌های غیرجاری/);
     assert.match(await pages.innerText(),/دارایی‌های جاری/);
     assert.match(await pages.innerText(),/جمع کل/);
@@ -484,6 +484,7 @@ test("all A-family sheets use the A-70 layout and produce complete PDFs", {skip:
       const pages=page.locator('#mwPreview .mw-paper');
       const count=await pages.count();assert(count>=1);
       const table=pages.first().locator('.mw-paper-table');assert.equal(await table.locator('col').count(),13);
+      assert(await pages.locator('tbody tr').evaluateAll(rows=>rows.every(row=>row.getBoundingClientRect().height>=23)),`${id} rows should be at least 6.2 mm`);
       assert.equal((await table.locator('thead th').first().innerText()).trim(),'شرح');
       for(const term of terms)assert.match((await pages.allInnerTexts()).join(" "),new RegExp(term));
       assert.equal(await pages.locator('.mw-summary-note, .mw-balance-print').count(),0);
