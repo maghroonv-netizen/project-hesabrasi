@@ -429,6 +429,9 @@ test("A-family controls match the template without changing GL controls", { skip
       for(const p of await page.locator('#mwPreview .mw-paper').all()) {
         const rows=p.locator('.mw-control-items > div');
         assert.equal(await rows.count(),5);
+        const top=await rows.evaluateAll(els=>els.map(el=>Math.round(el.getBoundingClientRect().top)));
+        assert.equal(new Set(top).size,2);
+        assert.equal(top[0],top[2]);assert.equal(top[2],top[4]);assert.equal(top[1],top[3]);
         assert(await p.evaluate(el => parseFloat(getComputedStyle(el.querySelector(".mw-control-items")).fontSize) >= parseFloat(getComputedStyle(el.querySelector(".mw-paper-table td")).fontSize)));
         for(let i=0;i<5;i++) { assert.equal((await rows.nth(i).innerText()).replace('□','').trim(),expected[i]);assert.equal((await rows.nth(i).locator('span').innerText()).trim(),'□'); }
       }
@@ -454,7 +457,7 @@ test("A-70 current and noncurrent asset headings fit on one real PDF page", { sk
     const boxes=await pages.locator('.mw-control-items > div').evaluateAll(els=>els.map(e=>({top:Math.round(e.getBoundingClientRect().top),bottom:e.getBoundingClientRect().bottom,height:e.getBoundingClientRect().height,scroll:e.scrollHeight})));
     assert.equal(new Set(boxes.map(b=>b.top)).size,2);
     assert(boxes.every(b=>b.scroll<=b.height+1));
-    assert((await pages.locator('tbody tr:not(.mw-group):not(.mw-total)').first().evaluate(el=>el.getBoundingClientRect().height)) >= 20);
+    assert((await pages.locator('tbody tr:not(.mw-group):not(.mw-total)').first().evaluate(el=>el.getBoundingClientRect().height)) >= 21.5);
     assert.match(await pages.innerText(),/دارایی‌های غیرجاری/);
     assert.match(await pages.innerText(),/دارایی‌های جاری/);
     assert.match(await pages.innerText(),/جمع کل/);
