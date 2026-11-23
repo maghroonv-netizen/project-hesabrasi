@@ -495,7 +495,7 @@ test("all A-family sheets use the A-70 layout and produce complete PDFs", {skip:
   } finally {await browser.close();}
 });
 
-test('model titles, automatic mapping, review, debit-credit signs and honest balance control', {skip:!executablePath&&'Set CHROMIUM_PATH'}, async()=>{
+test('model titles, automatic mapping, review and debit-credit signs', {skip:!executablePath&&'Set CHROMIUM_PATH'}, async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try {
   const {page,context,errors}=await setup(browser);
@@ -508,17 +508,12 @@ test('model titles, automatic mapping, review, debit-credit signs and honest bal
   });
   assert.equal(await page.locator('[data-mw-link]').first().inputValue(),'A-70|1|5');
   assert.match(await page.locator('.mw-match-origin').first().innerText(),/تطبیق خودکار/);
-  assert.equal((await page.locator('[data-mw-ledger]').innerText()).trim(),'۰');
-  assert.equal((await page.locator('[data-mw-equation]').innerText()).trim(),'۳۰۰');
-  assert.equal((await page.locator('[data-mw-profit-equation]').innerText()).trim(),'۰');
   await page.locator('[data-mw-view="A-70"]').click();
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'موجودی نقد'}).getAttribute('data-mw-amount'),'950');
   await page.locator('[data-mw-view="A-71"]').click();
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'تسهیلات مالی'}).last().getAttribute('data-mw-amount'),'400');
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'سهام خزانه'}).last().getAttribute('data-mw-amount'),'-50');
   assert.equal(await page.locator('#mwPreview .mw-summary-note, #mwPreview .mw-balance-print').count(),0);
-  assert.equal((await page.locator('[data-mw-ledger]').innerText()).trim(),'۰');
-  assert.equal((await page.locator('[data-mw-profit-equation]').innerText()).trim(),'۰');
   await page.locator('[data-mw-view="A-72"]').click();
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'درآمدهای عملیاتی'}).first().getAttribute('data-mw-amount'),'400');
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'بهای تمام‌شده درآمدهای عملیاتی'}).first().getAttribute('data-mw-amount'),'-100');
@@ -526,13 +521,11 @@ test('model titles, automatic mapping, review, debit-credit signs and honest bal
   assert.match(await page.locator('h2').filter({hasText:'موجودی نقد و بانک'}).first().innerText(),/موجودی نقد و بانک/);
   await page.locator('[data-mw-link]').selectOption('');
   assert.equal(await page.locator('[data-mw-link]').inputValue(),'');
-  assert.match(await page.locator('.mw-balance-control').innerText(),/ناقص/);
-  assert.equal((await page.locator('[data-mw-equation]').innerText()).trim(),'نامشخص');
   assert.deepEqual(errors,[]);await context.close();
  } finally {await browser.close();}
 });
 
-test('ambiguous and unknown titles remain unassigned; missing and invalid data cannot certify balance', {skip:!executablePath&&'Set CHROMIUM_PATH'}, async()=>{
+test('ambiguous and unknown titles remain unassigned; invalid data stays visible', {skip:!executablePath&&'Set CHROMIUM_PATH'}, async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try {
   const {page,context,errors}=await setup(browser);
@@ -544,9 +537,8 @@ test('ambiguous and unknown titles remain unassigned; missing and invalid data c
    ];gotoModule('mainWorkpaper');
   });
   assert.equal(await page.locator('[data-mw-link]').inputValue(),'');
-  assert.match(await page.locator('.mw-balance-control').innerText(),/ناقص/);
-  assert.equal((await page.locator('[data-mw-ledger]').innerText()).trim(),'نامشخص');
   await page.locator('[data-mw-view="accounts"][data-mw-active="2"]').click();assert.equal(await page.locator('[data-mw-link]').inputValue(),'');
+  assert.match(await page.locator('#mainWorkpaperModule > .err').innerText(),/نامعتبر/);await page.locator('[data-mw-view="accounts"][data-mw-active="3"]').click();assert.equal(await page.locator('#mwPreview tbody tr').first().getAttribute('data-mw-amount'),'');
   assert.deepEqual(errors,[]);await context.close();
  } finally {await browser.close();}
 });
@@ -726,15 +718,11 @@ test('topic-first mobile selection, reassignment, deletion and restoration prese
   page.once('dialog',d=>d.accept());await page.locator('[data-mw-topic-remove="A-70|1|0"]').click();
   assert.equal(await row('پیش‌پرداخت‌ها').count(),0);
   assert.equal(await row('جمع کل').getAttribute('data-mw-amount'),'50');
-  assert.match(await page.locator('.mw-balance-control').innerText(),/۳ معین بدون مقصد/);
-  assert.match(await page.locator('.mw-unresolved').innerText(),/نام اختصاصی/);
-  assert.match(await page.locator('.mw-unresolved').innerText(),/بانک/);
   await page.locator('#mwMatching summary').click();
   assert.equal(await page.locator('select[data-mw-map-link] option[value="A-70|1|0"]').count(),0);
   await page.locator('#mwPreview .mw-preview-tools summary').click();
   await page.locator('[data-mw-topic-restore="A-70|1|0"]').click();
   assert.equal(await row('پیش‌پرداخت‌ها').getAttribute('data-mw-amount'),'');
-  assert.match(await page.locator('.mw-balance-control').innerText(),/۳ معین بدون مقصد/);
   await page.locator('[data-mw-view="accounts"][data-mw-active="1"]').click();
   assert.equal(await row('جمع حساب کل').getAttribute('data-mw-amount'),'150');
   assert.equal(await page.locator('#mwPreview .mw-number').first().evaluate(el=>getComputedStyle(el).textAlign),'center');
@@ -753,7 +741,7 @@ test('topic picker preserves selections across searches and pages', {skip:!execu
   assert.equal(await d.locator('[data-topic-account]').count(),5);await d.locator('#mwTopicSearch').fill('عنوان اختصاصی 105');
   assert(await d.locator('[data-topic-account]').isChecked());await d.locator('[data-topic-account]').uncheck();await d.locator('[data-topic-save]').click();
   assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})}).first().getAttribute('data-mw-amount'),'104');
-  assert.match(await page.locator('.mw-balance-control').innerText(),/۱ معین بدون مقصد/);assert.deepEqual(errors,[]);await context.close();
+  assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
 
@@ -848,6 +836,12 @@ test('all main and A workpapers print bold enlarged headers and centered amounts
    assert(distances.length>0,id);assert(distances.every(d=>d<1.1),`${id}: ${distances}`);
    if(id==='A-72')assert(await pages.locator('.mw-number-text').evaluateAll(ns=>ns.some(n=>n.textContent.includes('('))));
    const centering=id==='A-70'?await pages.locator('.mw-number').filter({hasText:'۱٬۲۳۴٬۵۶۷'}).first().evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right};}):null;
+   const ink=await pages.locator('.mw-number-text').evaluateAll(nodes=>nodes.filter(n=>n.textContent.trim()).map(n=>{
+    const text=n.textContent,style=getComputedStyle(n),ctx=document.createElement('canvas').getContext('2d');ctx.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;ctx.direction='ltr';
+    const m=ctx.measureText(text),marker=document.createElement('span');marker.style.cssText='display:inline-block;width:0;height:0;vertical-align:baseline';n.appendChild(marker);
+    const base=marker.getBoundingClientRect().top,cell=n.parentElement.getBoundingClientRect();marker.remove();
+    return {text,above:base-m.actualBoundingBoxAscent-cell.top,below:cell.bottom-(base+m.actualBoundingBoxDescent),asc:m.actualBoundingBoxAscent,desc:m.actualBoundingBoxDescent};
+   }));assert(ink.length>0,id);for(const m of ink){assert(m.above>=4&&m.below>=4,`${id} ${m.text}: ${JSON.stringify(m)}`);assert(Math.abs(m.above-m.below)<2.5,`${id} ${m.text}: ${JSON.stringify(m)}`);}
    const pageCount=await pages.count();const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),pageCount,id);
    if(id==='A-70'){fs.writeFileSync('.arena/main-centered-print.pdf',pdf);fs.writeFileSync('.arena/main-centered-cell.json',JSON.stringify(centering));}
    await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
@@ -877,60 +871,6 @@ test('keyword matching handles standalone intangible names, accounting context a
   cases.forEach(([parent,child,expected],i)=>assert.equal(values[JSON.stringify([String(i+1),'1'])],expected,`${parent} / ${child}`));
   await page.locator('[data-mw-view="A-70"]').click();
   assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'دارایی‌های نامشهود'})}).getAttribute('data-mw-amount'),'600');
-  assert.deepEqual(errors,[]);await context.close();
- }finally{await browser.close();}
-});
-
-test('unresolved conclusion shows actual items, missing codes and invalid balances; updates after choosing from preview', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
- const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
- try{
-  const {page,context,errors}=await setup(browser);
-  await page.evaluate(()=>{ACCOUNT_ROWS=[
-   {'کد حساب کل':'1','عنوان حساب کل':'دارایی ثابت','کد حساب معین':'1','عنوان حساب معین':'نامشهود','بدهکار':'120','بستانکار':''},
-   {'کد حساب کل':'2','عنوان حساب کل':'حساب خاص آلفا','کد حساب معین':'2','عنوان حساب معین':'مورد ناشناخته','بدهکار':'40','بستانکار':''},
-   {'کد حساب کل':'3','عنوان حساب کل':'موجودی نقد','کد حساب معین':'3','عنوان حساب معین':'بانک الف','بدهکار':'bad','بستانکار':''},
-   {'کد حساب کل':'4','عنوان حساب کل':'حساب مجهول','کد حساب معین':'4','عنوان حساب معین':'فاقد مقدار','بدهکار':'','بستانکار':''},
-   {'کد حساب کل':'','عنوان حساب کل':'کل بدون کد','کد حساب معین':'5','عنوان حساب معین':'معین بدون کل','بدهکار':'9','بستانکار':''}
-  ];gotoModule('mainWorkpaper');});
-  const report=page.locator('.mw-unresolved');assert(await report.isVisible());
-  assert.match(await report.innerText(),/۲ معین بدون مقصد/);assert.match(await report.innerText(),/۲ معین با مانده نامشخص/);assert.match(await report.innerText(),/۱ ردیف فاقد کد کل/);
-  assert.equal(await report.locator('[data-unresolved-item]').count(),4);
-  assert.match(await report.innerText(),/حساب خاص آلفا/);assert.match(await report.innerText(),/۴۰/);assert.match(await report.innerText(),/بانک الف/);
-  assert.match(await report.innerText(),/مقصد: A-70/);assert.match(await report.innerText(),/نامشخص/);assert.match(await report.innerText(),/کل بدون کد/);assert.match(await report.innerText(),/بدهکار: ۹/);
-  await report.locator('#mwUnresolvedSearch').fill('آلفا');assert.equal(await report.locator('[data-unresolved-item]').count(),1);
-  await page.locator('[data-mw-view="A-70"]').click();await page.locator('[data-mw-topic-choose="A-70|1|5"]').click();
-  const picker=page.locator('#mwTopicDialog');await picker.locator('#mwTopicSearch').fill('آلفا');await picker.locator('[data-topic-account]').check();await picker.locator('[data-topic-save]').click();
-  assert.equal(await report.locator('#mwUnresolvedSearch').inputValue(),'آلفا');assert.equal(await report.locator('[data-unresolved-item]').count(),0);
-  await report.locator('#mwUnresolvedSearch').fill('');assert.match(await report.innerText(),/۱ معین بدون مقصد/);assert.equal(await report.locator('[data-unresolved-item]').count(),3);
-  assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})}).getAttribute('data-mw-amount'),'');
-  assert.match(await page.locator('.mw-balance-control').innerText(),/ناقص/);
-  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
-  assert.equal(await page.locator('#printHost .mw-unresolved').count(),0);await page.evaluate(()=>window.__activePrintRestore?.());
-  assert.deepEqual(errors,[]);await context.close();
- }finally{await browser.close();}
-});
-
-test('unresolved conclusion paginates, searches and resets on loading a new source', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
- const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
- try{
-  const {page,context,errors}=await setup(browser);
-  await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:85},(_,i)=>({'کد حساب کل':String(i+1),'عنوان حساب کل':'حساب اختصاصی '+(i+1),'کد حساب معین':'1','عنوان حساب معین':'معین ناشناخته '+(i+1),'بدهکار':'1','بستانکار':''}));gotoModule('mainWorkpaper');});
-  const report=page.locator('.mw-unresolved');assert.match(await report.innerText(),/۸۵ معین بدون مقصد/);assert.equal(await report.locator('[data-unresolved-item]').count(),40);
-  await report.locator('[data-unresolved-next]').click();assert.equal(await report.locator('[data-unresolved-item]').count(),40);
-  await report.locator('[data-unresolved-next]').click();assert.equal(await report.locator('[data-unresolved-item]').count(),5);
-  await report.locator('#mwUnresolvedSearch').fill('اختصاصی 85');assert.equal(await report.locator('[data-unresolved-item]').count(),1);
-  await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'99','عنوان حساب کل':'موجودی نقد','کد حساب معین':'1','عنوان حساب معین':'بانک','بدهکار':'1','بستانکار':''}];gotoModule('mainWorkpaper');});
-  assert.equal(await report.locator('#mwUnresolvedSearch').inputValue(),'');assert.match(await report.innerText(),/۰ معین بدون مقصد/);assert.match(await report.innerText(),/اتصال‌های خودکار همچنان باید بازبینی شوند/);
-  assert.deepEqual(errors,[]);await context.close();
- }finally{await browser.close();}
-});
-
-test('unresolved conclusion remains available when all source rows have no account code', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
- const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
- try{
-  const {page,context,errors}=await setup(browser);
-  await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'','عنوان حساب کل':'کل بی کد','کد حساب معین':'1','عنوان حساب معین':'نمونه بدون کد','بدهکار':'123','بستانکار':''}];gotoModule('mainWorkpaper');});
-  const report=page.locator('.mw-unresolved');assert(await report.isVisible());assert.match(await report.innerText(),/۱ ردیف فاقد کد کل/);assert.match(await report.innerText(),/نمونه بدون کد/);assert(await report.locator('[data-unresolved-preview]').isDisabled());assert.equal(await page.locator('#mwPreview').count(),0);
   assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
@@ -1057,7 +997,7 @@ test('all previous automatic and manual mappings are ticked as status, bulk sele
   await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();await d.locator('[data-topic-expand]').click();const moved=d.locator('.mw-topic-account').nth(1);
   assert(await moved.locator('[data-topic-account]').isChecked());assert.match(await moved.innerText(),/قبلاً متصل: A-70.*پیش‌پرداخت‌ها.*دستی/s);
   await moved.locator('[data-topic-account]').uncheck();assert.match(await moved.innerText(),/لغو اتصال در انتظار ثبت/);await d.locator('[data-topic-save]').click();
-  assert.equal(await amount('پیش‌پرداخت‌ها'),'30');assert.match(await page.locator('.mw-unresolved').innerText(),/نقد/);assert.deepEqual(errors,[]);await context.close();
+  assert.equal(await amount('پیش‌پرداخت‌ها'),'30');await page.locator('#mwMatching summary').click();assert.match(await page.locator('.mw-map-item').nth(1).innerText(),/انتخاب نشده/);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
 
@@ -1074,5 +1014,23 @@ test('unassigned filter, page and group selection only affect eligible accounts 
   assert.equal(await d.locator('[data-topic-account]').count(),3);assert(await d.locator('.mw-topic-account').first().locator('.mw-topic-previous input').isChecked());
   await d.locator('[data-topic-save]').click();const row=label=>page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:label})}).first();
   assert.equal(await row('موجودی نقد').getAttribute('data-mw-amount'),'50');assert.equal(await row('دارایی‌های نامشهود').getAttribute('data-mw-amount'),'10');assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('removed results and balance panels stay absent while selection and invalid input warnings remain', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=[
+   {'کد حساب کل':'1','عنوان حساب کل':'حساب خاص','کد حساب معین':'1','عنوان حساب معین':'مورد ناشناس','بدهکار':'40','بستانکار':''},
+   {'کد حساب کل':'2','عنوان حساب کل':'موجودی نقد','کد حساب معین':'1','عنوان حساب معین':'بانک الف','بدهکار':'bad','بستانکار':''},
+   {'کد حساب کل':'','عنوان حساب کل':'کل بدون کد','کد حساب معین':'5','عنوان حساب معین':'بی کل','بدهکار':'9','بستانکار':''}
+  ];gotoModule('mainWorkpaper');});
+  const mod=page.locator('#mainWorkpaperModule');assert.doesNotMatch(await mod.innerText(),/کنترل توازن|نتیجه بررسی حساب‌ها/);assert.equal(await mod.locator('.mw-balance-control,.mw-unresolved').count(),0);assert.match(await mod.locator(':scope > .err').innerText(),/فاقد کد کل/);
+  await page.locator('[data-mw-view="A-70"]').click();await page.locator('[data-mw-topic-choose="A-70|1|5"]').click();const picker=page.locator('#mwTopicDialog');
+  await picker.locator('#mwTopicUnlinked').check();await picker.locator('[data-topic-expand]').click();assert.match(await picker.innerText(),/مورد ناشناس/);await picker.locator('[data-topic-account]').check();await picker.locator('[data-topic-save]').click();
+  assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})}).getAttribute('data-mw-amount'),'');
+  await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'','عنوان حساب کل':'بی کد','بدهکار':'5','بستانکار':''}];gotoModule('mainWorkpaper');});
+  assert.match(await mod.innerText(),/هیچ حساب کل معتبری/);assert.match(await mod.innerText(),/فاقد کد کل/);assert.doesNotMatch(await mod.innerText(),/کنترل توازن|نتیجه بررسی حساب‌ها/);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
