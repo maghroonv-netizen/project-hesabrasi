@@ -410,7 +410,7 @@ test("summary arithmetic is signed partial ledger data and invalid entries propa
   } finally { await browser.close(); }
 });
 
-test("A-family controls match the template without changing GL controls", { skip: !executablePath && "Set CHROMIUM_PATH" }, async () => {
+test("A-family and GL retain the correct control texts with adaptive layout", { skip: !executablePath && "Set CHROMIUM_PATH" }, async () => {
   const browser = await chromium.launch({ executablePath, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   try {
     const {page,context,errors}=await setup(browser);
@@ -427,8 +427,10 @@ test("A-family controls match the template without changing GL controls", { skip
         assert.equal(await rows.count(),5);
         const titleHeight=await p.locator('.mw-control-title').evaluate(el=>el.getBoundingClientRect().height);assert(titleHeight>=17.5 && titleHeight<=21);
         const top=await rows.evaluateAll(els=>els.map(el=>Math.round(el.getBoundingClientRect().top)));
-        assert.equal(new Set(top).size,2);
-        assert.equal(top[0],top[2]);assert.equal(top[2],top[4]);assert.equal(top[1],top[3]);
+        const compact=await p.evaluate(el=>el.classList.contains('mw-controls-compact'));
+        assert.equal(new Set(top).size,compact?2:5);
+        if(compact){assert.equal(top[0],top[2]);assert.equal(top[2],top[4]);assert.equal(top[1],top[3]);}
+        else assert(top.every((x,i)=>i===0||x>top[i-1]));
         assert(await p.evaluate(el => parseFloat(getComputedStyle(el.querySelector(".mw-control-items")).fontSize) >= parseFloat(getComputedStyle(el.querySelector(".mw-paper-table td")).fontSize)));
         for(let i=0;i<5;i++) { assert.equal((await rows.nth(i).innerText()).replace('□','').trim(),expected[i]);assert.equal((await rows.nth(i).locator('span').innerText()).trim(),'□'); }
       }
@@ -971,5 +973,56 @@ test('floating trial balance paginates major accounts and group selections persi
   await d.locator('[data-topic-major="42"]').check();await d.locator('[data-topic-prev]').click();assert(await d.locator('[data-topic-major="1"]').isChecked());
   await d.locator('#mwTopicSearch').fill('ویژه 42');assert(await d.locator('[data-topic-account]').isChecked());await d.locator('#mwTopicSearch').fill('');await d.locator('[data-topic-save]').click();
   assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})}).getAttribute('data-mw-amount'),'2');assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('audit controls use the same reference styling and adapt only when vertical controls do not fit', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>document.fonts.ready);
+  const sheet=()=>page.locator('#mwPreview .mw-paper').first();
+  async function measure(){return sheet().evaluate(p=>{const items=[...p.querySelectorAll('.mw-control-items > div')];return {compact:p.classList.contains('mw-controls-compact'),titleHeight:p.querySelector('.mw-control-title').getBoundingClientRect().height,titleFont:getComputedStyle(p.querySelector('.mw-control-title')).fontSize,itemFont:getComputedStyle(p.querySelector('.mw-control-items')).fontSize,lineHeight:getComputedStyle(p.querySelector('.mw-control-items')).lineHeight,squareWidth:items[0].querySelector('span').getBoundingClientRect().width,top:items.map(x=>x.getBoundingClientRect().top),within:items.every(x=>x.scrollHeight<=x.clientHeight+1&&x.scrollWidth<=x.clientWidth+1),controlWidth:p.querySelector('.mw-controls').getBoundingClientRect().width};});}
+  const gl=await measure();assert.equal(gl.compact,false);assert.equal(new Set(gl.top).size,5);
+  await page.locator('[data-mw-view="A-73"]').click();const short=await measure();assert.equal(short.compact,false);assert.equal(new Set(short.top).size,5);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+  const shortPrint=page.locator('#printHost .mw-paper');assert.equal(await shortPrint.count(),1);assert.equal(await shortPrint.locator('.mw-controls-compact').count(),0);
+  assert(await shortPrint.evaluate(p=>{const c=p.querySelector('.mw-card').getBoundingClientRect();return [...p.querySelectorAll('.mw-control-items > div')].every(el=>{const r=el.getBoundingClientRect();return r.bottom<=c.bottom&&r.left>=c.left&&r.right<=c.right;});}));
+  const shortPdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(shortPdf)).getPageCount(),1);
+  await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+  await page.locator('[data-mw-view="A-70"]').click();const long=await measure();assert.equal(long.compact,true);assert.equal(new Set(long.top).size,2);assert.equal(await page.locator('#mwPreview .mw-paper').count(),1);
+  for(const v of [short,long])for(const prop of ['titleHeight','titleFont','itemFont','lineHeight','squareWidth','controlWidth'])assert.equal(v[prop],gl[prop],prop);
+  assert(gl.within&&short.within&&long.within);assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+  assert.equal(await page.locator('#printHost .mw-controls-compact').count(),1);const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),1);
+  await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('long GL workpaper repeats compact controls on all pages without losing rows', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:35},(_,i)=>({'کد حساب کل':'10','عنوان حساب کل':'موجودی نقد','کد حساب معین':String(i+1),'عنوان حساب معین':'حساب ویژه '+(i+1),'بدهکار':'1','بستانکار':''}));gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  const pages=page.locator('#mwPreview .mw-paper');assert((await pages.count())>1);assert.equal(await pages.locator('.mw-control-items').count(),await pages.count());
+  assert(await pages.evaluateAll(xs=>xs.every(x=>x.classList.contains('mw-controls-compact'))));assert.equal(await pages.locator('tbody tr').count(),36);
+  assert.equal(await page.locator('#mwPrint').isEnabled(),true);await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+  const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),await pages.count());
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('control layout recalculates after hiding and restoring statement topics', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);await page.locator('[data-mw-view="A-70"]').click();await page.evaluate(()=>document.fonts.ready);
+  const sheet=()=>page.locator('#mwPreview .mw-paper').first();assert(await sheet().evaluate(el=>el.classList.contains('mw-controls-compact')));
+  const removed=[];
+  for(let i=0;i<12;i++){
+   if(!await sheet().evaluate(el=>el.classList.contains('mw-controls-compact')))break;
+   const button=page.locator('#mwPreview [data-mw-topic-remove]').first();removed.push(await button.getAttribute('data-mw-topic-remove'));page.once('dialog',d=>d.accept());await button.click();
+  }
+  assert(removed.length>0);assert.equal(await sheet().evaluate(el=>el.classList.contains('mw-controls-compact')),false);assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+  for(const key of removed){await page.locator('#mwPreview .mw-preview-tools summary').click();await page.locator(`[data-mw-topic-restore="${key}"]`).click();}
+  assert(await sheet().evaluate(el=>el.classList.contains('mw-controls-compact')));assert.equal(await page.locator('#mwPreview .mw-paper').count(),1);assert.equal(await page.locator('#mwPrint').isEnabled(),true);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
