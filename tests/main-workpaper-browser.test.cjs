@@ -118,8 +118,8 @@ test(
       await h.locator('[data-mw-view="A-70"]').click();
       assert.match(await cash.innerText(), /۱۳۰/);
       const cells = cash.locator("td");
-      assert.equal(await cells.count(), 13);
-      for (let i = 3; i < 13; i++)
+      assert.equal(await cells.count(), 14);
+      for (let i = 4; i < 14; i++)
         assert.equal((await cells.nth(i).innerText()).trim(), "");
       assert.match(await h.innerText(), /طبقه‌بندی و سال قبل محاسبه نمی‌شوند/);
       assert.equal(
@@ -341,3 +341,66 @@ test(
     }
   },
 );
+
+test("select all includes filtered-out accounts and can be cleared on mobile", { skip: !executablePath && "Set CHROMIUM_PATH" }, async () => {
+  const browser = await chromium.launch({ executablePath, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+  try {
+    const {page,context,errors}=await setup(browser);
+    await page.locator('[data-balance-open]').click();
+    await page.locator('#mwSearch').fill('موجودی');
+    await page.locator('#mwSelectAll').check();
+    assert.equal(await page.locator('[data-mw-account="02"]').isChecked(),true);
+    await page.locator('#mwSelectAll').uncheck();
+    assert.equal(await page.locator('[data-mw-account="01"]').isChecked(),false);
+    await page.locator('[data-mw-account="01"]').check();
+    assert.equal(await page.locator('#mwSelectAll').evaluate(el=>el.indeterminate),true);
+    await page.locator('#mwSelectAll').check();
+    await page.locator('[data-mw-done]').click();
+    assert.match(await page.locator('.balance-picker-launch').innerText(),/۲ حساب/);
+    await page.locator('[data-balance-open]').click();
+    assert.equal(await page.locator('#mwSelectAll').isChecked(),true);
+    await page.locator('#mwSelectAll').uncheck();
+    await page.locator('[data-mw-done]').click();
+    assert.match(await page.locator('#mainWorkpaperModule').innerText(),/هنوز حسابی انتخاب نشده/);
+    assert.deepEqual(errors,[]);await context.close();
+  } finally { await browser.close(); }
+});
+
+test("summary arithmetic is signed partial ledger data and invalid entries propagate", { skip: !executablePath && "Set CHROMIUM_PATH" }, async () => {
+  const browser = await chromium.launch({ executablePath, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+  try {
+    const {page,context,errors}=await setup(browser);
+    await page.evaluate(()=>{
+      ACCOUNT_ROWS=[
+        ['1','درآمد','0','1000'],['2','بهای تمام شده','400','0'],['3','هزینه اداری','100','0'],['4','سود جامع','0','30'],['5','نامعتبر','bad','0'],['6','دارایی','200','0']
+      ].map(([code,title,debit,credit])=>({'کد حساب کل':code,'عنوان حساب کل':title,'کد حساب معین':code,'عنوان حساب معین':title,'بدهکار':debit,'بستانکار':credit}));
+      gotoModule('mainWorkpaper');
+    });
+    await page.locator('[data-balance-open]').click();await page.locator('#mwSelectAll').check();await page.locator('[data-mw-done]').click();
+    const map=async (code,dest)=>{await page.locator(`[data-mw-view="accounts"][data-mw-active="${code}"]`).click();await page.locator('[data-mw-link]').selectOption(dest);};
+    await map('1','A-72|0|0');await map('2','A-72|0|1');await map('3','A-72|0|2');await map('4','A-73|0|0');await map('6','A-70|1|5');
+    await page.locator('[data-mw-view="A-72"]').click();
+    const amount=async label=>page.locator('.mw-paper-table tbody tr').filter({hasText:label}).first().getAttribute('data-mw-amount');
+    assert.equal(await amount('جمع مانده دفتر سود / زیان ناخالص'),'-600');
+    assert.equal(await amount('جمع مانده دفتر سود / زیان عملیاتی'),'-500');
+    assert.match(await page.locator('.mw-summary-note').first().innerText(),/بدهکار منهای بستانکار/);
+    assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+    await page.locator('[data-mw-view="A-73"]').click();
+    assert.equal(await amount('جمع مانده دفتر A-72'),'-500');
+    assert.equal(await amount('جمع مانده دفتر سود و زیان جامع'),'-530');
+    assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+    const count=await page.locator('#mwPreview .mw-paper').count();
+    await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
+    await page.emulateMedia({media:'print'});
+    const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});
+    assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),count);
+    await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+    await page.locator('[data-mw-view="A-70"]').click();
+    assert.equal(await amount('جمع دارایی‌های جاری'),'200');
+    assert.equal(await amount('جمع کل'),'200');
+    assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+    await map('5','A-70|1|5');await page.locator('[data-mw-view="A-70"]').click();
+    assert.equal(await amount('موجودی نقد'),'');assert.equal(await amount('جمع دارایی‌های جاری'),'');assert.equal(await amount('جمع کل'),'');
+    assert.deepEqual(errors,[]);await context.close();
+  } finally { await browser.close(); }
+});
