@@ -656,3 +656,47 @@ test('mapping editor paginates many accounts and retains search when a mapping c
   assert.deepEqual(errors,[]);await context.close();
  } finally {await browser.close();}
 });
+
+test('A-70 fits multiple ledger references and large realistic amounts without truncation', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try {
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{
+   ACCOUNT_ROWS=[['210','دارایی‌های ثابت مشهود','1157197412444'],['195','پیش پرداخت ها','47619741246'],['170','موجودی کالا','22655501000'],['150','حسابهای دریافتنی','12345678901'],['160','بدهکاران تجاری','2211040800'],['110','موجودی نقد','1726971789']].map(([code,title,amount])=>({'کد حساب کل':code,'عنوان حساب کل':title,'کد حساب معین':'1','عنوان حساب معین':title,'بدهکار':amount,'بستانکار':''}));
+   gotoModule('mainWorkpaper');
+  });
+  await page.locator('[data-balance-open]').click();await page.locator('#mwSelectAll').check();await page.locator('[data-mw-done]').click();await page.locator('[data-mw-view="A-70"]').click();
+  await page.evaluate(()=>document.fonts.ready);
+  const diagnostic=await page.locator('#mwPreview').evaluate(el=>[...el.querySelectorAll('td,th')].filter(c=>c.scrollWidth>c.clientWidth+1).map(c=>({text:c.textContent,scroll:c.scrollWidth,client:c.clientWidth})));
+  assert.equal(await page.locator('#mwPrint').isEnabled(),true,JSON.stringify(diagnostic));
+  const row=page.locator('.mw-paper-table tbody tr').filter({hasText:'دریافتنی‌های تجاری و سایر دریافتنی‌ها'}).last();
+  assert.match(await row.innerText(),/GL-150/);assert.match(await row.innerText(),/GL-160/);
+  assert.deepEqual(await row.locator('.mw-ref-token').allTextContents(),['GL-150','GL-160']);
+  assert(await row.locator('.mw-ref-token').evaluateAll(els=>els.every(el=>el.getClientRects().length===1 && el.scrollWidth<=el.parentElement.clientWidth)));
+  const refLines=await row.locator('.mw-ref-token').evaluateAll(els=>els.map(el=>Math.round(el.getBoundingClientRect().top)));assert.notEqual(refLines[0],refLines[1]);
+  assert.equal(await row.getAttribute('data-mw-amount'),'14556719701');
+  assert.deepEqual(diagnostic,[]);
+  const count=await page.locator('#mwPreview .mw-paper').count();
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+  const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),count);
+  fs.writeFileSync('.arena/a70-multiple-ref.pdf',pdf);assert.deepEqual(errors,[]);await context.close();
+ } finally {await browser.close();}
+});
+
+test('many references wrap at account boundaries and still paginate safely', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try {
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:18},(_,i)=>({'کد حساب کل':String(100+i),'عنوان حساب کل':'بدهکاران تجاری '+String(i),'کد حساب معین':'1','عنوان حساب معین':'بدهکاران تجاری '+String(i),'بدهکار':'100','بستانکار':''}));gotoModule('mainWorkpaper');});
+  await page.locator('[data-balance-open]').click();await page.locator('#mwSelectAll').check();await page.locator('[data-mw-done]').click();await page.locator('[data-mw-view="A-70"]').click();
+  const row=page.locator('.mw-paper-table tbody tr').filter({hasText:'دریافتنی‌های تجاری و سایر دریافتنی‌ها'}).last();
+  assert.equal(await row.getAttribute('data-mw-amount'),'1800');assert.equal(await row.locator('.mw-ref-token').count(),18);
+  assert(await row.locator('.mw-ref-token').evaluateAll(els=>els.every(el=>el.getClientRects().length===1 && el.scrollWidth<=el.parentElement.clientWidth)));
+  const pages=page.locator('#mwPreview .mw-paper');const count=await pages.count();
+  for(const p of await pages.all())assert(await p.evaluate(el=>{const c=el.querySelector('.mw-card');return c.scrollHeight<=c.clientHeight+1&&[...el.querySelectorAll('td,th')].every(x=>x.scrollWidth<=x.clientWidth+1);}));
+  assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+  const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),count);
+  assert.deepEqual(errors,[]);await context.close();
+ } finally {await browser.close();}
+});
