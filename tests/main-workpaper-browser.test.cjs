@@ -451,6 +451,10 @@ test("A-70 current and noncurrent asset headings fit on one real PDF page", { sk
     const pages=page.locator('#mwPreview .mw-paper');
     assert.equal(await pages.count(),1);
     assert.equal(await pages.locator('tbody tr').count(),19);
+    const boxes=await pages.locator('.mw-control-items > div').evaluateAll(els=>els.map(e=>({top:Math.round(e.getBoundingClientRect().top),bottom:e.getBoundingClientRect().bottom,height:e.getBoundingClientRect().height,scroll:e.scrollHeight})));
+    assert.equal(new Set(boxes.map(b=>b.top)).size,2);
+    assert(boxes.every(b=>b.scroll<=b.height+1));
+    assert((await pages.locator('tbody tr:not(.mw-group):not(.mw-total)').first().evaluate(el=>el.getBoundingClientRect().height)) >= 20);
     assert.match(await pages.innerText(),/دارایی‌های غیرجاری/);
     assert.match(await pages.innerText(),/دارایی‌های جاری/);
     assert.match(await pages.innerText(),/جمع کل/);
