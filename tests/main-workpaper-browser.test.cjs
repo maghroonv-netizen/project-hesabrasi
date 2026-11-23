@@ -470,3 +470,26 @@ test("A-70 current and noncurrent asset headings fit on one real PDF page", { sk
     assert.deepEqual(errors,[]);await context.close();
   } finally {await browser.close();}
 });
+
+test("all four A-family sheets use the A-70 layout and fit one real PDF page", {skip: !executablePath && 'Set CHROMIUM_PATH'}, async()=>{
+  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+  try {
+    const {page,context,errors}=await setup(browser);
+    await page.locator('[data-balance-open]').click();await page.locator('[data-mw-account="01"]').check();await page.locator('[data-mw-done]').click();
+    for(const [id,terms] of [['A-70',['دارایی‌های غیرجاری','دارایی‌های جاری']],['A-71',['حقوق مالکانه','بدهی‌های غیرجاری','بدهی‌های جاری']],['A-72',['صورت سود و زیان','سود / زیان خالص']],['A-73',['سود و زیان جامع','جمع مانده دفتر']]]){
+      await page.locator(`[data-mw-view="${id}"]`).click();
+      const pages=page.locator('#mwPreview .mw-paper');
+      assert.equal(await pages.count(),1,`${id} fits one page`);
+      const table=pages.locator('.mw-paper-table');assert.equal(await table.locator('col').count(),13);
+      assert.equal((await table.locator('thead th').first().innerText()).trim(),'شرح');
+      for(const term of terms)assert.match(await pages.innerText(),new RegExp(term));
+      assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+      await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
+      await page.emulateMedia({media:'print'});const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});
+      assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),1,id);
+      fs.writeFileSync(`.arena/${id}-single-page.pdf`,pdf);
+      await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+    }
+    assert.deepEqual(errors,[]);await context.close();
+  } finally {await browser.close();}
+});
