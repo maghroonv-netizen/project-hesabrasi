@@ -394,7 +394,7 @@ test("summary arithmetic is signed partial ledger data and invalid entries propa
     assert.equal(await page.locator('#mwPreview .mw-summary-note, #mwPreview .mw-balance-print').count(),0);
     assert.equal(await page.locator('#mwPrint').isEnabled(),true);
     await page.locator('[data-mw-view="A-73"]').click();
-    assert.equal(await amount('جمع مانده دفتر سود و زیان (جزئی)'),'500');
+    assert.equal(await amount('جمع مانده دفتر سود و زیان'),'500');
     assert.equal(await amount('جمع مانده دفتر سود و زیان جامع'),'530');
     assert.equal(await page.locator('#mwPrint').isEnabled(),true);
     const count=await page.locator('#mwPreview .mw-paper').count();
@@ -488,6 +488,7 @@ test("all A-family sheets use the A-70 layout and produce complete PDFs", {skip:
       for(const term of terms)assert.match((await pages.allInnerTexts()).join(" "),new RegExp(term));
       assert.equal(await pages.locator('.mw-summary-note, .mw-balance-print').count(),0);
       assert(await pages.locator('.mw-reference').evaluateAll(cells=>cells.every(c=>c.textContent.trim()==='')));
+      assert(await pages.locator('.mw-total .mw-description').evaluateAll(cells=>cells.every(c=>!/[()（）]/.test(c.textContent))));
       assert.doesNotMatch((await pages.allInnerTexts()).join(' '),/GL-\d+/);
       assert.doesNotMatch((await pages.allInnerTexts()).join(' '),/برای A-73 و اسناد اختتامیه بررسی لازم است|پیش‌نمایش مانده‌های تخصیص‌یافته/);
       assert.equal(await page.locator('#mwPrint').isEnabled(),true);

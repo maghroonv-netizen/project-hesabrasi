@@ -15455,18 +15455,18 @@ function summariesRows(s){
    output.push(row(name,show(aggregate(children))));
    if(s.id==='A-72'&&[1,5,7,8,9].includes(i)){
     const labels={1:'سود / زیان ناخالص',5:'سود / زیان عملیاتی',7:'سود / زیان عملیات در حال تداوم قبل از مالیات',8:'سود / زیان خالص عملیات در حال تداوم',9:'سود / زیان خالص'};
-    output.push(row('جمع مانده دفتر '+labels[i]+' (جزئی)',show(aggregate(revenueEntries)),'mw-total'));
+    output.push(row('جمع مانده دفتر '+labels[i],show(aggregate(revenueEntries)),'mw-total'));
    }
   });
-  if(s.id==='A-70'||s.id==='A-71')output.push(row('جمع '+group+' (حساب‌های تخصیص‌یافته)',show(aggregate(groupEntries)),'mw-total'));
+  if(s.id==='A-70'||s.id==='A-71')output.push(row('جمع '+group,show(aggregate(groupEntries)),'mw-total'));
  }
- if(s.id==='A-70'||s.id==='A-71')output.push(row('جمع کل (حساب‌های تخصیص‌یافته)',show(aggregate(all)),'mw-total'));
+ if(s.id==='A-70'||s.id==='A-71')output.push(row('جمع کل',show(aggregate(all)),'mw-total'));
  if(s.id==='A-72'){output.push(`<tr class="mw-group"><td colspan="13">سود پایه هر سهم — بدون محاسبه</td></tr>`);['عملیاتی (ریال)','غیرعملیاتی (ریال)','ناشی از عملیات در حال تداوم (ریال)','ناشی از عملیات متوقف‌شده (ریال)','سود پایه هر سهم (ریال)'].forEach(name=>output.push(row(name,null,'mw-unavailable')));}
  if(s.id==='A-73'){
   const prior=destinationList.filter(x=>x.id==='A-72').flatMap(x=>byDest.get(x.key)||[]);
-  output.unshift(row('جمع مانده دفتر سود و زیان (جزئی)',show(aggregate(prior))));
-  output.push(row('سایر اقلام سود و زیان جامع پس از کسر مالیات (جزئی)',show(aggregate(all)),'mw-total'));
-  output.push(row('جمع مانده دفتر سود و زیان جامع (جزئی)',show(prior.length?aggregate([...prior,...all]):null),'mw-total'));
+  output.unshift(row('جمع مانده دفتر سود و زیان',show(aggregate(prior))));
+  output.push(row('سایر اقلام سود و زیان جامع پس از کسر مالیات',show(aggregate(all)),'mw-total'));
+  output.push(row('جمع مانده دفتر سود و زیان جامع',show(prior.length?aggregate([...prior,...all]):null),'mw-total'));
  }
  return output;
 }
