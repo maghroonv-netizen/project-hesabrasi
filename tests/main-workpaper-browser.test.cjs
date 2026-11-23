@@ -215,6 +215,7 @@ test(
       const pages = page.locator("#mwPreview .mw-paper");
       const count = await pages.count();
       assert(count >= 2);
+      assert(await pages.first().locator(".mw-paper-table tbody tr").count() >= 8, "compact controls leave room for at least eight item rows");
       for (let i = 0; i < count; i++) {
         const p = pages.nth(i);
         assert.match(await p.innerText(), /شرکت آزمایشی/);
