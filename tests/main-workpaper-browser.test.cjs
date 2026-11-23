@@ -410,3 +410,27 @@ test("summary arithmetic is signed partial ledger data and invalid entries propa
     assert.deepEqual(errors,[]);await context.close();
   } finally { await browser.close(); }
 });
+
+test("A-family controls match the template without changing GL controls", { skip: !executablePath && "Set CHROMIUM_PATH" }, async () => {
+  const browser = await chromium.launch({ executablePath, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+  try {
+    const {page,context,errors}=await setup(browser);
+    await page.locator('[data-balance-open]').click();
+    await page.locator('[data-mw-account="01"]').check();
+    await page.locator('[data-mw-done]').click();
+    const controls=()=>page.locator('#mwPreview .mw-paper').first().locator('.mw-control-items > div');
+    assert.match(await controls().nth(2).innerText(),/تراز آزمایشی/);
+    assert.doesNotMatch(await controls().first().innerText(),/کاربرگ‌های مربوطه/);
+    const expected=['کنترل مطابقت با کاربرگ‌های مربوطه','کنترل جمع عمودی','کنترل جمع (محاسبات) افقی','کنترل مطابقت با اقلام صورت‌های مالی سال جاری','کنترل مطابقت با اقلام صورت‌های مالی سال مقایسه‌ای'];
+    for(const id of ['A-70','A-71','A-72','A-73']) {
+      await page.locator(`[data-mw-view="${id}"]`).click();
+      for(const p of await page.locator('#mwPreview .mw-paper').all()) {
+        const rows=p.locator('.mw-control-items > div');
+        assert.equal(await rows.count(),5);
+        for(let i=0;i<5;i++) { assert.equal((await rows.nth(i).innerText()).replace('□','').trim(),expected[i]);assert.equal((await rows.nth(i).locator('span').innerText()).trim(),'□'); }
+      }
+      assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+    }
+    assert.deepEqual(errors,[]);await context.close();
+  } finally { await browser.close(); }
+});
