@@ -394,7 +394,7 @@ test("summary arithmetic is signed partial ledger data and invalid entries propa
     assert.equal(await page.locator('#mwPreview .mw-summary-note, #mwPreview .mw-balance-print').count(),0);
     assert.equal(await page.locator('#mwPrint').isEnabled(),true);
     await page.locator('[data-mw-view="A-73"]').click();
-    assert.equal(await amount('جمع مانده دفتر A-72'),'500');
+    assert.equal(await amount('جمع مانده دفتر سود و زیان (جزئی)'),'500');
     assert.equal(await amount('جمع مانده دفتر سود و زیان جامع'),'530');
     assert.equal(await page.locator('#mwPrint').isEnabled(),true);
     const count=await page.locator('#mwPreview .mw-paper').count();
@@ -421,7 +421,7 @@ test("A-family controls match the template without changing GL controls", { skip
     await page.locator('[data-mw-account="01"]').check();
     await page.locator('[data-mw-done]').click();
     const controls=()=>page.locator('#mwPreview .mw-paper').first().locator('.mw-control-items > div');
-    const expectedGL=['کنترل جمع عمودی','کنترل جمع (محاسبات) افقی','کنترل مطابقت با تراز آزمایشی سال جاری','کنترل مطابقت با اقلام سال جاری کاربرگ A-70','کنترل مطابقت با اقلام مقایسه‌ای کاربرگ A-70'];
+    const expectedGL=['کنترل جمع عمودی','کنترل جمع (محاسبات) افقی','کنترل مطابقت با تراز آزمایشی سال جاری','کنترل مطابقت با اقلام سال جاری کاربرگ نهایی','کنترل مطابقت با اقلام مقایسه‌ای کاربرگ نهایی'];
     for(let i=0;i<5;i++) assert.equal((await controls().nth(i).innerText()).replace('□','').trim(),expectedGL[i]);
     await page.locator('[data-mw-link]').first().selectOption('A-72|0|0');
     for(let i=0;i<5;i++) assert.equal((await controls().nth(i).innerText()).replace('□','').trim(),expectedGL[i]);
@@ -486,6 +486,8 @@ test("all A-family sheets use the A-70 layout and produce complete PDFs", {skip:
       assert.equal((await table.locator('thead th').first().innerText()).trim(),'شرح');
       for(const term of terms)assert.match((await pages.allInnerTexts()).join(" "),new RegExp(term));
       assert.equal(await pages.locator('.mw-summary-note, .mw-balance-print').count(),0);
+      assert(await pages.locator('.mw-reference').evaluateAll(cells=>cells.every(c=>c.textContent.trim()==='')));
+      assert.doesNotMatch((await pages.allInnerTexts()).join(' '),/GL-\d+/);
       assert.doesNotMatch((await pages.allInnerTexts()).join(' '),/برای A-73 و اسناد اختتامیه بررسی لازم است|پیش‌نمایش مانده‌های تخصیص‌یافته/);
       assert.equal(await page.locator('#mwPrint').isEnabled(),true);
       await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
@@ -657,7 +659,7 @@ test('mapping editor paginates many accounts and retains search when a mapping c
  } finally {await browser.close();}
 });
 
-test('A-70 fits multiple ledger references and large realistic amounts without truncation', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+test('A-70 keeps reference cells blank when aggregating accounts and large amounts', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try {
   const {page,context,errors}=await setup(browser);
@@ -670,10 +672,9 @@ test('A-70 fits multiple ledger references and large realistic amounts without t
   const diagnostic=await page.locator('#mwPreview').evaluate(el=>[...el.querySelectorAll('td,th')].filter(c=>c.scrollWidth>c.clientWidth+1).map(c=>({text:c.textContent,scroll:c.scrollWidth,client:c.clientWidth})));
   assert.equal(await page.locator('#mwPrint').isEnabled(),true,JSON.stringify(diagnostic));
   const row=page.locator('.mw-paper-table tbody tr').filter({hasText:'دریافتنی‌های تجاری و سایر دریافتنی‌ها'}).last();
-  assert.match(await row.innerText(),/GL-150/);assert.match(await row.innerText(),/GL-160/);
-  assert.deepEqual(await row.locator('.mw-ref-token').allTextContents(),['GL-150','GL-160']);
-  assert(await row.locator('.mw-ref-token').evaluateAll(els=>els.every(el=>el.getClientRects().length===1 && el.scrollWidth<=el.parentElement.clientWidth)));
-  const refLines=await row.locator('.mw-ref-token').evaluateAll(els=>els.map(el=>Math.round(el.getBoundingClientRect().top)));assert.notEqual(refLines[0],refLines[1]);
+  assert.equal((await row.locator('.mw-reference').innerText()).trim(),'');
+  assert.doesNotMatch(await page.locator('#mwPreview').innerText(),/GL-150|GL-160/);
+  assert(await page.locator('#mwPreview .mw-reference').evaluateAll(cells=>cells.every(c=>c.textContent.trim()==='')));
   assert.equal(await row.getAttribute('data-mw-amount'),'14556719701');
   assert.deepEqual(diagnostic,[]);
   const count=await page.locator('#mwPreview .mw-paper').count();
@@ -683,15 +684,15 @@ test('A-70 fits multiple ledger references and large realistic amounts without t
  } finally {await browser.close();}
 });
 
-test('many references wrap at account boundaries and still paginate safely', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+test('many accounts aggregate without creating references and paginate safely', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try {
   const {page,context,errors}=await setup(browser);
   await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:18},(_,i)=>({'کد حساب کل':String(100+i),'عنوان حساب کل':'بدهکاران تجاری '+String(i),'کد حساب معین':'1','عنوان حساب معین':'بدهکاران تجاری '+String(i),'بدهکار':'100','بستانکار':''}));gotoModule('mainWorkpaper');});
   await page.locator('[data-balance-open]').click();await page.locator('#mwSelectAll').check();await page.locator('[data-mw-done]').click();await page.locator('[data-mw-view="A-70"]').click();
   const row=page.locator('.mw-paper-table tbody tr').filter({hasText:'دریافتنی‌های تجاری و سایر دریافتنی‌ها'}).last();
-  assert.equal(await row.getAttribute('data-mw-amount'),'1800');assert.equal(await row.locator('.mw-ref-token').count(),18);
-  assert(await row.locator('.mw-ref-token').evaluateAll(els=>els.every(el=>el.getClientRects().length===1 && el.scrollWidth<=el.parentElement.clientWidth)));
+  assert.equal(await row.getAttribute('data-mw-amount'),'1800');assert.equal((await row.locator('.mw-reference').innerText()).trim(),'');
+  assert.equal(await page.locator('#mwPreview .mw-ref-token').count(),0);
   const pages=page.locator('#mwPreview .mw-paper');const count=await pages.count();
   for(const p of await pages.all())assert(await p.evaluate(el=>{const c=el.querySelector('.mw-card');return c.scrollHeight<=c.clientHeight+1&&[...el.querySelectorAll('td,th')].every(x=>x.scrollWidth<=x.clientWidth+1);}));
   assert.equal(await page.locator('#mwPrint').isEnabled(),true);
