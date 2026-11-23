@@ -301,3 +301,22 @@ test(
     }
   },
 );
+
+test('other floating balance pickers have readable contrast in dark mode', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>document.documentElement.setAttribute('data-theme','dark'));
+  const contrast=async selector=>page.locator(selector).first().evaluate(el=>{
+   const rgb=s=>s.match(/[\d.]+/g).map(Number),fg=rgb(getComputedStyle(el).color);let bg;for(let p=el;p;p=p.parentElement){const c=rgb(getComputedStyle(p).backgroundColor);if(c.length===3||c[3]>.99){bg=c;break;}}
+   bg??=[255,255,255];const lum=c=>c.slice(0,3).map(x=>x/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((sum,x,i)=>sum+x*[.2126,.7152,.0722][i],0);let a=lum(fg),b=lum(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+  });
+  for(const mode of ['variance','aged']){
+   if(mode==='variance')await page.evaluate(()=>window.__variancePickerFixture());else await page.evaluate(()=>window.__agedPickerFixture());
+   const root=mode==='variance'?'#varianceBalanceDialog':'#srBalanceDialog';await page.locator(mode==='variance'?'#varianceV3 [data-balance-open]':'#srReport [data-balance-open]').click();
+   for(const suffix of ['.sr-tb-period span','.sr-tb-period b','.sr-tb-kol td:nth-child(2)','.sr-tb-moein td:nth-child(2)','.sr-tb-table th:nth-child(2)','.sr-tb-footer span'])assert((await contrast(root+' '+suffix))>=4.5,`${mode} ${suffix}`);
+   if(mode==='aged')assert((await contrast(root+' .sr-tree-count'))>=4.5);
+   await page.locator(root+' [data-balance-close]').click();
+  }
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});

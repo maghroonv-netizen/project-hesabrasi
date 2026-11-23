@@ -704,7 +704,7 @@ test('topic-first mobile selection, reassignment, deletion and restoration prese
   await dialog.locator('#mwTopicSearch').fill('نام اختصاصی');
   assert.equal(await dialog.locator('[data-topic-account]').count(),1);
   await dialog.locator('[data-topic-account]').check();
-  await dialog.locator('#mwTopicSearch').fill('بانک');await dialog.locator('[data-topic-account]').check();
+  await dialog.locator('#mwTopicSearch').fill('بانک');await dialog.locator('[data-topic-transfer]').click();
   page.once('dialog',d=>d.dismiss());await dialog.locator('[data-topic-save]').click();assert(await dialog.isVisible());
   page.once('dialog',d=>d.accept());await dialog.locator('[data-topic-save]').click();
   assert.equal(await row('پیش‌پرداخت‌ها').getAttribute('data-mw-amount'),'125');
@@ -886,11 +886,12 @@ test('floating trial balance starts at major accounts and reflects partial, prev
   await page.locator('[data-mw-view="A-70"]').click();await page.locator('[data-mw-topic-choose="A-70|1|5"]').click();
   const d=page.locator('#mwTopicDialog'),g=d.locator('[data-topic-group="10"]'),other=d.locator('[data-topic-group="20"]');
   assert.equal(await d.locator('[data-topic-group]').count(),3);assert.equal(await d.locator('[data-topic-account]').count(),0);
-  assert.match(await g.innerText(),/۳ از ۳ انتخاب برای این سرفصل/);assert.match(await g.innerText(),/بدهکار: ۱۳۰/);assert.match(await other.innerText(),/بستانکار: ۷۵/);assert.match(await d.innerText(),/مانده نامشخص/);
+  assert(await other.locator('[data-topic-major]').isChecked());assert(await other.locator('[data-topic-major]').isDisabled());assert.doesNotMatch(await d.innerText(),/دارای مقصد|قبلاً متصل/);
+  assert.match(await g.innerText(),/۳ از ۳ معین انتخاب‌شده/);assert.match(await g.innerText(),/بدهکار: ۱۳۰/);assert.match(await other.innerText(),/بستانکار: ۷۵/);assert.match(await d.innerText(),/مانده نامشخص/);
   assert(await g.locator('[data-topic-major]').isChecked());await g.locator('[data-topic-expand]').click();assert.equal(await g.locator('[data-topic-account]').count(),3);
-  assert.equal(await g.locator('[data-topic-account]:checked').count(),3);assert.match(await g.innerText(),/خودکار، نیازمند بازبینی/);assert.match(await g.innerText(),/ثبت مستقیم در حساب کل/);
+  assert.equal(await g.locator('[data-topic-account]:checked').count(),3);assert.doesNotMatch(await g.innerText(),/دارای مقصد|قبلاً متصل/);assert.match(await g.innerText(),/ثبت مستقیم در حساب کل/);
   await g.locator('[data-topic-account]').first().uncheck();assert(await g.locator('[data-topic-major]').evaluate(x=>x.indeterminate));assert.match(await g.innerText(),/۲ از ۳/);
-  await other.locator('[data-topic-expand]').click();assert.match(await other.innerText(),/قبلاً متصل: A-71/);await other.locator('[data-topic-account]').check();
+  await other.locator('[data-topic-expand]').click();assert(await other.locator('[data-topic-account]').isChecked());assert(await other.locator('[data-topic-account]').isDisabled());await other.locator('[data-topic-transfer]').click();
   page.once('dialog',x=>x.dismiss());await d.locator('[data-topic-save]').click();assert(await d.isVisible());
   await d.locator('[data-topic-cancel]').first().click();
   await page.locator('[data-mw-topic-choose="A-70|1|5"]').click();assert.equal(await d.locator('[data-topic-account]').count(),0);assert(await d.locator('[data-topic-major="10"]').isChecked());
@@ -976,27 +977,27 @@ test('all previous automatic and manual mappings are ticked as status, bulk sele
   ].map(([m,title,amount])=>({'کد حساب کل':'11','عنوان حساب کل':'حساب خاص','کد حساب معین':m,'عنوان حساب معین':title,'بدهکار':amount,'بستانکار':''}));gotoModule('mainWorkpaper');});
   await page.locator('select[data-mw-link]').nth(3).selectOption('A-71|2|0');
   await page.locator('[data-mw-view="A-70"]').click();await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();
-  const d=page.locator('#mwTopicDialog'),g=d.locator('[data-topic-group="11"]');assert.match(await g.innerText(),/۳ دارای مقصد ثبت‌شده/);
+  const d=page.locator('#mwTopicDialog'),g=d.locator('[data-topic-group="11"]');assert.match(await g.innerText(),/۳ از ۴ معین انتخاب‌شده/);
   await g.locator('[data-topic-expand]').click();const rows=g.locator('.mw-topic-account');assert.equal(await rows.count(),4);
   const intangible=rows.nth(0),cash=rows.nth(1),unknown=rows.nth(2),manual=rows.nth(3);
-  for(const r of [intangible,cash,manual]){assert(await r.locator('.mw-topic-previous input').isChecked());assert(await r.locator('.mw-topic-previous input').isDisabled());assert.equal(await r.locator('[data-topic-account]').isChecked(),false);}
-  assert.match(await intangible.innerText(),/A-70.*دارایی‌های نامشهود.*خودکار، نیازمند بازبینی/s);assert.match(await manual.innerText(),/A-71.*پرداختنی.*دستی/s);
-  assert.equal(await unknown.locator('.mw-topic-previous input').isChecked(),false);assert.match(await unknown.innerText(),/بدون مقصد ثبت‌شده/);
-  await g.locator('[data-topic-major]').check();assert(await unknown.locator('[data-topic-account]').isChecked());assert.equal(await cash.locator('[data-topic-account]').isChecked(),false);
+  for(const r of [intangible,cash,manual]){assert(await r.locator('[data-topic-account]').isChecked());assert(await r.locator('[data-topic-account]').isDisabled());assert.equal(await r.locator('input[type=checkbox]').count(),1);}
+  assert.doesNotMatch(await g.innerText(),/دارای مقصد|قبلاً متصل|خودکار، نیازمند بازبینی/);
+  assert.equal(await unknown.locator('[data-topic-account]').isChecked(),false);assert(await g.locator('[data-topic-major]').evaluate(x=>x.indeterminate));
+  await g.locator('[data-topic-major]').check();assert(await unknown.locator('[data-topic-account]').isChecked());assert(await cash.locator('[data-topic-account]').isChecked());assert(await cash.locator('[data-topic-account]').isDisabled());
   await d.locator('[data-topic-save]').click();
   const amount=label=>page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:label})}).first().getAttribute('data-mw-amount');
   assert.equal(await amount('پیش‌پرداخت‌ها'),'30');assert.equal(await amount('موجودی نقد'),'20');assert.equal(await amount('دارایی‌های نامشهود'),'100');
   await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();await d.locator('#mwTopicUnlinked').check();assert.equal(await d.locator('[data-topic-group]').count(),0);
   await d.locator('#mwTopicUnlinked').uncheck();await d.locator('[data-topic-expand]').click();
-  assert(await d.locator('.mw-topic-account').nth(2).locator('[data-topic-account]').isChecked());assert(await d.locator('.mw-topic-account').nth(2).locator('.mw-topic-previous input').isChecked());
-  await d.locator('.mw-topic-account').nth(1).locator('[data-topic-account]').check();assert.match(await d.innerText(),/انتقال در انتظار ثبت/);
+  assert(await d.locator('.mw-topic-account').nth(2).locator('[data-topic-account]').isChecked());assert(await d.locator('.mw-topic-account').nth(2).locator('[data-topic-account]').isEnabled());
+  await d.locator('.mw-topic-account').nth(1).locator('[data-topic-transfer]').click();assert(await d.locator('.mw-topic-account').nth(1).locator('[data-topic-account]').isEnabled());
   page.once('dialog',x=>x.dismiss());await d.locator('[data-topic-save]').click();assert(await d.isVisible());
   await d.locator('[data-topic-cancel]').first().click();assert.equal(await amount('موجودی نقد'),'20');
-  await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();await d.locator('[data-topic-expand]').click();await d.locator('.mw-topic-account').nth(1).locator('[data-topic-account]').check();
+  await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();await d.locator('[data-topic-expand]').click();await d.locator('.mw-topic-account').nth(1).locator('[data-topic-transfer]').click();
   page.once('dialog',x=>x.accept());await d.locator('[data-topic-save]').click();assert.equal(await amount('پیش‌پرداخت‌ها'),'50');assert.equal(await amount('موجودی نقد'),'');
   await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();await d.locator('[data-topic-expand]').click();const moved=d.locator('.mw-topic-account').nth(1);
-  assert(await moved.locator('[data-topic-account]').isChecked());assert.match(await moved.innerText(),/قبلاً متصل: A-70.*پیش‌پرداخت‌ها.*دستی/s);
-  await moved.locator('[data-topic-account]').uncheck();assert.match(await moved.innerText(),/لغو اتصال در انتظار ثبت/);await d.locator('[data-topic-save]').click();
+  assert(await moved.locator('[data-topic-account]').isChecked());assert(await moved.locator('[data-topic-account]').isEnabled());
+  await moved.locator('[data-topic-account]').uncheck();assert.equal(await moved.locator('[data-topic-account]').isChecked(),false);await d.locator('[data-topic-save]').click();
   assert.equal(await amount('پیش‌پرداخت‌ها'),'30');await page.locator('#mwMatching summary').click();assert.match(await page.locator('.mw-map-item').nth(1).innerText(),/انتخاب نشده/);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
@@ -1011,7 +1012,7 @@ test('unassigned filter, page and group selection only affect eligible accounts 
   await d.locator('[data-topic-account]').first().check();assert.equal(await d.locator('[data-topic-account]').count(),2);
   await d.locator('#mwTopicSearch').fill('دوم');await d.locator('[data-topic-page-all]').check();await d.locator('#mwTopicSearch').fill('');
   assert.equal(await d.locator('[data-topic-account]:checked').count(),2);await d.locator('#mwTopicUnlinked').uncheck();
-  assert.equal(await d.locator('[data-topic-account]').count(),3);assert(await d.locator('.mw-topic-account').first().locator('.mw-topic-previous input').isChecked());
+  assert.equal(await d.locator('[data-topic-account]').count(),3);assert(await d.locator('.mw-topic-account').first().locator('[data-topic-account]').isChecked());assert(await d.locator('.mw-topic-account').first().locator('[data-topic-account]').isDisabled());
   await d.locator('[data-topic-save]').click();const row=label=>page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:label})}).first();
   assert.equal(await row('موجودی نقد').getAttribute('data-mw-amount'),'50');assert.equal(await row('دارایی‌های نامشهود').getAttribute('data-mw-amount'),'10');assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
@@ -1032,5 +1033,31 @@ test('removed results and balance panels stay absent while selection and invalid
   assert.equal(await page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})}).getAttribute('data-mw-amount'),'');
   await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'','عنوان حساب کل':'بی کد','بدهکار':'5','بستانکار':''}];gotoModule('mainWorkpaper');});
   assert.match(await mod.innerText(),/هیچ حساب کل معتبری/);assert.match(await mod.innerText(),/فاقد کد کل/);assert.doesNotMatch(await mod.innerText(),/کنترل توازن|نتیجه بررسی حساب‌ها/);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+
+test('dark and light themes keep preview tools, picker, selected rows and printed paper readable', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  async function contrast(selector){return page.locator(selector).first().evaluate(el=>{
+   const rgb=s=>{const n=s.match(/[\d.]+/g).map(Number);return n;};
+   const fg=rgb(getComputedStyle(el).color);let bg;for(let p=el;p;p=p.parentElement){const c=rgb(getComputedStyle(p).backgroundColor);if(c.length===3||c[3]>.99){bg=c;break;}}
+   bg??=[255,255,255];const lum=c=>c.slice(0,3).map(x=>x/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((sum,x,i)=>sum+x*[.2126,.7152,.0722][i],0);const a=lum(fg),b=lum(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+  });}
+  await page.locator('[data-mw-view="A-70"]').click();
+  for(const mode of ['dark','light','system-dark']){
+   if(mode==='system-dark'){await page.emulateMedia({colorScheme:'dark'});await page.evaluate(()=>document.documentElement.removeAttribute('data-theme'));}else await page.evaluate(mode=>applyTheme(mode),mode);
+   for(const selector of ['#mwPreview .mw-preview-tools p','#mwMatching summary','#mwPreview .mw-paper tbody td.mw-description'])assert((await contrast(selector))>=4.5,`${mode}: ${selector}`);
+   await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();const dialog=page.locator('#mwTopicDialog');await dialog.locator('[data-topic-expand]').first().click();
+   for(const selector of ['#mwTopicDialog','#mwTopicDialog .mw-topic-major-info b','#mwTopicDialog .mw-topic-major-info small','#mwTopicDialog .mw-topic-choice b','#mwTopicDialog .mw-topic-transfer'])assert((await contrast(selector))>=4.5,`${mode}: ${selector}`);
+   await dialog.locator('[data-topic-transfer]').first().click();assert((await contrast('#mwTopicDialog .mw-topic-account.is-selected .mw-topic-choice b'))>=4.5,`${mode}: selected`);
+   await dialog.locator('[data-topic-cancel]').first().click();
+  }
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+  assert((await contrast('#printHost .mw-paper tbody td.mw-description'))>=4.5);assert((await contrast('#printHost .mw-paper th'))>=4.5);
+  const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount()>=1);
+  assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
