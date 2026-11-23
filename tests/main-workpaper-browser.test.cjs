@@ -431,6 +431,7 @@ test("A-family controls match the template without changing GL controls", { skip
       for(const p of await page.locator('#mwPreview .mw-paper').all()) {
         const rows=p.locator('.mw-control-items > div');
         assert.equal(await rows.count(),5);
+        const titleHeight=await p.locator('.mw-control-title').evaluate(el=>el.getBoundingClientRect().height);assert(titleHeight>=17.5 && titleHeight<=21);
         const top=await rows.evaluateAll(els=>els.map(el=>Math.round(el.getBoundingClientRect().top)));
         assert.equal(new Set(top).size,2);
         assert.equal(top[0],top[2]);assert.equal(top[2],top[4]);assert.equal(top[1],top[3]);
