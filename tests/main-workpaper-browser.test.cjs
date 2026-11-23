@@ -120,8 +120,8 @@ test(
       assert.equal((await h.locator(".mw-ref").first().innerText()).trim(), "");
       assert(await h.locator(".mw-paper-table td, .mw-paper-table th").evaluateAll(cells => cells.every(cell => getComputedStyle(cell).color === "rgb(0, 0, 0)")));
       const cells = cash.locator("td");
-      assert.equal(await cells.count(), 14);
-      for (let i = 4; i < 14; i++)
+      assert.equal(await cells.count(), 13);
+      for (let i = 3; i < 13; i++)
         assert.equal((await cells.nth(i).innerText()).trim(), "");
       assert.match(await h.innerText(), /طبقه‌بندی و سال قبل محاسبه نمی‌شوند/);
       assert.equal(
@@ -436,4 +436,30 @@ test("A-family controls match the template without changing GL controls", { skip
     }
     assert.deepEqual(errors,[]);await context.close();
   } finally { await browser.close(); }
+});
+
+test("A-70 current and noncurrent asset headings fit on one real PDF page", { skip: !executablePath && "Set CHROMIUM_PATH" }, async () => {
+  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+  try {
+    const {page,context,errors}=await setup(browser);
+    await page.locator('[data-balance-open]').click();
+    await page.locator('[data-mw-account="01"]').check();
+    await page.locator('[data-mw-done]').click();
+    await page.locator('[data-mw-link]').first().selectOption('A-70|0|0');
+    await page.locator('[data-mw-link]').nth(1).selectOption('A-70|1|5');
+    await page.locator('[data-mw-view="A-70"]').click();
+    const pages=page.locator('#mwPreview .mw-paper');
+    assert.equal(await pages.count(),1);
+    assert.equal(await pages.locator('tbody tr').count(),19);
+    assert.match(await pages.innerText(),/دارایی‌های غیرجاری/);
+    assert.match(await pages.innerText(),/دارایی‌های جاری/);
+    assert.match(await pages.innerText(),/جمع کل/);
+    assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+    await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
+    await page.emulateMedia({media:'print'});
+    const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});
+    assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),1);
+    fs.writeFileSync('.arena/main-a70-single-page.pdf',pdf);
+    assert.deepEqual(errors,[]);await context.close();
+  } finally {await browser.close();}
 });
