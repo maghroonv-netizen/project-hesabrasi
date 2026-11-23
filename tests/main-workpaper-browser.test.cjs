@@ -718,7 +718,13 @@ test('topic-first mobile selection, reassignment, deletion and restoration prese
   const row=label=>page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description', {hasText:label})}).first();
   assert.equal(await row('موجودی نقد').getAttribute('data-mw-amount'),'150');
   assert.equal(await page.locator('.mw-number').first().evaluate(el=>getComputedStyle(el).textAlign),'center');
-  await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();
+  const previewChoice=page.locator('#mwPreview .mw-paper-table [data-mw-topic-choose="A-70|1|0"]');
+  assert.equal(await previewChoice.count(),1);
+  assert.equal(await page.locator('.mw-topics').count(),0);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();
+  assert.equal(await page.locator('#printHost .mw-row-actions, #printHost [data-mw-topic-remove], #printHost [data-mw-topic-choose]').count(),0);
+  await page.evaluate(()=>window.__activePrintRestore());
+  await previewChoice.click();
   const dialog=page.locator('#mwTopicDialog');assert(await dialog.isVisible());
   await dialog.locator('#mwTopicSearch').fill('نام اختصاصی');
   assert.equal(await dialog.locator('[data-topic-account]').count(),1);
@@ -740,6 +746,7 @@ test('topic-first mobile selection, reassignment, deletion and restoration prese
   assert.match(await page.locator('.mw-balance-control').innerText(),/۲ معین بدون مقصد/);
   await page.locator('#mwMatching summary').click();
   assert.equal(await page.locator('select[data-mw-map-link] option[value="A-70|1|0"]').count(),0);
+  await page.locator('#mwPreview .mw-preview-tools summary').click();
   await page.locator('[data-mw-topic-restore="A-70|1|0"]').click();
   assert.equal(await row('پیش‌پرداخت‌ها').getAttribute('data-mw-amount'),'');
   assert.match(await page.locator('.mw-balance-control').innerText(),/۲ معین بدون مقصد/);
