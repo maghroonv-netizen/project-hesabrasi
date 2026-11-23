@@ -427,6 +427,7 @@ test("A-family controls match the template without changing GL controls", { skip
       for(const p of await page.locator('#mwPreview .mw-paper').all()) {
         const rows=p.locator('.mw-control-items > div');
         assert.equal(await rows.count(),5);
+        assert(await p.evaluate(el => parseFloat(getComputedStyle(el.querySelector(".mw-control-items")).fontSize) >= parseFloat(getComputedStyle(el.querySelector(".mw-paper-table td")).fontSize)));
         for(let i=0;i<5;i++) { assert.equal((await rows.nth(i).innerText()).replace('□','').trim(),expected[i]);assert.equal((await rows.nth(i).locator('span').innerText()).trim(),'□'); }
       }
       assert.equal(await page.locator('#mwPrint').isEnabled(),true);
