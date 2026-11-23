@@ -346,17 +346,25 @@ test("all accounts appear automatically in a single horizontal mobile strip bene
   assert(await nav.evaluate(el=>el.scrollWidth>el.clientWidth&&getComputedStyle(el).flexWrap==='nowrap'));
   assert(await page.evaluate(()=>document.querySelector('#mwPreview').compareDocumentPosition(document.querySelector('.mw-nav'))&Node.DOCUMENT_POSITION_FOLLOWING));
   assert.match(await preview.innerText(),/حساب هم‌نام/);assert.match(await preview.innerText(),/۱/);
+  const left=page.locator('[data-mw-scroll="left"]'),right=page.locator('[data-mw-scroll="right"]');
+  assert(await left.isEnabled());assert(await right.isDisabled());
+  assert((await left.boundingBox()).x < (await nav.boundingBox()).x);
+  assert((await right.boundingBox()).x > (await nav.boundingBox()).x);
+  await left.click();await page.waitForFunction(()=>document.querySelector('.mw-nav').scrollLeft < -20);
+  await page.waitForFunction(()=>!document.querySelector('[data-mw-scroll="right"]').disabled);
+  await right.click();await page.waitForFunction(()=>document.querySelector('.mw-nav').scrollLeft >= -1);
   await nav.locator('[data-mw-active="65"]').click();
   assert.match(await preview.innerText(),/آخرین حساب/);assert.match(await preview.innerText(),/۶۵/);
   assert.equal(await page.locator('.mw-nav [aria-current="page"]').getAttribute('data-mw-active'),'65');
   assert(await nav.evaluate(el=>Math.abs(el.scrollLeft)>0));
+  await nav.locator('[data-mw-active="64"]').scrollIntoViewIfNeeded();
   const before=await nav.evaluate(el=>({left:el.scrollLeft,top:el.getBoundingClientRect().top}));
   await nav.locator('[data-mw-active="64"]').click();
   const after=await nav.evaluate(el=>({left:el.scrollLeft,top:el.getBoundingClientRect().top}));
   assert(Math.abs(after.left-before.left)<3,'horizontal position remains after changing workpaper');
   assert(Math.abs(after.top-before.top)<3,'navigation remains in view after changing workpaper');
   assert.match(await preview.innerText(),/۶۴/);
-  await nav.screenshot({path:'.arena/main-nav-mobile.png'});
+  await page.locator('.mw-nav-wrap').screenshot({path:'.arena/main-nav-mobile.png'});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
   await page.locator('[data-mw-view="A-70"]').click();assert.match(await preview.innerText(),/دارایی‌های جاری/);
   await page.locator('[data-mw-active="65"]').click();assert.match(await preview.innerText(),/آخرین حساب/);
@@ -785,6 +793,60 @@ test('intangible details, current and long-term names and conflicts are matched 
    assert.equal(values[id],input[i][2],`${input[i][0]} / ${input[i][1]}`);
   }
   const conflict=page.locator('.mw-map-item').filter({has:page.locator('b').filter({hasText:'کل ۷ —'})});assert.match(await conflict.innerText(),/متفاوت یا مبهم/);
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('statement asset and liability groups follow sample order with separate current and long-term balances', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=[
+   ['1','دریافتنی کوتاه مدت','100',''],['2','دریافتنی بلندمدت','200',''],
+   ['3','پرداختنی کوتاه مدت','','300'],['4','پرداختنی بلندمدت','','400']
+  ].map(([code,title,debit,credit])=>({'کد حساب کل':code,'عنوان حساب کل':title,'کد حساب معین':code,'عنوان حساب معین':title,'بدهکار':debit,'بستانکار':credit}));gotoModule('mainWorkpaper');});
+  await page.locator('[data-mw-view="A-70"]').click();
+  const groups=await page.locator('#mwPreview tbody').evaluateAll(bodies=>{const groups=[];let current;for(const body of bodies)for(const row of body.rows){if(row.classList.contains('mw-group')){current={group:row.textContent.trim(),items:[]};groups.push(current);}else if(row.querySelector('.mw-editable-topic'))current.items.push({name:row.querySelector('.mw-editable-topic').childNodes[0].textContent.trim(),amount:row.dataset.mwAmount});}return groups;});
+  assert.deepEqual(groups.map(g=>g.group),['دارایی‌های غیرجاری','دارایی‌های جاری']);
+  assert.deepEqual(groups[0].items.map(x=>x.name),['دارایی‌های ثابت مشهود','سرمایه‌گذاری در املاک','دارایی‌های نامشهود','سرمایه‌گذاری‌های بلندمدت','دریافتنی‌های تجاری و سایر دریافتنی‌ها','دارایی مالیات انتقالی','سایر دارایی‌ها']);
+  assert.deepEqual(groups[1].items.map(x=>x.name),['پیش‌پرداخت‌ها','موجودی مواد و کالا','دارایی‌های حاصل از قرارداد','دریافتنی‌های تجاری و سایر دریافتنی‌ها','سرمایه‌گذاری‌های کوتاه‌مدت','موجودی نقد','دارایی‌های غیرجاری نگهداری‌شده برای فروش']);
+  assert.equal(groups[0].items[4].amount,'200');assert.equal(groups[1].items[3].amount,'100');
+  await page.locator('[data-mw-view="A-71"]').click();
+  const items=await page.locator('#mwPreview [data-mw-topic-choose]').evaluateAll(els=>els.map(el=>({dest:el.dataset.mwTopicChoose,amount:el.closest('tr').dataset.mwAmount})));
+  assert.equal(items.find(x=>x.dest==='A-71|1|0').amount,'400');assert.equal(items.find(x=>x.dest==='A-71|2|0').amount,'300');
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('all main and A workpapers print bold enlarged headers and centered amounts', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{ACCOUNT_ROWS=[
+   ['1','موجودی نقد','001','بانک','1234567',''],['2','تسهیلات مالی','002','تسهیلات','0','800'],['3','فروش','003','فروش','','70'],['4','بهای تمام شده فروش','004','بهای تمام شده فروش','42','']
+  ].map(([k,t,m,mt,d,c])=>({'کد حساب کل':k,'عنوان حساب کل':t,'کد حساب معین':m,'عنوان حساب معین':mt,'بدهکار':d,'بستانکار':c}));gotoModule('mainWorkpaper');});
+  await page.evaluate(()=>{window.print=()=>{};});
+  for(const id of ['accounts','A-70','A-71','A-72','A-73']){
+   if(id==='accounts')await page.locator('[data-mw-view="accounts"][data-mw-active="1"]').click();else await page.locator(`[data-mw-view="${id}"]`).click();
+   assert(await page.locator('#mwPrint').isEnabled(),id);
+   await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+   const pages=page.locator('#printHost .mw-paper');
+   const styles=await pages.first().evaluate(el=>{
+    const meta=el.querySelector('.mw-meta'),sign=el.querySelector('.mw-sign'),heads=[...el.querySelectorAll('thead th')];
+    const info=node=>({size:parseFloat(getComputedStyle(node).fontSize),weight:parseInt(getComputedStyle(node).fontWeight)});
+    return {meta:info(meta),sign:info(sign),metaChildren:[...meta.querySelectorAll('div,b')].map(info),signChildren:[...sign.querySelectorAll('div,b')].map(info),heads:heads.map(info)};
+   });
+   assert(styles.meta.size>=15.4&&styles.sign.size>=14.1,id);
+   assert([...styles.metaChildren,...styles.signChildren].every(s=>s.weight>=700),id);
+   assert(styles.heads.every(s=>s.weight>=700&&s.size>=16),id);
+   const distances=await pages.locator('.mw-number-text').evaluateAll(nodes=>nodes.filter(n=>n.textContent.trim()).map(n=>{const cell=n.parentElement.getBoundingClientRect(),text=n.getBoundingClientRect();return Math.abs((cell.left+cell.right-text.left-text.right)/2);}));
+   assert(distances.length>0,id);assert(distances.every(d=>d<1.1),`${id}: ${distances}`);
+   if(id==='A-72')assert(await pages.locator('.mw-number-text').evaluateAll(ns=>ns.some(n=>n.textContent.includes('('))));
+   const centering=id==='A-70'?await pages.locator('.mw-number').filter({hasText:'۱٬۲۳۴٬۵۶۷'}).first().evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right};}):null;
+   const pageCount=await pages.count();const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),pageCount,id);
+   if(id==='A-70'){fs.writeFileSync('.arena/main-centered-print.pdf',pdf);fs.writeFileSync('.arena/main-centered-cell.json',JSON.stringify(centering));}
+   await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+  }
   assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
