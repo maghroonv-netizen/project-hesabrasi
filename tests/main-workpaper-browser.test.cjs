@@ -772,3 +772,49 @@ test('topic picker preserves selections across searches and pages', {skip:!execu
   assert.match(await page.locator('.mw-balance-control').innerText(),/۱ معین بدون مقصد/);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
+
+test('statement topics follow the reference order and maintain stable destination keys', {skip:!executablePath && 'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);await page.locator('[data-balance-open]').click();await page.locator('[data-mw-account="01"]').check();await page.locator('[data-mw-done]').click();
+  const expected={
+   'A-70':[['A-70|0|0','A-70|0|1','A-70|0|2','A-70|0|3','A-70|0|4','A-70|0|5','A-70|0|6'],['A-70|1|0','A-70|1|2','A-70|1|1','A-70|1|3','A-70|1|4','A-70|1|5','A-70|1|6']],
+   'A-71':[[0,1,2,3,4,5,6,7,8].map(i=>`A-71|0|${i}`),[0,1,2,3].map(i=>`A-71|1|${i}`),[0,1,2,3,4,5,6,7].map(i=>`A-71|2|${i}`)],
+   'A-72':[[0,1,2,3,4,5,6,7,8,9].map(i=>`A-72|0|${i}`)],
+   'A-73':[['A-73|0|0','A-73|0|1'],['A-73|1|0']]
+  };
+  for(const id of Object.keys(expected)){await page.locator(`[data-mw-view="${id}"]`).click();const keys=await page.locator('#mwPreview [data-mw-topic-choose]').evaluateAll(xs=>xs.map(x=>x.dataset.mwTopicChoose));assert.deepEqual(keys,expected[id].flat());}
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('intangible details, current and long-term names and conflicts are matched safely', {skip:!executablePath && 'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  const input=[
+   ['دارایی ثابت','دارایی نامشهود','A-70|0|2'],['دارایی های ثابت','دارایی غیرمشهود','A-70|0|2'],
+   ['دارایی نامشهود','نرم افزار','A-70|0|2'],['دارایی ثابت','سرقفلی','A-70|0|2'],
+   ['دارایی نامشهود','پیش پرداخت سرمایه ای نرم افزار','A-70|0|2'],['دارایی نامشهود','استهلاک انباشته دارایی نامشهود','A-70|0|2'],
+   ['دارایی ثابت مشهود','دارایی نامشهود',''],['دارایی نامشهود','هزینه استهلاک دارایی نامشهود',''],
+   ['دریافتنی تجاری','مطالبات مشتریان','A-70|1|3'],['حساب های دریافتنی بلندمدت','بدهکاران تجاری','A-70|0|4'],
+   ['دارایی های جاری','دریافتنی بلندمدت',''],['دارایی های غیر جاری','دریافتنی کوتاه مدت',''],
+   ['بستانکاران تجاری','حساب های پرداختنی','A-71|2|0'],['بدهی های غیر جاری','پرداختنی بلند مدت','A-71|1|0'],
+   ['بدهی های جاری','تسهیلات بلند مدت',''],['پرداختنی بلندمدت','پرداختنی جاری',''],
+   ['دارایی های غیر جاری','موجودی نقد',''],['بدهی های جاری','دریافتنی تجاری',''],['بدهی های جاری','سرمایه',''],['دارایی های جاری','بستانکاران',''],['درآمد','درآمد فروش','A-72|0|0'],
+   ['دارایی نامشهود','فروش نرم افزار',''],['حساب نامشخص','نرم افزار',''],
+   ['هزینه کاهش ارزش مطالبات','هزینه مطالبات مشکوک الوصول','A-72|0|3'],['سایر درآمدهای عملیاتی','فروش ضایعات','A-72|0|4'],['سایر هزینه های غیرعملیاتی','سایر هزینه های غیرعملیاتی','A-72|0|7'],
+   ['فروشندگان','فروشندگان','A-71|2|0'],['هزینه های پرداختنی','هزینه مالی پرداختنی','A-71|2|0'],['درآمد خدمات شرکت','درآمد خدمات مشاوره','A-72|0|0'],
+   ['استهلاک انباشته ماشین آلات','استهلاک انباشته ماشین آلات','A-70|0|0']
+  ];
+  await page.evaluate(input=>{ACCOUNT_ROWS=input.map(([parent,child],i)=>({'کد حساب کل':String(i+1),'عنوان حساب کل':parent,'کد حساب معین':'1','عنوان حساب معین':child,'بدهکار':'1','بستانکار':''}));gotoModule('mainWorkpaper');},input);
+  await page.locator('[data-balance-open]').click();await page.locator('#mwSelectAll').check();await page.locator('[data-mw-done]').click();await page.locator('#mwMatching summary').click();
+  const values=await page.locator('[data-mw-map-link]').evaluateAll(els=>Object.fromEntries(els.map(el=>[el.dataset.mwMapLink,el.value])));
+  for(let i=0;i<input.length;i++){
+   const id=JSON.stringify([String(i+1),'1']);
+   assert.equal(values[id],input[i][2],`${input[i][0]} / ${input[i][1]}`);
+  }
+  const conflict=page.locator('.mw-map-item').filter({has:page.locator('b').filter({hasText:'کل ۷ —'})});assert.match(await conflict.innerText(),/متفاوت یا مبهم/);
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});

@@ -15334,7 +15334,9 @@ const summaries=[
  {id:'A-72',title:'کاربرگ نهایی تهیه صورت‌های مالی — سود و زیان',groups:[['عملیات در حال تداوم',['درآمدهای عملیاتی','بهای تمام‌شده درآمدهای عملیاتی','هزینه‌های فروش، اداری و عمومی','زیان کاهش ارزش دریافتنی‌ها','سایر درآمدها','سایر هزینه‌ها','هزینه‌های مالی','سایر درآمدها و هزینه‌های غیرعملیاتی','هزینه مالیات بر درآمد','سود (زیان) خالص عملیات متوقف‌شده']]]},
  {id:'A-73',title:'کاربرگ نهایی تهیه صورت‌های مالی — سود و زیان جامع',groups:[['سایر اقلامی که در دوره‌های آتی به سود و زیان تجدید طبقه‌بندی نخواهد شد',['مازاد تجدید ارزیابی دارایی‌های ثابت مشهود','مالیات بر درآمد اقلام فوق']],['سایر اقلامی که در دوره‌های آتی به سود و زیان تجدید طبقه‌بندی خواهد شد',['مالیات بر درآمد اقلام فوق']]]}
 ];
-const destinationList=summaries.flatMap(s=>s.groups.flatMap(([g,rows],gi)=>rows.map((name,i)=>({key:s.id+'|'+gi+'|'+i,id:s.id,group:g,name}))));
+// Display order follows the financial statements in the reference; keys stay stable.
+function orderedTopicIndexes(sheet,group,rows){return sheet==='A-70'&&group===1?[0,2,1,3,4,5,6]:rows.map((_,i)=>i);}
+const destinationList=summaries.flatMap(s=>s.groups.flatMap(([g,rows],gi)=>orderedTopicIndexes(s.id,gi,rows).map(i=>({key:s.id+'|'+gi+'|'+i,id:s.id,group:g,name:rows[i]}))));
 const e=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const code=x=>SRE.normCode(x); const fa=x=>String(x).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 const money=x=>x==null?'':(x<0n?'(':'')+fa((x<0n?-x:x).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'٬'))+(x<0n?')':'');
@@ -15363,6 +15365,7 @@ const aliasRules=[
  ['A-70|1|3',['دریافتنی های کوتاه مدت','دریافتنی کوتاه مدت','حساب های دریافتنی کوتاه مدت','اسناد دریافتنی کوتاه مدت']],
  ['A-70|1|2',['موجودی کالا','موجودی مواد','مواد اولیه','کالای ساخته شده','کالای در جریان ساخت']],
  ['A-70|0|0',['دارایی ثابت مشهود','دارایی های ثابت','دارایی ثابت','استهلاک انباشته دارایی های ثابت']],
+ ['A-70|0|2',['دارایی نامشهود','دارایی های نامشهود','دارایی ثابت نامشهود','دارایی های ثابت نامشهود','دارایی غیر مشهود','دارایی های غیر مشهود','استهلاک انباشته دارایی نامشهود','استهلاک انباشته دارایی های نامشهود']],
  ['A-70|1|0',['پیش پرداخت','پیش پرداخت ها']],
  ['A-71|0|7',['سود زیان انباشته','سود و زیان انباشته','زیان انباشته']],
  ['A-71|1|0',['پرداختنی های بلندمدت','حساب های پرداختنی بلندمدت','اسناد پرداختنی بلندمدت']],
@@ -15373,7 +15376,7 @@ const aliasRules=[
  ['A-72|0|1',['بهای تمام شده فروش','بهای تمام شده کالای فروش رفته']],
  ['A-72|0|8',['هزینه مالیات عملکرد','هزینه مالیات بر درآمد']]
 ];
-const matchName=x=>SRE.normText(String(x??'').normalize('NFKC')).replace(/[\u064b-\u065f\u0670\u0640\u200e\u200f]/g,'').replace(/[،,؛;()（）\-–—/]/g,' ').replace(/\s+/g,' ').trim();
+const matchName=x=>SRE.normText(String(x??'').normalize('NFKC')).replace(/[ى]/g,'ی').replace(/[\u064b-\u065f\u0670\u0640\u200d\u200e\u200f]/g,'').replace(/[،,؛;()（）\-–—/]/g,' ').replace(/\s+/g,' ').trim();
 const matchIndex=new Map();function addMatch(name,dest){const n=matchName(name);if(!n)return;if(!matchIndex.has(n))matchIndex.set(n,new Set());matchIndex.get(n).add(dest);}
 destinationList.forEach(d=>addMatch(d.name,d.key));aliasRules.forEach(([dest,names])=>names.forEach(n=>addMatch(n,dest)));
 // Conservative semantic filters. These produce reviewable suggestions, not accounting judgements.
@@ -15385,6 +15388,32 @@ function inferTitle(title,context){
  const choosePeriod=(shortKey,longKey,reason)=>period.long&&period.short?null:{dest:period.long?longKey:shortKey,reason:reason+(period.long?'؛ بلندمدت':period.short?'؛ جاری':'؛ فرض جاری، بررسی سررسید لازم است')};
  const hit=(dest,reason)=>({dest,reason});
  // Specific expressions must take precedence over broad words like بانک or پرداختنی.
+ // Note 18 examples are classified as intangible only in an asset context.
+ const contextName=matchName(context||'');
+ if(/دارایی/.test(contextName)&&!/(?:هزینه|درامد|فروش)/.test(contextName)){
+  if(/سرقفلی|دانش فنی|نرم\s*افزار|حق اختراع|حق امتیاز/.test(t))return hit('A-70|0|2','عنوان معین از نمونه دارایی نامشهود؛ بررسی ماهیت لازم است');
+  if(/پیش\s*پرداخت/.test(t)&&/سرمایه/.test(t)&&/(?:نام|غیر)\s*مشهود/.test(contextName))return hit('A-70|0|2','پیش‌پرداخت سرمایه‌ای با زمینه دارایی نامشهود؛ بررسی لازم است');
+ }
+ // فروشندگان denotes suppliers, not a sale. Accrued expenses payable are liabilities.
+ if(/فروشندگان/.test(t)&&!/هزینه|درامد|زیان|دریافتنی|بدهکار/.test(t))return choosePeriod('A-71|2|0','A-71|1|0','فروشندگان یا تامین‌کنندگان');
+ if(/هزینه/.test(t)&&/پرداختنی|بستانکار/.test(t)&&!/دریافتنی|بدهکار/.test(t))return choosePeriod('A-71|2|0','A-71|1|0','هزینه پرداختنی');
+ // Accumulated profit/loss belongs to equity, not the current-period P&L.
+ if(/سود|زیان/.test(t)&&/انباشته/.test(t))return hit('A-71|0|7','سود یا زیان انباشته');
+ // Revenue/expense wording is not evidence of an asset or liability balance.
+ // Known profit-and-loss names are matched first; unknown ones stay reviewable.
+ if(/هزینه|درامد|زیان|فروش/.test(t)&&!/نگهداری.*فروش/.test(t)){
+  if(/(?:زیان|هزینه)/.test(t)&&/(?:کاهش ارزش|مشکوک الوصول)/.test(t)&&/(?:دریافتنی|مطالبات)/.test(t))return hit('A-72|0|3','زیان کاهش ارزش دریافتنی‌ها');
+  if(/(?:درامد|هزینه)/.test(t)&&/غیر\s*عملیاتی/.test(t))return hit('A-72|0|7','درآمد یا هزینه غیرعملیاتی؛ بررسی لازم است');
+  if(/(?:سایر|دیگر)/.test(t)&&/درامد/.test(t)&&/عملیاتی/.test(t))return hit('A-72|0|4','سایر درآمدهای عملیاتی');
+  if(/(?:سایر|دیگر)/.test(t)&&/هزینه/.test(t)&&/عملیاتی/.test(t))return hit('A-72|0|5','سایر هزینه‌های عملیاتی');
+  if(/فروش/.test(t)&&/ضایعات/.test(t))return hit('A-72|0|4','فروش ضایعات؛ بررسی ماهیت درآمد لازم است');
+  if(/بهای تمام شده/.test(t)&&/فروش|درامد/.test(t))return hit('A-72|0|1','بهای تمام‌شده فروش یا درآمد');
+  if(/هزینه/.test(t)&&/مالیات/.test(t)&&!/انتقالی/.test(t))return hit('A-72|0|8','هزینه مالیات');
+  if(/هزینه/.test(t)&&/مالی|بهره تسهیلات|سود تسهیلات/.test(t))return hit('A-72|0|6','هزینه مالی');
+  if(/هزینه/.test(t)&&/اداری|عمومی|فروش/.test(t)&&!/تولید|بهای تمام شده/.test(t))return hit('A-72|0|2','هزینه فروش، اداری یا عمومی');
+  if(/درامد|فروش/.test(t)&&/عملیاتی|فروش کالا|فروش محصول|فروش خدمات|درامد خدمات|درامد حاصل از فروش/.test(t)&&!/غیر عملیاتی|غیرعملیاتی|دارایی ثابت|املاک/.test(t))return hit('A-72|0|0','درآمد عملیاتی یا فروش');
+  return null;
+ }
  if(/پیش\s*دریافت/.test(t))return hit('A-71|2|6','پیش‌دریافت');
  if(/پیش\s*پرداخت/.test(t))return hit('A-70|1|0','پیش‌پرداخت');
  if(/مالیات/.test(t)&&/انتقالی/.test(t)){if(/دارایی/.test(t)&&!/بدهی/.test(t))return hit('A-70|0|5','دارایی مالیات انتقالی');if(/بدهی/.test(t)&&!/دارایی/.test(t))return hit('A-71|1|2','بدهی مالیات انتقالی');return null;}
@@ -15399,31 +15428,26 @@ function inferTitle(title,context){
  if(/تسهیلات|وام|اضافه برداشت|اوراق مشارکت پرداختنی/.test(t)&&!/پرداخت شده|پرداختی|اعطایی|دریافتنی/.test(t))return choosePeriod('A-71|2|3','A-71|1|1','تسهیلات یا وام دریافتی');
  if(/دریافتنی|بدهکاران|بدهکار تجاری|مدیونین|مطالبات تجاری|مشتریان/.test(t)&&!/پرداختنی|بستانکار/.test(t))return choosePeriod('A-70|1|3','A-70|0|4','دریافتنی یا بدهکاران');
  if(/پرداختنی|بستانکار|طلبکاران|دائنین|داینین|تامین کنندگان|فروشندگان|بدهی به/.test(t)&&!/دریافتنی|بدهکاران/.test(t))return choosePeriod('A-71|2|0','A-71|1|0','پرداختنی یا بستانکاران');
- if(/استهلاک انباشته/.test(t)&&/دارایی ثابت|دارایی های ثابت|ساختمان|ماشین آلات|تجهیزات/.test(t))return hit('A-70|0|0','استهلاک انباشته دارایی ثابت؛ حساب کاهنده');
- if(/دارایی/.test(t)&&/ثابت|مشهود/.test(t)&&!/نامشهود|املاک|نگهداری|فروش|هزینه|درآمد|زیان|سود/.test(t))return hit('A-70|0|0','دارایی ثابت مشهود');
- if(/دارایی/.test(t)&&/نامشهود/.test(t))return hit('A-70|0|2','دارایی نامشهود');
+ if(/دارایی/.test(t)&&/(?:نام|غیر)\s*مشهود/.test(t))return hit('A-70|0|2','دارایی نامشهود');
+ if(/استهلاک انباشته/.test(t)&&/دارایی ثابت|دارایی های ثابت|ساختمان|ماشین الات|تجهیزات/.test(t))return hit('A-70|0|0','استهلاک انباشته دارایی ثابت؛ حساب کاهنده');
+ if(/دارایی/.test(t)&&/ثابت|مشهود/.test(t)&&!/(?:نام|غیر)\s*مشهود|املاک|نگهداری|فروش|هزینه|درامد|زیان|سود/.test(t))return hit('A-70|0|0','دارایی ثابت مشهود');
  if(/سرمایه گذاری/.test(t)&&/املاک|ملک/.test(t))return hit('A-70|0|1','سرمایه‌گذاری در املاک');
- if(/سرمایه گذاری/.test(t)&&!/درآمد|سود|زیان|هزینه/.test(t))return choosePeriod('A-70|1|4','A-70|0|3','سرمایه‌گذاری');
+ if(/سرمایه گذاری/.test(t)&&!/درامد|سود|زیان|هزینه/.test(t))return choosePeriod('A-70|1|4','A-70|0|3','سرمایه‌گذاری');
  if(/موجودی مواد|موجودی کالا|مواد اولیه|کالای ساخته شده|کالای در جریان ساخت/.test(t)&&!/هزینه|بهای|فروش|ضایعات/.test(t))return hit('A-70|1|2','موجودی مواد و کالا');
  if(/صندوق|تنخواه|وجوه نقد|وجه نقد|موجودی نقد|بانک/.test(t)&&!/هزینه|کارمزد|تسهیلات|اضافه برداشت|سپرده|مسدود|پرداختنی|دریافتنی|بستانکار|بدهکار/.test(t))return hit('A-70|1|5','وجوه نقد، صندوق یا بانک');
  if(/ذخیره/.test(t)&&/پایان خدمت|مزایای کارکنان|سنوات کارکنان/.test(t))return hit('A-71|1|3','ذخیره مزایای پایان خدمت');
  if(/اندوخته/.test(t)&&/قانونی/.test(t))return hit('A-71|0|4','اندوخته قانونی');
- if(/سود|زیان/.test(t)&&/انباشته/.test(t))return hit('A-71|0|7','سود یا زیان انباشته');
- if(/بهای تمام شده/.test(t)&&/فروش|درآمد|کالا/.test(t))return hit('A-72|0|1','بهای تمام‌شده فروش یا درآمد');
- if(/هزینه/.test(t)&&/مالی|بهره تسهیلات|سود تسهیلات/.test(t))return hit('A-72|0|6','هزینه مالی');
- if(/هزینه/.test(t)&&/اداری|عمومی|فروش/.test(t)&&!/تولید|بهای تمام شده/.test(t))return hit('A-72|0|2','هزینه فروش، اداری یا عمومی');
- if(/درآمد|فروش/.test(t)&&/عملیاتی|فروش کالا|فروش محصول|فروش خدمات|درآمد خدمات|درآمد حاصل از فروش/.test(t)&&!/غیر عملیاتی|غیرعملیاتی|دارایی ثابت|املاک/.test(t))return hit('A-72|0|0','درآمد عملیاتی یا فروش');
  // Only use overlap when two distinct informative words lead to one unique destination.
  const stop=new Set(['حساب','حسابها','حسابهای','حسابهای','های','ها','سایر','و','یا','از','در','به','برای','با','سال','شرکت','جمع','خالص','مالی','جاری','غیر','بلندمدت','کوتاه','بلند','مدت','مانده']);
  const tokens=x=>new Set(matchName(x).split(' ').filter(w=>w.length>=3&&!stop.has(w)));
  const words=tokens(t);if(words.size<2)return null;
- const scored=destinationList.filter(d=>!(/هزینه|درآمد|فروش|بهای تمام شده/.test(t)&&d.id!=='A-72')).map(d=>{const dw=tokens(d.name),common=[...words].filter(w=>dw.has(w));return {dest:d.key,score:common.length,coverage:common.length/Math.max(words.size,dw.size)};}).filter(x=>x.score>=2&&x.coverage>=0.6);
+ const scored=destinationList.filter(d=>!(/هزینه|درامد|فروش|بهای تمام شده/.test(t)&&d.id!=='A-72')).map(d=>{const dw=tokens(d.name),common=[...words].filter(w=>dw.has(w));return {dest:d.key,score:common.length,coverage:common.length/Math.max(words.size,dw.size)};}).filter(x=>x.score>=2&&x.coverage>=0.6);
  scored.sort((a,b)=>b.score-a.score||b.coverage-a.coverage);
  if(scored.length&&(!scored[1]||scored[0].score>scored[1].score||scored[0].coverage>scored[1].coverage+0.15))return hit(scored[0].dest,'شباهت چند کلمه‌ای؛ بازبینی لازم است');
  return null;
 }
 function resolveMatch(title,context){
- const whole=matchName(context||title);if(/فروش/.test(whole)&&/دارایی ثابت|دارایی های ثابت|ماشین آلات|ساختمان/.test(whole)&&!/نگهداری/.test(whole))return null;
+ const whole=matchName(context||title);if(/فروش/.test(whole)&&/دارایی ثابت|دارایی های ثابت|ماشین الات|ساختمان/.test(whole)&&!/نگهداری/.test(whole))return null;
  const exact=matchTitle(title);if(exact.length===1){if(exact[0]==='A-71|2|3'){const period=durationInfo(context||title);if(period.long&&period.short)return null;if(period.long)return {dest:'A-71|1|1',reason:'تسهیلات مالی؛ بلندمدت بر اساس عنوان'};return {dest:exact[0],reason:period.short?'تسهیلات مالی جاری':'تسهیلات مالی؛ فرض جاری، بررسی سررسید لازم است'};}return {dest:exact[0],reason:'عنوان یا معادل شناخته‌شده'};}
  // A repeated exact title in different sections is ambiguous until its maturity is explicit.
  if(exact.length>1){const period=durationInfo(context||title);if(period.long&&period.short)return null;const pair=exact.length===2&&((exact.includes('A-70|0|4')&&exact.includes('A-70|1|3'))||(exact.includes('A-71|1|0')&&exact.includes('A-71|2|0')));if(pair){const target=exact.filter(k=>period.long?/\|0\|4$|\|1\|0$/.test(k):/\|1\|3$|\|2\|0$/.test(k));if(target.length===1)return {dest:target[0],reason:period.long||period.short?'عنوان مشابه با سررسید مشخص':'عنوان مشابه؛ فرض جاری، بررسی سررسید لازم است'};}return null;}
@@ -15431,8 +15455,23 @@ function resolveMatch(title,context){
 }
 function sync(){if(MW.source!==ACCOUNT_ROWS){MW.source=ACCOUNT_ROWS;MW.selected.clear();MW.links.clear();MW.auto.clear();MW.noAuto.clear();MW.reasons.clear();MW.excluded.clear();MW.hiddenTopics.clear();MW.filter='';MW.mapping={open:false,search:'',status:'all',page:0};MW.active='';MW.view='accounts';}MW.model=build(MW.source||[],MW.excluded);
  MW.model.accounts.forEach(a=>a.children.forEach(c=>{if(MW.links.has(c.id)||MW.noAuto.has(c.id))return;const context=a.title+' '+(c.code?c.title:''),child=c.code?resolveMatch(c.title,context):null,parent=resolveMatch(a.title,context);
-  const found=child&&parent&&child.dest!==parent.dest?(parent.reason.includes('فرض جاری')&&(durationInfo(c.title).long||durationInfo(c.title).short)?child:null):child||parent;
+  const intangibleChild=child?.dest==='A-70|0|2'&&parent?.dest==='A-70|0|0'&&!/مشهود/.test(matchName(a.title));
+  const conflicting=child&&parent&&child.dest!==parent.dest;
+  // A generic fixed-asset parent does not override an explicitly intangible child.
+  // Explicit contradictory parents and children still require a manual decision.
+  let found=conflicting?(intangibleChild?{...child,reason:child.reason+'؛ عنوان معین نامشهود از عنوان کلی دارایی ثابت دقیق‌تر است'}:parent.reason.includes('فرض جاری')&&(durationInfo(c.title).long||durationInfo(c.title).short)?child:null):child||parent;
+  const childProfitWords=c.code&&/هزینه|درامد|زیان|فروش/.test(matchName(c.title))&&!/نگهداری.*فروش/.test(matchName(c.title));
+  if(!child&&parent&&parent.dest.startsWith('A-70|')&&childProfitWords)found=null;
+  // Explicitly contradictory current/noncurrent cues must never be silently overridden.
+  const pPeriod=durationInfo(a.title),cPeriod=durationInfo(c.code?c.title:'');
+  const maturityKeys=new Set(['A-70|0|3','A-70|1|4','A-70|0|4','A-70|1|3','A-71|1|0','A-71|2|0','A-71|1|1','A-71|2|3']);
+  const maturityConflict=found&&maturityKeys.has(found.dest)&&((pPeriod.long&&cPeriod.short)||(pPeriod.short&&cPeriod.long));
+  const p=matchName(a.title),declaredGroup=p.match(/^(?:حساب\s*)?(دارایی|بدهی)(?:\s*های|ها)?\s*(غیر\s*جاری|جاری)$/);
+  const groupConflict=found&&declaredGroup&&(found.dest.split('|')[0]!==(declaredGroup[1]==='دارایی'?'A-70':'A-71')||
+    found.dest.split('|')[1]!== (declaredGroup[1]==='دارایی'?(/غیر/.test(declaredGroup[2])?'0':'1'):(/غیر/.test(declaredGroup[2])?'1':'2')));
+  if(maturityConflict||groupConflict)found=null;
   if(found&&!MW.hiddenTopics.has(found.dest)){MW.links.set(c.id,found.dest);MW.auto.add(c.id);MW.reasons.set(c.id,found.reason);}
+  else if(conflicting||maturityConflict||groupConflict||(!found&&childProfitWords&&parent?.dest.startsWith('A-70|')))MW.reasons.set(c.id,'عنوان کل و معین متفاوت یا مبهم است؛ مقصد را دستی بررسی کنید');
  }));
 }
 function selectedAccounts(){return MW.model.accounts.filter(a=>MW.selected.has(a.code));}
@@ -15448,8 +15487,8 @@ function summariesRows(s){
  for(let gi=0;gi<s.groups.length;gi++){
   const [group,names]=s.groups[gi],groupEntries=[];
   output.push(`<tr class="mw-group"><td colspan="13">${e(group)}</td></tr>`);
-  names.forEach((name,i)=>{
-   const dest=s.id+'|'+gi+'|'+i,children=byDest.get(dest)||[];
+  orderedTopicIndexes(s.id,gi,names).forEach(i=>{
+   const name=names[i],dest=s.id+'|'+gi+'|'+i,children=byDest.get(dest)||[];
    all.push(...children);groupEntries.push(...children);if(s.id==='A-72')revenueEntries.push(...children);
    if(s.id==='A-72'&&i===9)output.push(`<tr class="mw-group"><td colspan="13">عملیات متوقف‌شده</td></tr>`);
    if(!MW.hiddenTopics.has(dest))output.push(row(name,show(aggregate(children)),'','',dest));
@@ -15503,7 +15542,7 @@ function balanceControl(){const {selectedMissing,unlinked,invalid,ledgers,residu
 }
 
 function linkOptions(id){return '<option value="">انتخاب نشده</option>'+destinationList.filter(x=>!MW.hiddenTopics.has(x.key)).map(x=>`<option value="${e(x.key)}" ${MW.links.get(id)===x.key?'selected':''}>${e(x.id+' — '+x.group+' — '+x.name)}</option>`).join('');}
-function linkOrigin(c){return MW.auto.has(c.id)?'تطبیق خودکار؛ نیازمند بررسی — '+(MW.reasons.get(c.id)||''):MW.links.has(c.id)?'انتخاب دستی / تأییدشده':'انتخاب نشده / نیازمند بررسی';}
+function linkOrigin(c){return MW.auto.has(c.id)?'تطبیق خودکار؛ نیازمند بررسی — '+(MW.reasons.get(c.id)||''):MW.links.has(c.id)?'انتخاب دستی / تأییدشده':'انتخاب نشده / نیازمند بررسی'+(MW.reasons.has(c.id)?' — '+MW.reasons.get(c.id):'');}
 function updateLink(id,dest){MW.auto.delete(id);MW.reasons.delete(id);if(dest){MW.links.set(id,dest);MW.noAuto.delete(id);}else{MW.links.delete(id);MW.noAuto.add(id);}}
 function selectorHtml(a){return a.children.map(c=>`<tr><td>${e(c.code?fa(c.code)+' — '+c.title:c.title)}</td><td class="mw-number">${c.bad?'نامعتبر':money(value(c))}</td><td><select data-mw-link="${e(c.id)}" aria-label="محل ارائه ${e(c.title)}">${linkOptions(c.id)}</select><small class="mw-match-origin">${e(linkOrigin(c))}</small>${MW.auto.has(c.id)?`<button type="button" class="btn mw-approve" data-mw-approve="${e(c.id)}">تأیید این اتصال</button>`:''}</td></tr>`).join('');}
 function matchingPanel(accounts){const children=accounts.flatMap(a=>a.children),automatic=children.filter(c=>MW.auto.has(c.id)).length,missing=children.filter(c=>!MW.links.has(c.id)).length;return `<details class="card mw-matching" id="mwMatching" ${MW.mapping.open?'open':''}><summary><b>بازبینی و ویرایش اتصال همه حساب‌ها</b> — ${fa(automatic)} تطبیق خودکار، ${fa(missing)} بدون مقصد</summary><p class="hint">حساب‌های کل انتخاب‌شده و معین‌های آنها در این فهرست هستند. می‌توانید چند حساب کل یا معین را به یک سرفصل وصل کنید. تطبیق خودکار فقط پیشنهاد است؛ سررسید، ماهیت و علائم را بررسی کنید. ویرایش فقط محل نمایش است و سند یا طبقه‌بندی ثبت نمی‌کند.</p><div class="mw-map-tools"><label>جست‌وجوی حساب یا سرفصل <input id="mwMapSearch" type="search" value="${e(MW.mapping.search)}" placeholder="نام، کد یا سرفصل"></label><label>نمایش <select id="mwMapStatus"><option value="all" ${MW.mapping.status==='all'?'selected':''}>همه</option><option value="auto" ${MW.mapping.status==='auto'?'selected':''}>تطبیق‌های خودکار</option><option value="missing" ${MW.mapping.status==='missing'?'selected':''}>بدون مقصد</option><option value="manual" ${MW.mapping.status==='manual'?'selected':''}>تغییرات دستی</option></select></label></div><div id="mwMapResults"></div></details>`;}
