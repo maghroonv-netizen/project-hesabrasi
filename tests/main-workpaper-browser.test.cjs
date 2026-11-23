@@ -419,8 +419,10 @@ test("A-family controls match the template without changing GL controls", { skip
     await page.locator('[data-mw-account="01"]').check();
     await page.locator('[data-mw-done]').click();
     const controls=()=>page.locator('#mwPreview .mw-paper').first().locator('.mw-control-items > div');
-    assert.match(await controls().nth(2).innerText(),/تراز آزمایشی/);
-    assert.doesNotMatch(await controls().first().innerText(),/کاربرگ‌های مربوطه/);
+    const expectedGL=['کنترل جمع عمودی','کنترل جمع (محاسبات) افقی','کنترل مطابقت با تراز آزمایشی سال جاری','کنترل مطابقت با اقلام سال جاری کاربرگ A-70','کنترل مطابقت با اقلام مقایسه‌ای کاربرگ A-70'];
+    for(let i=0;i<5;i++) assert.equal((await controls().nth(i).innerText()).replace('□','').trim(),expectedGL[i]);
+    await page.locator('[data-mw-link]').first().selectOption('A-72|0|0');
+    for(let i=0;i<5;i++) assert.equal((await controls().nth(i).innerText()).replace('□','').trim(),expectedGL[i]);
     const expected=['کنترل مطابقت با کاربرگ‌های مربوطه','کنترل جمع عمودی','کنترل جمع (محاسبات) افقی','کنترل مطابقت با اقلام صورت‌های مالی سال جاری','کنترل مطابقت با اقلام صورت‌های مالی سال مقایسه‌ای'];
     for(const id of ['A-70','A-71','A-72','A-73']) {
       await page.locator(`[data-mw-view="${id}"]`).click();
