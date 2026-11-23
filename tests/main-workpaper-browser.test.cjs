@@ -117,6 +117,8 @@ test(
       await h.locator("[data-mw-link]").first().selectOption("A-70|1|5");
       await h.locator('[data-mw-view="A-70"]').click();
       assert.match(await cash.innerText(), /۱۳۰/);
+      assert.equal((await h.locator(".mw-ref").first().innerText()).trim(), "");
+      assert(await h.locator(".mw-paper-table td, .mw-paper-table th").evaluateAll(cells => cells.every(cell => getComputedStyle(cell).color === "rgb(0, 0, 0)")));
       const cells = cash.locator("td");
       assert.equal(await cells.count(), 14);
       for (let i = 4; i < 14; i++)
@@ -184,7 +186,7 @@ test(
   },
 );
 test(
-  "multi-page A4 preview and PDF fit, with page numbers and repeated headers",
+  "multi-page A4 preview and PDF fit, without page numbers and with repeated headers",
   { skip: !executablePath && "Set CHROMIUM_PATH" },
   async () => {
     const browser = await chromium.launch({
@@ -216,7 +218,10 @@ test(
       for (let i = 0; i < count; i++) {
         const p = pages.nth(i);
         assert.match(await p.innerText(), /شرکت آزمایشی/);
-        assert.match(await p.locator(".mw-paper-foot").innerText(), /صفحه/);
+        assert.equal((await p.locator(".mw-paper-foot").innerText()).trim(), "");
+        assert.equal((await p.locator(".mw-ref").innerText()).trim(), "");
+        assert.equal((await p.locator(".mw-refbox").innerText()).trim(), "");
+        assert(await p.locator(".mw-paper-table td, .mw-paper-table th").evaluateAll(cells => cells.every(cell => getComputedStyle(cell).color === "rgb(0, 0, 0)")));
         assert(
           await p
             .locator(".mw-inside")
