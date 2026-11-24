@@ -6,7 +6,7 @@ const original=fs.readFileSync(path.join(__dirname,'..','audit-google-auto.html'
 const hook=`window.__fixtureVariance=(groups,perGroup,orientation,hasDesc,notesLen,longTitle)=>{
  const old=document.getElementById('varianceV4');if(old)old.id='variance-original';const el=document.createElement('div');el.id='varianceV4';document.body.appendChild(el);
  V.rows=[];V.notes={};for(let g=0;g<groups;g++)for(let i=0;i<(Array.isArray(perGroup)?perGroup[g]:perGroup);i++){const id=g+'-'+i;V.rows.push({id,kol:{code:String(100+g),title:longTitle&&g===1?'هزینه حقوق و مزایای کارکنان و پشتیبانی خدمات عمومی '.repeat(3):'گروه هزینه '+g},sub:{code:String(1000+g*100+i),title:'عنوان حساب نمونه شماره '+i},descs:[new Map(),new Map()],present:[true,true],complete:[true,true],amounts:[g===0?0n:BigInt(10000+g*1000+i*37),g===0?-BigInt(200+i):BigInt(14000+g*500-i*19)]});if(notesLen)V.notes[id]='توضیح نمونه '.repeat(notesLen);};V.selected=new Set(V.rows.map(x=>x.id));V.orientation=orientation;V.includeDescriptions=hasDesc;V.years=[1403,1404];vRender4();
-};window.__variancePackTest=vPackAccountGroups;\n`;
+};window.__variancePackTest=vPackAccountGroups;window.__varianceState=()=>V;\n`;
 assert(original.includes('function vRender(){const s=vStage();'));
 const fixture=original.replace('function vRender(){const s=vStage();',hook+'function vRender(){const s=vStage();');
 async function runFixture(browser,options){
@@ -106,4 +106,30 @@ test('row heading remains on one line and workpaper headers are larger and bold 
   }
   await check('#varianceV4 .variance-preview-pages');await page.evaluate(()=>{window.print=()=>{};document.querySelector('#varianceV4 [data-vprint]').click();});await page.emulateMedia({media:'print'});await check('#printHost');const pageCount=(await layout(page,'#printHost')).length;const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert.equal(pdf.getPageCount(),pageCount);assert.deepEqual(errors,[]);await context.close();
  }}finally{await browser.close()}
+});
+
+test('manual year amounts recalculate details, totals, transfers and printed PDF without changing source amounts', {skip:!executablePath&&'Set CHROMIUM_PATH to a Chromium executable'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await runFixture(browser,{orientation:'landscape',desc:true,groups:2,rows:[35,2]});
+  const input=(id,year)=>page.locator(`.variance-preview-pages input[data-vamount="${id}"][data-vyear="${year}"]`);
+  await input('0-0',1).focus();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.type('123456');
+  assert.equal(await page.evaluate(()=>document.activeElement?.dataset.vamount),'0-0','focus survives typing on mobile');
+  await input('0-0',1).fill('۱۲۳٬۴۵۶');
+  await input('0-0',0).fill('۱۰۰٬۰۰۰');
+  const row=page.locator('.variance-preview-pages tr.variance-data-row').first();
+  assert.equal(await row.getAttribute('data-vcurrent'),'123456');assert.equal(await row.getAttribute('data-vprior'),'100000');assert.equal(await row.locator('td:nth-child(6)').innerText(),'۲۳٬۴۵۶');assert.equal(await row.locator('td:nth-child(7)').innerText(),'۲۳٫۵٪');
+  assert.equal(await row.locator('td:nth-child(6) input,td:nth-child(7) input').count(),0);
+  const source=await page.evaluate(()=>({amounts:__varianceState().rows[0].amounts.map(String),manual:__varianceState().rows[0].manualAmounts.map(String)}));assert.deepEqual(source,{amounts:['0','-200'],manual:['100000','123456']});
+  let sum=await page.locator('.variance-preview-pages .variance-summary-table tbody tr').first().evaluate(el=>[el.dataset.vsummarycurrent,el.dataset.vsummaryprior]);assert.deepEqual(sum,['116061','100000']);
+  const carry=page.locator('.variance-preview-pages .variance-page-carry').first();assert(await carry.count());assert(BigInt(await carry.getAttribute('data-vcurrent'))>0n);assert.equal(await carry.getAttribute('data-vprior'),'100000');
+  await input('0-0',0).fill('0');assert.equal(await row.locator('td:nth-child(7)').innerText(),'—');
+  await input('0-0',1).fill('-۱۲۳');assert.equal(await row.getAttribute('data-vcurrent'),'-123');assert.equal(await row.locator('td:nth-child(6)').innerText(),'(۱۲۳)');
+  await input('0-0',0).fill('');assert.equal(await page.locator('[data-vprint]').isDisabled(),true);assert.equal(await input('0-0',0).getAttribute('aria-invalid'),'true');
+  await page.locator('[data-vorientation]').selectOption('portrait');assert.equal(await page.locator('[data-vprint]').isDisabled(),true);assert.equal(await input('0-0',0).inputValue(),'');
+  await input('0-0',0).fill('100');assert.equal(await page.locator('[data-vprint]').isDisabled(),false);
+  await page.locator('[data-vdesc]').uncheck();assert.equal(await input('0-0',1).inputValue(),'(۱۲۳)');assert.equal(await input('0-0',0).inputValue(),'۱۰۰');
+  await page.evaluate(()=>{window.print=()=>{};document.querySelector('#varianceV4 [data-vprint]').click();});await page.emulateMedia({media:'print'});
+  const printed=page.locator('#printHost tr.variance-data-row').first();assert.equal(await printed.locator('input').count(),0);assert.equal(await printed.locator('td:nth-child(4)').innerText(),'(۱۲۳)');assert.equal(await printed.locator('td:nth-child(5)').innerText(),'۱۰۰');assert.equal(await printed.locator('td:nth-child(6)').innerText(),'(۲۲۳)');assert.equal(await printed.locator('td:nth-child(7)').innerText(),'(۲۲۳٫۰٪)');
+  assertInside(await layout(page,'#printHost'));const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert(pdf.getPageCount()>=2);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close()}
 });
