@@ -1091,3 +1091,36 @@ test('biological producer and non-producer titles map separately, respect confli
   assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
+
+test('adaptive audit controls are decided independently for every main-module workpaper', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  await page.evaluate(()=>{
+   ACCOUNT_ROWS=[...[[1,1],[2,12],[3,24],[4,38]].flatMap(([group,count])=>Array.from({length:count},(_,i)=>({'کد حساب کل':String(group),'عنوان حساب کل':'حساب گروه '+group,'کد حساب معین':String(i+1),'عنوان حساب معین':'معین '+(i+1),'بدهکار':'1','بستانکار':''})))];
+   gotoModule('mainWorkpaper');
+  });await page.evaluate(()=>document.fonts.ready);
+  const pdfCounts=[];
+  for(const item of [{view:'accounts',code:'1',rows:2},{view:'accounts',code:'2',rows:13},{view:'accounts',code:'3',rows:25},{view:'accounts',code:'4',rows:39},{view:'A-70'},{view:'A-71'},{view:'A-72'},{view:'A-73'},{view:'accounts',code:'1',rows:2}]){
+   const selector=item.code?`[data-mw-view="accounts"][data-mw-active="${item.code}"]`:`[data-mw-view="${item.view}"]`;
+   await page.locator(selector).click();
+   const decision=await page.evaluate(()=>{
+    const host=document.querySelector('#mwPreview'),pages=[...host.querySelectorAll('.mw-paper')],rows=pages.flatMap(p=>[...p.querySelectorAll('tbody tr')].map(r=>r.cloneNode(true)));
+    const compact=pages.map(p=>p.classList.contains('mw-controls-compact'));
+    const controlsFit=pages.every(p=>{const card=p.querySelector('.mw-card').getBoundingClientRect();return [...p.querySelectorAll('.mw-control-items > div')].every(el=>{const r=el.getBoundingClientRect();return r.bottom<=card.bottom+1&&r.left>=card.left-1&&r.right<=card.right+1&&el.scrollWidth<=el.clientWidth+1;});});
+    const clone=pages[0].cloneNode(true);clone.classList.remove('mw-controls-compact');clone.style.position='absolute';clone.style.left='-20000px';clone.querySelector('tbody').replaceChildren(...rows);host.appendChild(clone);
+    const card=clone.querySelector('.mw-card'),inside=clone.querySelector('.mw-inside'),needsCompact=card.scrollHeight>card.clientHeight+1||inside.scrollHeight>inside.clientHeight+1;clone.remove();
+    return {compact,needsCompact,controlsFit,rows:rows.length};
+   });
+   assert(decision.compact.length>0);assert(decision.compact.every(x=>x===decision.needsCompact),`${item.view} ${item.code||''}: each page follows the workpaper's own measured space`);
+   if(item.rows)assert.equal(decision.rows,item.rows);assert(decision.controlsFit,'all five controls remain in the page');assert(await page.locator('#mwPrint').isEnabled());
+   if(item.code==='1'||item.code==='4'||item.view==='A-70'){
+    await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
+    const printed=page.locator('#printHost .mw-paper');assert.equal(await printed.count(),decision.compact.length);assert(await printed.evaluateAll((ps,expected)=>ps.every(p=>p.classList.contains('mw-controls-compact')===expected),decision.needsCompact));
+    const pdf=await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}));assert.equal(pdf.getPageCount(),decision.compact.length);pdfCounts.push(decision.needsCompact);
+    await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+   }
+  }
+  assert(pdfCounts.includes(true)&&pdfCounts.includes(false),'both compact and vertical layouts were printed');assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
