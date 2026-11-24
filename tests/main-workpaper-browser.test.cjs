@@ -120,15 +120,11 @@ test(
       assert(await h.locator(".mw-paper-table td, .mw-paper-table th").evaluateAll(cells => cells.every(cell => getComputedStyle(cell).color === "rgb(0, 0, 0)")));
       const cells = cash.locator("td");
       assert.equal(await cells.count(), 13);
-      for (let i = 3; i < 13; i++)
-        assert.equal((await cells.nth(i).innerText()).trim(), "");
-      assert.match(await h.innerText(), /طبقه‌بندی و سال قبل محاسبه نمی‌شوند/);
-      assert.equal(
-        await h
-          .locator(".mw-paper-table input, .mw-paper-table select")
-          .count(),
-        0,
-      );
+      assert.equal((await cells.nth(5).innerText()).trim(), "۱۳۰");
+      assert.equal((await cells.nth(8).innerText()).trim(), "۱۳۰");
+      assert.match(await h.innerText(), /تعدیلات و طبقه‌بندی در هر کاربرگ جداگانه/);
+      assert(await h.locator(".mw-paper-table input.mw-adjust-input").count()>0);
+      assert.equal(await h.locator(".mw-paper-table select").count(),0);
       assert.equal(await h.locator('.mw-classification, [data-mw-detail], [data-mw-link]').count(), 0);
       assert.doesNotMatch(await h.innerText(), /خلاصه حساب کل|اتصال معین‌های|ردیابی اسناد|بخش طبقه‌بندی — غیرفعال/);
       assert.deepEqual(errors, []);
@@ -776,7 +772,7 @@ test('all main and A workpapers print proportionate bold headers and centered am
     const info=node=>({size:parseFloat(getComputedStyle(node).fontSize),weight:parseInt(getComputedStyle(node).fontWeight)});
     return {meta:info(meta),sign:info(sign),metaChildren:[...meta.querySelectorAll('div,b')].map(info),signChildren:[...sign.querySelectorAll('div,b')].map(info),heads:heads.map(info)};
    });
-   assert(styles.meta.size>=15.4&&styles.sign.size>=14.1,id);
+   assert(Math.abs(styles.meta.size-styles.heads[0].size)<0.1&&Math.abs(styles.sign.size-styles.heads[0].size)<0.1,id);
    assert([...styles.metaChildren,...styles.signChildren].every(s=>s.weight>=700),id);
    assert(styles.heads.every(s=>s.weight>=700&&s.size>=13&&s.size<15),id);
    const distances=await pages.locator('.mw-number-text').evaluateAll(nodes=>nodes.filter(n=>n.textContent.trim()).map(n=>{const cell=n.parentElement.getBoundingClientRect(),text=n.getBoundingClientRect();return Math.abs((cell.left+cell.right-text.left-text.right)/2);}));
@@ -1230,5 +1226,62 @@ test('removed account and mapping panels stay absent without changing ledger or 
   const cash=page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})});assert.equal(await cash.getAttribute('data-mw-amount'),'130');
   await page.locator('[data-mw-topic-choose="A-70|1|5"]').click();const d=page.locator('#mwTopicDialog');assert(await d.isVisible());await d.locator('[data-topic-expand="01"]').click();assert(await d.locator('[data-topic-account]').first().isChecked());await d.locator('[data-topic-cancel]').first().click();
   assert.equal(await page.locator('#mwMatching, .mw-matching, [data-mw-map-link]').count(),0);await verify();assert.equal(await page.evaluate(()=>JSON.stringify(ACCOUNT_ROWS)),before);assert.deepEqual((await snapshot(page)).links,mappingBefore);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('editable adjustments calculate GL balances, opening and totals without altering ledger, including PDF', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[
+   {'نوع سند':'ابتدای سال','کد حساب کل':'1','عنوان حساب کل':'موجودی نقد','کد حساب معین':'1','عنوان حساب معین':'صندوق','بدهکار':'100','بستانکار':''},
+   {'نوع سند':'سند جاری','کد حساب کل':'1','عنوان حساب کل':'موجودی نقد','کد حساب معین':'1','عنوان حساب معین':'صندوق','بدهکار':'50','بستانکار':'20'},
+   {'نوع سند':'ابتدای سال','کد حساب کل':'1','عنوان حساب کل':'موجودی نقد','کد حساب معین':'2','عنوان حساب معین':'بانک','بدهکار':'200','بستانکار':''},
+   {'نوع سند':'سند جاری','کد حساب کل':'1','عنوان حساب کل':'موجودی نقد','کد حساب معین':'2','عنوان حساب معین':'بانک','بدهکار':'','بستانکار':'50'}];gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);const ledger=await page.evaluate(()=>JSON.stringify(ACCOUNT_ROWS));
+  const r=page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'صندوق'})});const total=page.locator('#mwPreview .mw-total').last();
+  const n=(loc,i)=>loc.locator(`[data-mw-calc-col="${i}"]`).innerText();const edit=(field,value)=>r.locator(`[data-mw-field="${field}"]`).fill(value);
+  assert.equal(await r.getAttribute('data-mw-amount'),'130');assert.equal((await n(r,2)).trim(),'۱۳۰');assert.equal((await n(r,6)).trim(),'۱۰۰');
+  await edit('adjD','20');await edit('adjC','5');assert.equal((await n(r,2)).trim(),'۱۴۵');assert.equal((await n(total,2)).trim(),'۲۹۵');
+  await edit('classD','3');await edit('classC','13');assert.equal((await n(r,5)).trim(),'۱۳۵');assert.equal((await n(total,5)).trim(),'۲۸۵');
+  await edit('priorD','7');await edit('priorC','2');assert.equal((await n(r,9)).trim(),'۱۰۵');assert.equal((await n(total,6)).trim(),'۳۰۰');assert.equal((await n(total,9)).trim(),'۳۰۵');
+  await page.locator('[data-mw-view="A-70"]').click();assert.equal(await page.locator('[data-mw-topic-choose="A-70|1|5"]').locator('xpath=ancestor::tr').getAttribute('data-mw-amount'),'280');await page.locator('[data-mw-view="accounts"][data-mw-active="1"]').click();assert.equal(await r.locator('[data-mw-field="adjD"]').inputValue(),'20');assert.equal((await n(r,5)).trim(),'۱۳۵');
+  await page.evaluate(()=>{window.print=()=>{};});assert(await page.locator('#mwPrint').isEnabled());await page.locator('#mwPrint').click();assert.equal(await page.locator('#printHost .mw-adjust-input').count(),0);assert.match(await page.locator('#printHost').innerText(),/۱۴۵/);assert.match(await page.locator('#printHost').innerText(),/۱۳۵/);assert((await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}))).getPageCount()>0);await page.evaluate(()=>window.__activePrintRestore?.());
+  await edit('adjD','bad');assert(await page.locator('#mwPrint').isDisabled());assert.equal((await n(r,2)).trim(),'');assert.match(await page.locator('#mwPaginationWarning').innerText(),/نامعتبر/);await edit('adjD','');assert(await page.locator('#mwPrint').isEnabled());assert.equal((await n(r,2)).trim(),'۱۲۵');
+  assert.equal(await page.evaluate(()=>JSON.stringify(ACCOUNT_ROWS)),ledger);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('A workpaper edits use account direction, aggregate and leave missing openings unknown', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[
+   {'نوع سند':'ابتدای سال','کد حساب کل':'1','عنوان حساب کل':'پرداختنی تجاری','کد حساب معین':'1','عنوان حساب معین':'پرداختنی تجاری','بدهکار':'','بستانکار':'80'},
+   {'نوع سند':'سند جاری','کد حساب کل':'1','عنوان حساب کل':'پرداختنی تجاری','کد حساب معین':'1','عنوان حساب معین':'پرداختنی تجاری','بدهکار':'','بستانکار':'20'},
+   {'نوع سند':'سند جاری','کد حساب کل':'2','عنوان حساب کل':'موجودی نقد','کد حساب معین':'1','عنوان حساب معین':'موجودی نقد','بدهکار':'40','بستانکار':''}];gotoModule('mainWorkpaper');});await page.locator('[data-mw-view="A-71"]').click();const r=page.locator('[data-mw-topic-choose="A-71|2|0"]').locator('xpath=ancestor::tr'),n=(loc,i)=>loc.locator(`[data-mw-calc-col="${i}"]`).innerText();
+  assert.equal(await r.getAttribute('data-mw-amount'),'100');await r.locator('[data-mw-field="adjD"]').fill('15');await r.locator('[data-mw-field="adjC"]').fill('5');assert.equal((await n(r,2)).trim(),'۹۰');await r.locator('[data-mw-field="classC"]').fill('10');assert.equal((await n(r,5)).trim(),'۱۰۰');assert.equal((await n(r,6)).trim(),'۸۰');await r.locator('[data-mw-field="priorD"]').fill('20');assert.equal((await n(r,9)).trim(),'۶۰');assert.equal((await n(page.locator('#mwPreview .mw-total').last(),5)).trim(),'۱۰۰');
+  await page.locator('[data-mw-view="A-70"]').click();const cash=page.locator('[data-mw-topic-choose="A-70|1|5"]').locator('xpath=ancestor::tr');assert.equal((await n(cash,6)).trim(),'');assert.equal((await n(cash,9)).trim(),'');await page.locator('[data-mw-view="A-71"]').click();assert.equal((await n(r,2)).trim(),'۹۰');
+  await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'8','عنوان حساب کل':'جدید','بدهکار':'1','بستانکار':''}];gotoModule('mainWorkpaper');});assert.equal(await page.locator('[data-mw-field="adjD"]').first().inputValue(),'');assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('long amounts, invalid edits and hidden topics never silently create totals or cropped print', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[{'نوع سند':'ابتدای سال','کد حساب کل':'1','عنوان حساب کل':'موجودی نقد','کد حساب معین':'1','عنوان حساب معین':'نقد','بدهکار':'100','بستانکار':''}];gotoModule('mainWorkpaper');});await page.locator('[data-mw-view="A-70"]').click();const cash=page.locator('[data-mw-topic-choose="A-70|1|5"]').locator('xpath=ancestor::tr'),total=page.locator('#mwPreview .mw-total').last();const adj=cash.locator('[data-mw-field="adjD"]');
+  await adj.fill('1000000000');assert.equal((await cash.locator('[data-mw-calc-col="2"]').innerText()).trim(),'۱٬۰۰۰٬۰۰۰٬۱۰۰');assert(await page.locator('#mwPrint').isEnabled());
+  await adj.fill('-');assert(await page.locator('#mwPrint').isDisabled());assert.equal((await total.locator('[data-mw-calc-col="2"]').innerText()).trim(),'');await adj.fill('100000000000000000000000000000');assert(await page.locator('#mwPrint').isDisabled());await adj.fill('10');assert(await page.locator('#mwPrint').isEnabled());
+  page.once('dialog',x=>x.accept());await page.locator('[data-mw-topic-remove="A-70|1|5"]').click();assert.equal((await page.locator('#mwPreview .mw-total').last().locator('[data-mw-calc-col="2"]').innerText()).trim(),'');assert(await page.locator('#mwPrint').isEnabled());assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('per-account adjustments follow a moved account across paginated workpapers', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:35},(_,i)=>({'نوع سند':'ابتدای سال','کد حساب کل':'1','عنوان حساب کل':'حساب اول','کد حساب معین':String(i+1),'عنوان حساب معین':'معین '+(i+1),'بدهکار':'10','بستانکار':''})).concat([{'نوع سند':'ابتدای سال','کد حساب کل':'2','عنوان حساب کل':'حساب دوم','کد حساب معین':'1','عنوان حساب معین':'دوم','بدهکار':'20','بستانکار':''}]);gotoModule('mainWorkpaper');});assert((await page.locator('#mwPreview .mw-paper').count())>1);
+  const input=page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'معین 35'})}).locator('[data-mw-field="adjD"]');await input.fill('5');assert.equal((await page.locator('#mwPreview .mw-total').last().locator('[data-mw-calc-col="2"]').innerText()).trim(),'۳۵۵');
+  await page.locator('[data-mw-view="accounts"][data-mw-active="2"]').click();await page.locator('[data-mw-paper-choose]').click();const dialog=page.locator('#mwPaperDialog');await dialog.locator('[data-paper-expand="1"]').click();await dialog.locator('label').filter({hasText:'معین 35'}).locator('input').check();page.once('dialog',x=>x.accept());await dialog.locator('[data-paper-save]').click();
+  const moved=page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'معین 35'})});assert.equal(await moved.locator('[data-mw-field="adjD"]').inputValue(),'5');assert.equal((await moved.locator('[data-mw-calc-col="2"]').innerText()).trim(),'۱۵');assert.equal((await page.locator('#mwPreview .mw-total').last().locator('[data-mw-calc-col="2"]').innerText()).trim(),'۳۵');assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('income adjustments flow into cumulative totals and comprehensive income', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[{'نوع سند':'ابتدای سال','کد حساب کل':'1','عنوان حساب کل':'فروش','کد حساب معین':'1','عنوان حساب معین':'فروش','بدهکار':'','بستانکار':'100'},{'نوع سند':'ابتدای سال','کد حساب کل':'2','عنوان حساب کل':'بهای تمام شده فروش','کد حساب معین':'1','عنوان حساب معین':'بهای تمام شده فروش','بدهکار':'40','بستانکار':''}];gotoModule('mainWorkpaper');});await page.locator('[data-mw-view="A-72"]').click();const revenue=page.locator('[data-mw-topic-choose="A-72|0|0"]').locator('xpath=ancestor::tr');await revenue.locator('[data-mw-field="adjD"]').fill('10');await revenue.locator('[data-mw-field="classC"]').fill('5');const gross=page.locator('#mwPreview .mw-total').filter({hasText:'سود / زیان ناخالص'});assert.equal((await gross.locator('[data-mw-calc-col="2"]').innerText()).trim(),'۵۰');assert.equal((await gross.locator('[data-mw-calc-col="5"]').innerText()).trim(),'۵۵');
+  await page.locator('[data-mw-view="A-73"]').click();const prior=page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'جمع مانده دفتر سود و زیان'})}).first();assert.equal((await prior.locator('[data-mw-calc-col="2"]').innerText()).trim(),'۵۰');assert.equal((await prior.locator('[data-mw-calc-col="5"]').innerText()).trim(),'۵۵');assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
