@@ -45,7 +45,7 @@ test('every additional fixed preset routes to its recorded models endpoint',asyn
   for(const spec of registry.providers){
     if(spec.id==='cloudflare') continue;
     const response=await req('/api/ai/'+spec.id+'/models',{headers:ok});assert.equal(response.status,200,spec.id);
-    assert.equal(hits.at(-1).url,spec.id==='kilo'?'https://api.kilo.ai/api/gateway/models':spec.base.replace(/\/+$/,'')+'/models',spec.id);
+    assert.equal(hits.at(-1).url,spec.id==='kilo'?'https://api.kilo.ai/api/gateway/models':spec.id==='cohere'?'https://api.cohere.com/v1/models':spec.base.replace(/\/+$/,'')+'/models',spec.id);
   }
 });
 test('Gemini and Cloudflare require constrained parameters and preserve upstream rate limits',async()=>{
@@ -67,3 +67,17 @@ test('bridge does not retry ambiguous network errors, follow redirects or expose
   const font=await req('/assets/fonts/Vazirmatn-variable.woff2');assert.equal(font.status,200);assert.equal(font.headers['content-type'],'font/woff2');assert.equal((await req('/assets/fonts/OFL-Vazirmatn.txt')).status,404);
 });
 test.after(()=>new Promise(resolve=>server.close(resolve)));
+test('Anthropic pagination only forwards a constrained cursor to the fixed endpoint',async()=>{
+  assert.equal((await req('/api/ai/anthropic/models?after_id=claude-sonnet-4-0',{headers:{...ok,'x-api-key':'secret','anthropic-version':'2023-06-01'}})).status,200);
+  assert.equal(hits.at(-1).url,'https://api.anthropic.com/v1/models?after_id=claude-sonnet-4-0');
+  assert.equal(hits.at(-1).init.headers['x-api-key'],'secret');
+  const before=hits.length;
+  assert.equal((await req('/api/ai/anthropic/models?after_id=https%3A%2F%2Fevil.test',{headers:ok})).status,599);
+  assert.equal(hits.length,before);
+});
+
+test('Cohere catalog uses its native models endpoint and safely encoded pagination',async()=>{
+  assert.equal((await req('/api/ai/cohere/models?page_token=abc%2B%2F%3D',{headers:ok})).status,200);
+  assert.equal(hits.at(-1).url,'https://api.cohere.com/v1/models?page_token=abc%2B%2F%3D');
+  const before=hits.length;assert.equal((await req('/api/ai/cohere/models?page_token=bad%3Ftoken',{headers:ok})).status,599);assert.equal(hits.length,before);
+});

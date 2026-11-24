@@ -16,6 +16,8 @@ const { PDFDocument } = require('pdf-lib');
     const page = await browser.newPage({viewport:{width:1400,height:900}});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.evaluate(()=>document.fonts.load('12px workpaper-lotus'));
+    await page.evaluate(()=>document.fonts.ready);
     const initial = await page.evaluate(() => {
       // Build while the stage is hidden, as happens on first entering the output step.
       ACCOUNT_LEVELS=[{code:'کد حساب',title:'عنوان حساب'}];const all=[],selected=[];
@@ -27,7 +29,8 @@ const { PDFDocument } = require('pdf-lib');
       }
       selected.reverse();
       FULL_ROWS=all;ACCOUNT_ROWS=all;
-      const w={keyPath:['100|حساب نمونه'],levelIdx:0,pathLabel:'حساب نمونه',title:'حساب نمونه',code:'100'};
+      const w={keyPath:['150|حسابها و اسناد دریافتنی','15020|حسابهای دریافتنی تجاری','21223|مشتریان متفرقه'],levelIdx:0,pathLabel:'حساب نمونه',title:'حساب نمونه',code:'100'};
+      Object.assign(SHEET_CFG,{company:'شرکت نمونه حسابرسی',year:'سال مالی منتهی به ۲۹ اسفند ۱۴۰۴',date:'۲۹ اسفند ۱۴۰۴',prep:'علی رضایی',rev:'محمد حسینی'});
       WORKSHEET_ACCOUNTS=[w];SHEET_OUT=[{w,sel:selected}];ACTIVE_SHEET=0;renderOutputStep();
       const canvas=document.querySelector('.sheetwrap:not(.hide) [data-sheet-canvas]');
       const hidden=canvas.dataset.paginated;
@@ -35,9 +38,17 @@ const { PDFDocument } = require('pdf-lib');
       document.querySelectorAll('.stage').forEach(x=>x.classList.remove('active'));document.querySelector('[data-stage="5"]').classList.add('active');
       const markers=[...canvas.querySelectorAll('.ref-oval')],dates=[...canvas.querySelectorAll('tr.item .sample-date-text')].map(x=>x.textContent);
       const dateSorted=dates.every((date,i)=>i===0||sampleDateCompare(dates[i-1],date)<=0);
-      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:markers.length,rectangular:markers.length>0&&markers.every(m=>getComputedStyle(m).borderRadius==='0px'),atRight:markers.length>0&&markers.every(m=>{const r=m.getBoundingClientRect(),box=m.closest('.meta').getBoundingClientRect();return Math.abs(box.right-r.right)<Math.abs(r.left-box.left)}),headerNotExpanded:markers.length>0&&markers.every(m=>m.getBoundingClientRect().height<m.closest('.meta').getBoundingClientRect().height),controlsHaveNoBoxes:!canvas.querySelector('td.ctl .box'),oversizedFooter:!!canvas.querySelector('.sample-page-bottom'),pageNumbers:[...canvas.querySelectorAll('.sample-page-num')].map(x=>x.textContent),prepBlocks:canvas.querySelectorAll('.sample-meta-prep').length,dateSorted};
+      return {hidden, buttons:canvas.querySelectorAll('.cp-ws-anchor button').length,refMarkers:markers.length,rounded:markers.length>0&&markers.every(m=>parseFloat(getComputedStyle(m).borderRadius)>0),atRight:markers.length>0&&markers.every(m=>{const r=m.getBoundingClientRect(),box=m.closest('.meta').getBoundingClientRect();return Math.abs(box.right-r.right)<Math.abs(r.left-box.left)}),headerNotExpanded:markers.length>0&&markers.every(m=>m.getBoundingClientRect().height<m.closest('.meta').getBoundingClientRect().height),controlsHaveNoBoxes:!canvas.querySelector('td.ctl .box'),oversizedFooter:!!canvas.querySelector('.sample-page-bottom'),pageNumbers:[...canvas.querySelectorAll('.sample-page-num')].map(x=>x.textContent),prepBlocks:canvas.querySelectorAll('.sample-meta-prep').length,dateSorted};
     });
-    assert.equal(initial.hidden,'1');assert.equal(initial.buttons,38);assert.ok(initial.refMarkers>=1&&initial.rectangular&&initial.atRight&&initial.headerNotExpanded,'every sampling page keeps a right-aligned rectangular reference cell that does not expand the header');assert.ok(initial.controlsHaveNoBoxes,'audit control cells remain but their square marks are removed');assert.ok(!initial.oversizedFooter&&initial.pageNumbers.every(x=>/^صفحه [۰-۹]+ از [۰-۹]+$/.test(x)),'sampling pages retain the compact footer while using the revised Persian page number');assert.ok(initial.prepBlocks>=1,'preparer metadata is retained in the designated left header block');assert.ok(initial.dateSorted,'sample worksheet rows are sorted chronologically, not by amount-selection order');
+    assert.equal(initial.hidden,'1');assert.equal(initial.buttons,38);assert.ok(initial.refMarkers>=1&&initial.rounded&&initial.atRight&&initial.headerNotExpanded,'every sampling page keeps a right-aligned rounded reference cell that does not expand the header');assert.ok(initial.controlsHaveNoBoxes,'audit control cells remain but their square marks are removed');assert.ok(!initial.oversizedFooter&&initial.pageNumbers.every(x=>/^صفحه [۰-۹]+ از [۰-۹]+$/.test(x)),'sampling pages retain the compact footer while using the revised Persian page number');assert.ok(initial.prepBlocks>=1,'preparer metadata is retained in the designated left header block');assert.ok(initial.dateSorted,'sample worksheet rows are sorted chronologically, not by amount-selection order');
+    // When Lotus is still loading, do not measure with a fallback or allow printing.
+    const pending=await page.evaluate(()=>{
+      const fonts=document.fonts,check=fonts.check.bind(fonts),load=fonts.load.bind(fonts);window.__restoreSampleFont=()=>{fonts.check=check;fonts.load=load;};fonts.check=()=>false;fonts.load=()=>new Promise(resolve=>{window.__releaseSampleFont=()=>resolve([{}]);});
+      drawSheets();const wrap=document.querySelector('.sheetwrap:not(.hide)'),canvas=wrap.querySelector('[data-sheet-canvas]');let blocked=false;try{sampleCopyPreviewForPrint(wrap,document.getElementById('printHost'));}catch(e){blocked=true;}return {state:canvas.dataset.paginated,blocked};
+    });
+    assert.deepStrictEqual(pending,{state:'0',blocked:true});
+    await page.evaluate(()=>{window.__restoreSampleFont();window.__releaseSampleFont();});
+    await page.waitForFunction(()=>document.querySelector('.sheetwrap:not(.hide) [data-sheet-canvas]')?.dataset.paginated==='1');
     const removal=await page.evaluate(()=>{
       const wrap=document.querySelector('.sheetwrap:not(.hide)'),canvas=wrap.querySelector('[data-sheet-canvas]'),printTarget=document.getElementById('printHost');SHEET_OUT[0].unit='row';SHEET_OUT[0].count=38;
       sampleCopyPreviewForPrint(wrap,printTarget);const printHasNoDeleteControls=!printTarget.querySelector('.sample-row-remove');printTarget.replaceChildren();
@@ -77,7 +88,12 @@ const { PDFDocument } = require('pdf-lib');
       const blockSummary=document.querySelector('#cpWorksheetDialog .cp-ws-reconcile'),blockRows=document.querySelectorAll('#cpWorksheetDialog [data-counterpart="true"]');
       if(blockRows.length!==2||!blockSummary.textContent.includes('مرزبندی')||!blockSummary.textContent.includes('برابر است'))throw Error('Voucher row-number sequence was not shown as a qualified structural grouping: '+blockSummary?.textContent);document.getElementById('cpWorksheetDialog').close();
     });
-    for(const [orientation,density] of [['landscape','normal'],['landscape','compact'],['portrait','normal']]){
+    await page.setViewportSize({width:390,height:844});
+    async function checkHeader(root){
+      const pages=await page.evaluate(root=>[...document.querySelectorAll(root+' .sample-paper-box')].map(box=>{const meta=box.querySelector('.meta'),main=meta.querySelector('.sample-meta-main'),prep=meta.querySelector('.sample-meta-prep'),ref=meta.querySelector('.ref-oval'),m=meta.getBoundingClientRect(),a=main.getBoundingClientRect(),b=prep.getBoundingClientRect(),r=ref.getBoundingClientRect();const rects=[...meta.querySelectorAll('.big,.sample-meta-prep>div')].flatMap(el=>{const range=document.createRange();range.selectNodeContents(el);const limit=el.getBoundingClientRect();return [...range.getClientRects()].map(x=>x.left>=limit.left-1&&x.right<=limit.right+1&&x.top>=limit.top-1&&x.bottom<=limit.bottom+1)});const st=getComputedStyle(main.querySelector('.big')),bs=getComputedStyle(box.querySelector('tr.item td')||box.querySelector('.sum td'));return {text:meta.textContent,font:st.fontFamily,size:parseFloat(st.fontSize),weight:+st.fontWeight,bodyFont:bs.fontFamily,align:st.textAlign,separator:getComputedStyle(prep).borderRightStyle,short:b.top>m.top+1&&b.bottom<m.bottom-1,ordered:r.left>=a.right-1&&a.left>=b.right-1,rects};}),root);
+      assert(pages.length);for(const p of pages){assert.match(p.text,/مشتریان متفرقه/);assert.match(p.text,/شرکت نمونه حسابرسی/);assert.match(p.text,/علی رضایی/);assert(p.font.includes('workpaper-lotus')&&p.bodyFont.includes('workpaper-lotus'));assert(p.size>=12&&p.weight>=700&&p.align==='right',JSON.stringify(p));assert(p.separator==='dotted'&&p.short&&p.ordered,'header aligns like variance workpaper');assert(p.rects.every(Boolean),'header text must fit inside its block');}
+    }
+    for(const [orientation,density] of [['landscape','normal'],['landscape','compact'],['portrait','normal'],['portrait','compact']]){
       await page.evaluate(([orientation,density])=>{
         SHEET_CFG.orientation=orientation;SHEET_CFG.density=density;drawSheets();
         const vec=samplePrintLayout(SHEET_OUT[0].w).vector.slice();vec[3]+=5;vec[4]-=5;sampleSetWorksheetColumns(0,vec);
@@ -88,7 +104,7 @@ const { PDFDocument } = require('pdf-lib');
         if(canvas.dataset.paginated!=='1')throw Error(wrap.querySelector('[data-page-badge]').textContent);
         return [...canvas.querySelectorAll('.sample-paper-box')].map(x=>[...x.querySelectorAll('tr.item')].map(r=>r.dataset.sampleRow));
       });
-      assert(expected.length>1);assert.strictEqual(expected.flat().length,37);
+      assert(expected.length>1);assert.strictEqual(expected.flat().length,37);await checkHeader('.sheetwrap:not(.hide) [data-sheet-canvas]');
       // Exercise Ctrl+P first, before the explicit toolbar print path.
       const direct=await page.pdf({preferCSSPageSize:true,printBackground:true});
       assert.strictEqual((await PDFDocument.load(direct)).getPageCount(),expected.length,`${orientation}/${density}: direct PDF page count`);
@@ -96,9 +112,10 @@ const { PDFDocument } = require('pdf-lib');
       const printed=await page.evaluate(()=>[...document.querySelectorAll('#printHost .sample-paper-box')].map(x=>[...x.querySelectorAll('tr.item')].map(r=>r.dataset.sampleRow)));
       assert.deepStrictEqual(printed,expected);
       const printLayout=await page.evaluate(()=>[...document.querySelectorAll('#printHost .sample-paper-box')].map(box=>({oversizedFooter:!!box.querySelector('.sample-page-bottom'),num:box.querySelector('.sample-page-num')?.textContent,controlMarks:box.querySelectorAll('td.ctl .box').length,refRadius:getComputedStyle(box.querySelector('.ref-oval')).borderRadius})));
-      assert.strictEqual(printLayout.length,expected.length);assert(printLayout.every(p=>!p.oversizedFooter&&/^صفحه [۰-۹]+ از [۰-۹]+$/.test(p.num)&&p.controlMarks===0&&p.refRadius==='0px'),'printed sampling pages must retain compact numbering, blank audit-control cells, and rectangular reference areas');
+      assert.strictEqual(printLayout.length,expected.length);assert(printLayout.every(p=>!p.oversizedFooter&&/^صفحه [۰-۹]+ از [۰-۹]+$/.test(p.num)&&p.controlMarks===0&&parseFloat(p.refRadius)>0),'printed sampling pages must retain compact numbering, blank audit-control cells, and rounded reference areas');
       assert.strictEqual(await page.locator('#printHost .cp-ws-action,#printHost .cp-ws-status').count(),0);
       await page.emulateMedia({media:'print'});
+      await checkHeader('#printHost');
       const measurements=await page.evaluate(()=>[...document.querySelectorAll('#printHost .sample-paper-box')].map(x=>({height:x.getBoundingClientRect().height, limit:parseFloat(x.querySelector('.sheet').style.getPropertyValue('--sample-full-height'))*96/25.4})));
       assert(measurements.every(x=>x.height<=x.limit+1),'A print page exceeds the physical paper height');
       const printRowHeight=await page.locator('#printHost tr.item').first().evaluate(e=>e.getBoundingClientRect().height);

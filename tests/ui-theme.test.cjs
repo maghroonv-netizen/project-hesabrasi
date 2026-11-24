@@ -30,12 +30,12 @@ const {chromium} = require('playwright-core');
       await page.locator('#homeFile').setInputFiles({name:'sample.csv',mimeType:'text/csv',buffer:Buffer.from('\ufeff'+csv)});
       await page.locator('#confirmBtn').waitFor();assert.equal(await page.locator('#mapRowsHost .map-row').count(),17);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`mapping overflow at ${width}`);
       await page.locator('#entryBack').click();assert.equal(await page.locator('#homeDrop').isVisible(),true);
-      await page.locator('#routerPanel summary').first().click();assert.equal(await page.locator('#routerDialog').isVisible(),true);
+      await page.locator('#routerPanel summary').first().click();await page.locator('#routerDialog').waitFor({state:'visible'});
       await page.locator('#aihubSearch').fill('NextRouter');assert.equal(await page.locator('[data-aihub-card="next_router"]').getAttribute('hidden'),null);assert.notEqual(await page.locator('[data-aihub-card="tokenrouter"]').getAttribute('hidden'),null);
       await page.locator('#routerDismiss').click();await page.locator('#themeBtn').click();assert.equal(await page.evaluate(()=>document.documentElement.getAttribute('data-theme')),'dark');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`dark upload overflow at ${width}`);
       await page.evaluate(()=>{ACCOUNT_ROWS=[{'شماره سند':'1'}];currentHeaders=['شماره سند'];ENTRY.phase='ready';renderModuleHome();paint();});
-      assert.equal(await page.locator('.entry-tile').count(),4);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`modules overflow at ${width}`);
+      assert.equal(await page.locator('.entry-tile').count(),5);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`modules overflow at ${width}`);
       assert.equal(await page.locator('.entry-tile svg').count(),4);await page.locator('[data-open="analysis"]').click();assert.equal(await page.evaluate(()=>CUR_MODULE),'analysis');
       assert.deepEqual(errors,[]);await page.close();
     }
