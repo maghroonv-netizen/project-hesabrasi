@@ -80,12 +80,13 @@ async function setup(browser) {
   await page.evaluate(() => document.fonts.ready);
   return { page, context, errors };
 }
+async function openMapping(page){if(!await page.locator('#mwMatching').evaluate(el=>el.open))await page.locator('#mwMatching summary').click();}
 async function sheetAction(page,view,code,hidden,action){
  const key=JSON.stringify([view,code||'']);const zone=hidden?'.mw-hidden-nav':'.mw-nav';
  await page.locator(`${zone} [data-mw-sheet-more='${key}']`).click();const button=page.locator('#mwSheetMenu [data-mw-sheet-action]');assert.equal((await button.innerText()).trim(),action);await button.click();
 }
 test(
-  "automatic main workpapers, current balances, explicit mapping and inert classification on mobile",
+  "automatic main workpapers, current balances and explicit mapping on mobile",
   { skip: !executablePath && "Set CHROMIUM_PATH" },
   async () => {
     const browser = await chromium.launch({
@@ -101,9 +102,10 @@ test(
       assert.match(await h.locator(".mw-paper-table").innerText(), /۱۲۵|۱۳۰/);
       assert.match(await h.locator(".mw-paper-table").innerText(), /۱۳۰/);
       assert.match(await h.innerText(), /ثبت مستقیم در حساب کل/);
+      await openMapping(page);
       assert.match(await h.locator(".mw-match-origin").first().innerText(), /تطبیق خودکار/);
-      await h.locator("[data-mw-link]").first().selectOption("");
-      const sel = h.locator("[data-mw-link]").nth(1);
+      await h.locator("[data-mw-map-link]").first().selectOption("");
+      const sel = h.locator("[data-mw-map-link]").nth(1);
       await sel.selectOption("A-70|1|5");
       await h.locator('[data-mw-view="A-70"]').click();
       const cash = h
@@ -111,7 +113,7 @@ test(
         .filter({ hasText: "موجودی نقد" });
       assert.match(await cash.innerText(), /۱۲۰/);
       await h.locator('[data-mw-view="accounts"][data-mw-active="01"]').click();
-      await h.locator("[data-mw-link]").first().selectOption("A-70|1|5");
+      await h.locator("[data-mw-map-link]").first().selectOption("A-70|1|5");
       await h.locator('[data-mw-view="A-70"]').click();
       assert.match(await cash.innerText(), /۱۳۰/);
       assert.equal((await h.locator(".mw-ref").first().innerText()).trim(), "");
@@ -127,18 +129,8 @@ test(
           .count(),
         0,
       );
-      assert.equal(
-        await h
-          .locator(
-            ".mw-classification input, .mw-classification select, .mw-classification button",
-          )
-          .count(),
-        0,
-      );
-      assert.equal(
-        (await h.locator(".mw-classification tbody").innerText()).trim(),
-        "",
-      );
+      assert.equal(await h.locator('.mw-classification, [data-mw-detail], [data-mw-link]').count(), 0);
+      assert.doesNotMatch(await h.innerText(), /خلاصه حساب کل|اتصال معین‌های|ردیابی اسناد|بخش طبقه‌بندی — غیرفعال/);
       assert.deepEqual(errors, []);
       await context.close();
     } finally {
@@ -387,7 +379,7 @@ test("summary arithmetic is signed partial ledger data and invalid entries propa
       ].map(([code,title,debit,credit])=>({'کد حساب کل':code,'عنوان حساب کل':title,'کد حساب معین':code,'عنوان حساب معین':title,'بدهکار':debit,'بستانکار':credit}));
       gotoModule('mainWorkpaper');
     });
-    const map=async (code,dest)=>{await page.locator(`[data-mw-view="accounts"][data-mw-active="${code}"]`).click();await page.locator('[data-mw-link]').selectOption(dest);};
+    const map=async (code,dest)=>{await openMapping(page);await page.locator('[data-mw-map-link]').nth(Number(code)-1).selectOption(dest);};
     await map('1','A-72|0|0');await map('2','A-72|0|1');await map('3','A-72|0|2');await map('4','A-73|0|0');await map('6','A-70|1|5');
     await page.locator('[data-mw-view="A-72"]').click();
     const amount=async label=>page.locator('.mw-paper-table tbody tr').filter({hasText:label}).first().getAttribute('data-mw-amount');
@@ -422,7 +414,7 @@ test("A-family and GL retain the correct control texts with adaptive layout", { 
     const controls=()=>page.locator('#mwPreview .mw-paper').first().locator('.mw-control-items > div');
     const expectedGL=['کنترل جمع عمودی','کنترل جمع (محاسبات) افقی','کنترل مطابقت با تراز آزمایشی سال جاری','کنترل مطابقت با اقلام سال جاری کاربرگ نهایی','کنترل مطابقت با اقلام مقایسه‌ای کاربرگ نهایی'];
     for(let i=0;i<5;i++) assert.equal((await controls().nth(i).innerText()).replace('□','').trim(),expectedGL[i]);
-    await page.locator('[data-mw-link]').first().selectOption('A-72|0|0');
+    await openMapping(page);await page.locator('[data-mw-map-link]').first().selectOption('A-72|0|0');
     for(let i=0;i<5;i++) assert.equal((await controls().nth(i).innerText()).replace('□','').trim(),expectedGL[i]);
     const expected=['کنترل مطابقت با کاربرگ‌های مربوطه','کنترل جمع عمودی','کنترل جمع (محاسبات) افقی','کنترل مطابقت با اقلام صورت‌های مالی سال جاری','کنترل مطابقت با اقلام صورت‌های مالی سال مقایسه‌ای'];
     for(const id of ['A-70','A-71','A-72','A-73']) {
@@ -450,8 +442,8 @@ test("A-70 current and noncurrent asset headings fit on one real PDF page", { sk
   const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
   try {
     const {page,context,errors}=await setup(browser);
-    await page.locator('[data-mw-link]').first().selectOption('A-70|0|0');
-    await page.locator('[data-mw-link]').nth(1).selectOption('A-70|1|5');
+    await openMapping(page);await page.locator('[data-mw-map-link]').first().selectOption('A-70|0|0');
+    await page.locator('[data-mw-map-link]').nth(1).selectOption('A-70|1|5');
     await page.locator('[data-mw-view="A-70"]').click();
     const pages=page.locator('#mwPreview .mw-paper');
     assert.equal(await pages.count(),1);
@@ -512,7 +504,7 @@ test('model titles, automatic mapping, review and debit-credit signs', {skip:!ex
    ].map(([code,title,debit,credit])=>({'کد حساب کل':code,'عنوان حساب کل':title,'کد حساب معین':code,'عنوان حساب معین':title,'بدهکار':debit,'بستانکار':credit}));
    gotoModule('mainWorkpaper');
   });
-  assert.equal(await page.locator('[data-mw-link]').first().inputValue(),'A-70|1|5');
+  await openMapping(page);assert.equal(await page.locator('[data-mw-map-link]').first().inputValue(),'A-70|1|5');
   assert.match(await page.locator('.mw-match-origin').first().innerText(),/تطبیق خودکار/);
   await page.locator('[data-mw-view="A-70"]').click();
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'موجودی نقد'}).getAttribute('data-mw-amount'),'950');
@@ -524,9 +516,9 @@ test('model titles, automatic mapping, review and debit-credit signs', {skip:!ex
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'درآمدهای عملیاتی'}).first().getAttribute('data-mw-amount'),'400');
   assert.equal(await page.locator('.mw-paper-table tbody tr').filter({hasText:'بهای تمام‌شده درآمدهای عملیاتی'}).first().getAttribute('data-mw-amount'),'-100');
   await page.locator('[data-mw-view="accounts"][data-mw-active="1"]').click();
-  assert.match(await page.locator('h2').filter({hasText:'موجودی نقد و بانک'}).first().innerText(),/موجودی نقد و بانک/);
-  await page.locator('[data-mw-link]').selectOption('');
-  assert.equal(await page.locator('[data-mw-link]').inputValue(),'');
+  assert.match(await page.locator('#mwPreview').innerText(),/موجودی نقد و بانک/);
+  await page.locator('[data-mw-map-link]').first().selectOption('');
+  assert.equal(await page.locator('[data-mw-map-link]').first().inputValue(),'');
   assert.deepEqual(errors,[]);await context.close();
  } finally {await browser.close();}
 });
@@ -542,8 +534,8 @@ test('ambiguous and unknown titles remain unassigned; invalid data stays visible
     {'کد حساب کل':'3','عنوان حساب کل':'سرمایه','کد حساب معین':'1','عنوان حساب معین':'سرمایه','بدهکار':'خطا','بستانکار':''}
    ];gotoModule('mainWorkpaper');
   });
-  assert.equal(await page.locator('[data-mw-link]').inputValue(),'');
-  await page.locator('[data-mw-view="accounts"][data-mw-active="2"]').click();assert.equal(await page.locator('[data-mw-link]').inputValue(),'');
+  await openMapping(page);assert.equal(await page.locator('[data-mw-map-link]').nth(0).inputValue(),'');
+  await page.locator('[data-mw-view="accounts"][data-mw-active="2"]').click();assert.equal(await page.locator('[data-mw-map-link]').nth(1).inputValue(),'');
   assert.match(await page.locator('#mainWorkpaperModule > .err').innerText(),/نامعتبر/);await page.locator('[data-mw-view="accounts"][data-mw-active="3"]').click();assert.equal(await page.locator('#mwPreview tbody tr').first().getAttribute('data-mw-amount'),'');
   assert.deepEqual(errors,[]);await context.close();
  } finally {await browser.close();}
@@ -980,7 +972,7 @@ test('all previous automatic and manual mappings are ticked as status, bulk sele
   await page.evaluate(()=>{ACCOUNT_ROWS=[
    ['1','نامشهود','100'],['2','نقد','20'],['3','عنوان نامعلوم','30'],['4','حساب ناشناخته','40']
   ].map(([m,title,amount])=>({'کد حساب کل':'11','عنوان حساب کل':'حساب خاص','کد حساب معین':m,'عنوان حساب معین':title,'بدهکار':amount,'بستانکار':''}));gotoModule('mainWorkpaper');});
-  await page.locator('select[data-mw-link]').nth(3).selectOption('A-71|2|0');
+  await openMapping(page);await page.locator('select[data-mw-map-link]').nth(3).selectOption('A-71|2|0');
   await page.locator('[data-mw-view="A-70"]').click();await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();
   const d=page.locator('#mwTopicDialog'),g=d.locator('[data-topic-group="11"]');assert.match(await g.innerText(),/۳ از ۴ معین انتخاب‌شده/);
   await g.locator('[data-topic-expand]').click();const rows=g.locator('.mw-topic-account');assert.equal(await rows.count(),4);
@@ -1003,7 +995,7 @@ test('all previous automatic and manual mappings are ticked as status, bulk sele
   await page.locator('[data-mw-topic-choose="A-70|1|0"]').click();await d.locator('[data-topic-expand]').click();const moved=d.locator('.mw-topic-account').nth(1);
   assert(await moved.locator('[data-topic-account]').isChecked());assert(await moved.locator('[data-topic-account]').isEnabled());
   await moved.locator('[data-topic-account]').uncheck();assert.equal(await moved.locator('[data-topic-account]').isChecked(),false);await d.locator('[data-topic-save]').click();
-  assert.equal(await amount('پیش‌پرداخت‌ها'),'30');await page.locator('#mwMatching summary').click();assert.match(await page.locator('.mw-map-item').nth(1).innerText(),/انتخاب نشده/);assert.deepEqual(errors,[]);await context.close();
+  assert.equal(await amount('پیش‌پرداخت‌ها'),'30');await openMapping(page);assert.match(await page.locator('.mw-map-item').nth(1).innerText(),/انتخاب نشده/);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
 
@@ -1119,6 +1111,7 @@ test('move whole or partial ledger accounts among GL workpapers without altering
    {'کد حساب کل':'20','عنوان حساب کل':'استهلاک انباشته','کد حساب معین':'1','عنوان حساب معین':'استهلاک ساختمان','بدهکار':'','بستانکار':'40'},
    {'کد حساب کل':'20','عنوان حساب کل':'استهلاک انباشته','کد حساب معین':'2','عنوان حساب معین':'استهلاک تجهیزات','بدهکار':'','بستانکار':'60'},
    {'کد حساب کل':'30','عنوان حساب کل':'پرداختنی','کد حساب معین':'1','عنوان حساب معین':'سایر پرداختنی','بدهکار':'','بستانکار':'50'}];gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  const ledgerBefore=await page.evaluate(()=>JSON.stringify(ACCOUNT_ROWS));
   const select=async id=>page.locator(`[data-mw-view="accounts"][data-mw-active="${id}"]`).click();
   const rows=()=>page.locator('#mwPreview .mw-paper tbody tr:not(.mw-total):not(.mw-group)');
   const total=()=>page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount');
@@ -1131,7 +1124,7 @@ test('move whole or partial ledger accounts among GL workpapers without altering
   await page.locator('[data-mw-paper-choose]').click();await d.locator('[data-paper-expand="20"]').click();await d.locator('label').filter({hasText:'استهلاک ساختمان'}).locator('input').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();
   assert.equal(await total(),'260');assert.match(await rows().allTextContents().then(x=>x.join(' ')),/استهلاک ساختمان/);assert.match(await page.locator('#mwPreview .mw-total').innerText(),/ارزش دفتری/);
   await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});assert.equal(await page.locator('#printHost [data-mw-paper-choose]').count(),0);assert.match(await page.locator('#printHost').innerText(),/استهلاک ساختمان/);const count=await page.locator('#printHost .mw-paper').count();assert.equal((await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}))).getPageCount(),count);await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
-  await select('20');assert.equal(await total(),'-60');assert.equal(await rows().count(),1);assert.match(await rows().innerText(),/استهلاک تجهیزات/);assert.match(await page.locator('#mainWorkpaperModule').innerText(),/مانده دفتر/);
+  await select('20');assert.equal(await total(),'-60');assert.equal(await rows().count(),1);assert.match(await rows().innerText(),/استهلاک تجهیزات/);assert.equal(await page.evaluate(()=>JSON.stringify(ACCOUNT_ROWS)),ledgerBefore);
   await page.locator('[data-mw-view="A-70"]').click();assert.equal(await page.locator('#mwPreview tbody').innerText(),beforeA,'A-70 mappings and balances do not change');
   await select('10');await page.locator('[data-mw-paper-choose]').click();await d.locator('[data-paper-major="20"]').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();assert.equal(await total(),'200');
   assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="20"]').count(),0,'empty source is hidden');await sheetAction(page,'accounts','20',true,'بازگرداندن');assert.equal(await total(),'');assert.equal(await rows().count(),0);assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="20"]').count(),1,'empty workpaper can be restored');
@@ -1278,5 +1271,16 @@ test('sheet menus and both scrollable bars work on a short dark mobile screen', 
   for(const view of ['A-70','A-71','A-72','A-73'])await sheetAction(page,view,'',false,'حذف');const hidden=page.locator('.mw-hidden-nav');assert(await hidden.evaluate(el=>el.scrollWidth>el.clientWidth));await page.locator('[data-mw-hidden-scroll="left"]').click();await page.waitForTimeout(500);assert((await hidden.evaluate(el=>el.scrollLeft))<0);await page.locator('[data-mw-hidden-scroll="right"]').click();await page.waitForTimeout(500);
   const trigger=hidden.locator('.mw-sheet-more').first();await trigger.click();let menu=page.locator('#mwSheetMenu');assert(await menu.isVisible());assert.equal(await trigger.getAttribute('aria-expanded'),'true');const bounds=await menu.boundingBox();assert(bounds.x>=0&&bounds.y>=0&&bounds.x+bounds.width<=390&&bounds.y+bounds.height<=580);const colors=await menu.evaluate(el=>({bg:getComputedStyle(el).backgroundColor,fg:getComputedStyle(el).color}));assert.notEqual(colors.bg,colors.fg);await page.keyboard.press('Escape');assert(await menu.isHidden());assert.equal(await trigger.getAttribute('aria-expanded'),'false');assert(await trigger.evaluate(el=>document.activeElement===el));
   await trigger.click();await page.locator('.mw-hidden-title').click();assert(await menu.isHidden());await trigger.click();await hidden.evaluate(el=>{el.scrollLeft=-60;});await page.waitForTimeout(100);assert(await menu.isVisible());const afterScroll=await menu.boundingBox();assert(afterScroll.x>=0&&afterScroll.x+afterScroll.width<=390);await page.keyboard.press('Escape');assert(await menu.isHidden());assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('removed account details and classification panels stay absent without changing ledger or workpaper links', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);const before=await page.evaluate(()=>JSON.stringify(ACCOUNT_ROWS));const h=page.locator('#mainWorkpaperModule');
+  const verify=async()=>{assert.equal(await h.locator('.mw-classification, [data-mw-detail], [data-mw-link], [data-mw-approve]').count(),0);assert.doesNotMatch(await h.innerText(),/خلاصه حساب کل|اتصال معین‌های|ردیابی اسناد|بخش طبقه‌بندی — غیرفعال/);};
+  await verify();await page.locator('[data-mw-view="accounts"][data-mw-active="02"]').click();await verify();await page.locator('[data-mw-view="A-70"]').click();await verify();
+  const cash=page.locator('#mwPreview tbody tr').filter({has:page.locator('.mw-description',{hasText:'موجودی نقد'})});assert.equal(await cash.getAttribute('data-mw-amount'),'130');
+  await page.locator('[data-mw-topic-choose="A-70|1|5"]').click();const d=page.locator('#mwTopicDialog');assert(await d.isVisible());await d.locator('[data-topic-expand="01"]').click();assert(await d.locator('[data-topic-account]').first().isChecked());await d.locator('[data-topic-cancel]').first().click();
+  await openMapping(page);await page.locator('[data-mw-map-link]').first().waitFor();assert(await page.locator('[data-mw-map-link]').count()>0);await verify();assert.equal(await page.evaluate(()=>JSON.stringify(ACCOUNT_ROWS)),before);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
