@@ -80,6 +80,10 @@ async function setup(browser) {
   await page.evaluate(() => document.fonts.ready);
   return { page, context, errors };
 }
+async function sheetAction(page,view,code,hidden,action){
+ const key=JSON.stringify([view,code||'']);const zone=hidden?'.mw-hidden-nav':'.mw-nav';
+ await page.locator(`${zone} [data-mw-sheet-more='${key}']`).click();const button=page.locator('#mwSheetMenu [data-mw-sheet-action]');assert.equal((await button.innerText()).trim(),action);await button.click();
+}
 test(
   "automatic main workpapers, current balances, explicit mapping and inert classification on mobile",
   { skip: !executablePath && "Set CHROMIUM_PATH" },
@@ -1130,7 +1134,7 @@ test('move whole or partial ledger accounts among GL workpapers without altering
   await select('20');assert.equal(await total(),'-60');assert.equal(await rows().count(),1);assert.match(await rows().innerText(),/استهلاک تجهیزات/);assert.match(await page.locator('#mainWorkpaperModule').innerText(),/مانده دفتر/);
   await page.locator('[data-mw-view="A-70"]').click();assert.equal(await page.locator('#mwPreview tbody').innerText(),beforeA,'A-70 mappings and balances do not change');
   await select('10');await page.locator('[data-mw-paper-choose]').click();await d.locator('[data-paper-major="20"]').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();assert.equal(await total(),'200');
-  assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="20"]').count(),0,'empty source is hidden');await page.locator('.mw-empty-papers summary').click();await page.locator('[data-mw-show-empty="20"]').click();assert.equal(await total(),'');assert.equal(await rows().count(),0);assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="20"]').count(),1,'empty workpaper can be restored');
+  assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="20"]').count(),0,'empty source is hidden');await sheetAction(page,'accounts','20',true,'بازگرداندن');assert.equal(await total(),'');assert.equal(await rows().count(),0);assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="20"]').count(),1,'empty workpaper can be restored');
   await select('30');await page.locator('[data-mw-paper-choose]').click();await d.locator('[data-paper-expand="20"]').click();assert.match(await d.innerText(),/کاربرگ فعلی: دارایی ثابت/);await d.locator('label').filter({hasText:'استهلاک ساختمان'}).locator('input').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();assert.equal(await total(),'-90');
   await select('10');assert.equal(await total(),'240');await page.locator('[data-mw-paper-choose]').click();await d.locator('[data-paper-expand="20"]').click();await d.locator('label').filter({hasText:'استهلاک تجهیزات'}).locator('input').uncheck();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();assert.equal(await total(),'300');
   await select('20');assert.equal(await total(),'-60');await page.locator('[data-mw-paper-choose]').click();await d.locator('[data-paper-expand="20"]').click();await d.locator('label').filter({hasText:'استهلاک ساختمان'}).locator('input').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();assert.equal(await total(),'-100');
@@ -1147,7 +1151,7 @@ test('workpaper moves handle invalid amounts, large groups, search and new ledge
   await page.locator('[data-mw-paper-choose]').click();const d=page.locator('#mwPaperDialog');await d.locator('[data-paper-expand="2"]').click();assert.equal(await d.locator('[data-paper-account]').count(),100);await d.locator('[data-paper-child-next="2"]').click();assert.equal(await d.locator('[data-paper-account]').count(),3);
   await d.locator('#mwPaperSearch').fill('جزء 1');assert(await d.locator('[data-paper-account]').count()>0);await d.locator('#mwPaperSearch').fill('');await d.locator('[data-paper-major="2"]').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();
   assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),104);assert.equal(await page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount'),'','invalid moved amount propagates instead of becoming zero');
-  assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="2"]').count(),0);await page.locator('.mw-empty-papers summary').click();await page.locator('[data-mw-show-empty="2"]').click();assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),0);
+  assert.equal(await page.locator('[data-mw-view="accounts"][data-mw-active="2"]').count(),0);await sheetAction(page,'accounts','2',true,'بازگرداندن');assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),0);
   await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'1','عنوان حساب کل':'مقصد جدید','کد حساب معین':'1','عنوان حساب معین':'نخست','بدهکار':'900719925474099300001','بستانکار':''},{'کد حساب کل':'2','عنوان حساب کل':'منبع جدید','کد حساب معین':'1','عنوان حساب معین':'جدید','بدهکار':'3','بستانکار':''}];gotoModule('mainWorkpaper');});
   assert.equal(await page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount'),'900719925474099300001');await page.locator('[data-mw-view="accounts"][data-mw-active="2"]').click();assert.equal(await page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount'),'3','assignments do not leak into a new source');assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
@@ -1161,7 +1165,7 @@ test('workpaper transfer picker is usable in dark mode on a short mobile screen'
  }finally{await browser.close();}
 });
 
-test('empty workpapers are hidden and can be shown or have their original accounts restored', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+test('empty workpapers are hidden and can be shown and have their original accounts restored', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
   const {page,context,errors}=await setup(browser);
   await page.evaluate(()=>{ACCOUNT_ROWS=[
@@ -1173,13 +1177,13 @@ test('empty workpapers are hidden and can be shown or have their original accoun
   const tab=id=>page.locator(`[data-mw-view="accounts"][data-mw-active="${id}"]`),dialog=page.locator('#mwPaperDialog'),total=()=>page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount');
   await page.locator('[data-mw-view="A-70"]').click();const baseline=await page.locator('#mwPreview tbody').innerText();await tab('1').click();
   await page.locator('[data-mw-paper-choose]').click();await dialog.locator('[data-paper-major="2"]').check();page.once('dialog',d=>d.accept());await dialog.locator('[data-paper-save]').click();assert.equal(await tab('2').count(),0);assert.equal(await tab('3').count(),1,'a zero balance with a row is not empty');assert.equal(await total(),'100');
-  await page.locator('.mw-empty-papers summary').click();page.once('dialog',d=>d.dismiss());await page.locator('[data-mw-return-paper="2"]').click();assert.equal(await tab('2').count(),0,'cancel preserves hidden state');assert.equal(await total(),'100');
-  await page.locator('[data-mw-show-empty="2"]').click();assert.equal(await total(),'');assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),0);await page.locator('[data-mw-view="A-71"]').click();assert.equal(await tab('2').count(),1,'explicitly shown empty workpaper stays visible');
+  assert.equal(await page.locator('.mw-hidden-nav .mw-sheet-pair').count(),1);assert.equal(await total(),'100');
+  await sheetAction(page,'accounts','2',true,'بازگرداندن');assert.equal(await total(),'');assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),0);await page.locator('[data-mw-view="A-71"]').click();assert.equal(await tab('2').count(),1,'explicitly shown empty workpaper stays visible');
   await tab('4').click();await page.locator('[data-mw-paper-choose]').click();await dialog.locator('[data-paper-expand="2"]').click();await dialog.locator('label').filter({hasText:'جزء اول'}).locator('input').check();page.once('dialog',d=>d.accept());await dialog.locator('[data-paper-save]').click();assert.equal(await total(),'70');
   await tab('2').click();await page.locator('[data-mw-paper-choose]').click();await dialog.locator('[data-paper-major="2"]').check();page.once('dialog',d=>d.accept());await dialog.locator('[data-paper-save]').click();assert.equal(await total(),'0');assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),2);
   await tab('1').click();assert.equal(await total(),'100');await tab('4').click();assert.equal(await total(),'50');
   await tab('1').click();await page.locator('[data-mw-paper-choose]').click();await dialog.locator('[data-paper-major="2"]').check();page.once('dialog',d=>d.accept());await dialog.locator('[data-paper-save]').click();assert.equal(await tab('2').count(),0,'workpaper is hidden again after being emptied again');
-  await page.locator('.mw-empty-papers summary').click();page.once('dialog',d=>d.accept());await page.locator('[data-mw-return-paper="2"]').click();assert.equal(await tab('2').getAttribute('aria-current'),'page');assert.equal(await total(),'0');assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),2);
+  await sheetAction(page,'accounts','2',true,'بازگرداندن');assert.equal(await tab('2').getAttribute('aria-current'),'page');assert.equal(await total(),'');await page.locator('[data-mw-paper-choose]').click();await dialog.locator('[data-paper-major="2"]').check();page.once('dialog',d=>d.accept());await dialog.locator('[data-paper-save]').click();assert.equal(await total(),'0');assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),2);
   await tab('1').click();assert.equal(await total(),'100');await page.locator('[data-mw-view="A-70"]').click();assert.equal(await page.locator('#mwPreview tbody').innerText(),baseline);assert.equal(await page.locator('#mwPrint').isEnabled(),true);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
@@ -1236,5 +1240,43 @@ test('fixed asset workpaper places construction and capital items after book val
   const rows=page.locator('#mwPreview tbody tr'),contents=await rows.allTextContents(),book=contents.findIndex(x=>x.includes('ارزش دفتری اقلام بالا')),construction=contents.findIndex(x=>x.includes('دارایی در جریان تکمیل')),advance=contents.findIndex(x=>x.includes('پیش پرداخت سرمایه ای'));assert(book>=0&&book<construction&&construction<advance);
   assert.equal(await page.locator('#mwPreview .mw-asset-book').getAttribute('data-mw-amount'),'150');assert.equal(await page.locator('#mwPreview .mw-total').last().getAttribute('data-mw-amount'),'250');
   await page.locator('[data-mw-view="asset-analysis"][data-mw-active="10"]').click();const header=await page.locator('#mwPreview thead').first().innerText();assert.match(header,/دارایی در جریان تکمیل/);assert.match(header,/پیش پرداخت سرمایه ای/);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('every sheet has a three-dot menu and deletion only moves it to the lower bar without losing data', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[
+   {'کد حساب کل':'10','عنوان حساب کل':'دارایی ثابت مشهود','کد حساب معین':'1','عنوان حساب معین':'زمین','بدهکار':'200','بستانکار':''},
+   {'کد حساب کل':'20','عنوان حساب کل':'استهلاک انباشته','کد حساب معین':'1','عنوان حساب معین':'استهلاک ساختمان','بدهکار':'','بستانکار':'50'}];gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  assert.equal(await page.locator('.mw-nav .mw-sheet-pair').count(),7);assert.equal(await page.locator('.mw-nav .mw-sheet-more').count(),7);assert.equal(await page.locator('.mw-hidden-nav').count(),0);
+  await page.locator('[data-mw-view="A-70"]').click();const before=await page.locator('#mwPreview tbody').innerText();await sheetAction(page,'A-70','',false,'حذف');assert.equal(await page.locator('.mw-nav [data-mw-view="A-70"]').count(),0);assert.equal(await page.locator('.mw-hidden-nav .mw-sheet-pair').count(),1);assert.match(await page.locator('.mw-hidden-nav').innerText(),/A-70/);
+  await sheetAction(page,'accounts','20',false,'حذف');assert.equal(await page.locator('.mw-nav [data-mw-view="accounts"][data-mw-active="20"]').count(),0);assert.equal(await page.locator('.mw-hidden-nav .mw-sheet-more').count(),2);
+  await page.locator('[data-mw-view="accounts"][data-mw-active="10"]').click();await page.locator('[data-mw-paper-choose]').click();const d=page.locator('#mwPaperDialog');await d.locator('[data-paper-major="20"]').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();assert.equal(await page.locator('#mwPreview .mw-total').last().getAttribute('data-mw-amount'),'150');
+  await sheetAction(page,'A-70','',true,'بازگرداندن');assert.equal(await page.locator('#mwPreview tbody').innerText(),before,'hiding and moving a sheet did not change final-statement data');
+  await sheetAction(page,'asset-analysis','10',false,'حذف');assert.equal(await page.locator('.mw-nav [data-mw-view="asset-analysis"]').count(),0);await sheetAction(page,'asset-analysis','10',true,'بازگرداندن');assert.equal(await page.locator('.mw-nav [data-mw-view="asset-analysis"][aria-current="page"]').count(),1);
+  await sheetAction(page,'accounts','10',false,'حذف');assert.equal(await page.locator('.mw-nav [data-mw-view="accounts"][data-mw-active="10"]').count(),0);assert.equal(await page.locator('.mw-nav [data-mw-view="asset-analysis"]').count(),1,'analysis can remain visible when its main sheet is hidden');
+  await sheetAction(page,'accounts','10',true,'بازگرداندن');assert.equal(await page.locator('#mwPreview .mw-total').last().getAttribute('data-mw-amount'),'150');assert.equal(await page.locator('#printHost .mw-sheet-more').count(),0);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});assert.equal(await page.locator('#printHost .mw-sheet-more').count(),0);const pdf=await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}));assert(pdf.getPageCount()>0);await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('all sheets can be hidden and restored, and a new ledger resets manual visibility', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'1','عنوان حساب کل':'نقد','کد حساب معین':'1','عنوان حساب معین':'نقد','بدهکار':'42','بستانکار':''}];gotoModule('mainWorkpaper');});
+  for(const view of ['A-70','A-71','A-72','A-73'])await sheetAction(page,view,'',false,'حذف');await sheetAction(page,'accounts','1',false,'حذف');
+  assert.equal(await page.locator('.mw-nav .mw-sheet-pair').count(),0);assert.equal(await page.locator('.mw-hidden-nav .mw-sheet-pair').count(),5);assert.match(await page.locator('#mwPreview').innerText(),/کاربرگی برای نمایش انتخاب نشده/);assert(await page.locator('#mwPrint').isDisabled());
+  await sheetAction(page,'accounts','1',true,'بازگرداندن');assert.equal(await page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount'),'42');assert(await page.locator('#mwPrint').isEnabled());
+  await page.evaluate(()=>{ACCOUNT_ROWS=[{'کد حساب کل':'2','عنوان حساب کل':'جدید','بدهکار':'3','بستانکار':''}];gotoModule('mainWorkpaper');});assert.equal(await page.locator('.mw-hidden-nav').count(),0);assert.equal(await page.locator('.mw-nav .mw-sheet-pair').count(),5);assert.equal(await page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount'),'3');assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('sheet menus and both scrollable bars work on a short dark mobile screen', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.setViewportSize({width:390,height:580});await page.evaluate(()=>{applyTheme('dark');ACCOUNT_ROWS=Array.from({length:12},(_,i)=>({'کد حساب کل':String(i+1),'عنوان حساب کل':'حساب آزمایشی '+(i+1),'بدهکار':'10','بستانکار':''}));gotoModule('mainWorkpaper');});
+  const nav=page.locator('.mw-nav');assert(await nav.evaluate(el=>el.scrollWidth>el.clientWidth));await page.locator('[data-mw-scroll="left"]').click();await page.waitForTimeout(500);assert((await nav.evaluate(el=>el.scrollLeft))<0);await page.locator('[data-mw-scroll="right"]').click();await page.waitForTimeout(500);
+  for(const view of ['A-70','A-71','A-72','A-73'])await sheetAction(page,view,'',false,'حذف');const hidden=page.locator('.mw-hidden-nav');assert(await hidden.evaluate(el=>el.scrollWidth>el.clientWidth));await page.locator('[data-mw-hidden-scroll="left"]').click();await page.waitForTimeout(500);assert((await hidden.evaluate(el=>el.scrollLeft))<0);await page.locator('[data-mw-hidden-scroll="right"]').click();await page.waitForTimeout(500);
+  const trigger=hidden.locator('.mw-sheet-more').first();await trigger.click();let menu=page.locator('#mwSheetMenu');assert(await menu.isVisible());assert.equal(await trigger.getAttribute('aria-expanded'),'true');const bounds=await menu.boundingBox();assert(bounds.x>=0&&bounds.y>=0&&bounds.x+bounds.width<=390&&bounds.y+bounds.height<=580);const colors=await menu.evaluate(el=>({bg:getComputedStyle(el).backgroundColor,fg:getComputedStyle(el).color}));assert.notEqual(colors.bg,colors.fg);await page.keyboard.press('Escape');assert(await menu.isHidden());assert.equal(await trigger.getAttribute('aria-expanded'),'false');assert(await trigger.evaluate(el=>document.activeElement===el));
+  await trigger.click();await page.locator('.mw-hidden-title').click();assert(await menu.isHidden());await trigger.click();await hidden.evaluate(el=>{el.scrollLeft=-60;});await page.waitForTimeout(100);assert(await menu.isVisible());const afterScroll=await menu.boundingBox();assert(afterScroll.x>=0&&afterScroll.x+afterScroll.width<=390);await page.keyboard.press('Escape');assert(await menu.isHidden());assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
