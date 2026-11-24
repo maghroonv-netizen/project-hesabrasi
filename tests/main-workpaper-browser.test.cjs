@@ -179,7 +179,7 @@ test(
   },
 );
 test(
-  "multi-page A4 preview and PDF fit, without page numbers and with repeated headers",
+  "multi-page A4 preview and PDF fit with page numbers and repeated headers",
   { skip: !executablePath && "Set CHROMIUM_PATH" },
   async () => {
     const browser = await chromium.launch({
@@ -205,11 +205,12 @@ test(
       const pages = page.locator("#mwPreview .mw-paper");
       const count = await pages.count();
       assert(count >= 2);
-      assert(await pages.first().locator(".mw-paper-table tbody tr").count() >= 8, "compact controls leave room for at least eight item rows");
+      assert(await pages.first().locator(".mw-paper-table tbody tr").count() >= 8, "earlier pages leave room for at least eight item rows");
       for (let i = 0; i < count; i++) {
         const p = pages.nth(i);
         assert.match(await p.innerText(), /شرکت آزمایشی/);
-        assert.equal((await p.locator(".mw-paper-foot").innerText()).trim(), "");
+        assert.equal((await p.locator(".mw-paper-foot").innerText()).trim(), `صفحه ${String(i+1).replace(/[0-9]/g,d=>"۰۱۲۳۴۵۶۷۸۹"[d])} از ${String(count).replace(/[0-9]/g,d=>"۰۱۲۳۴۵۶۷۸۹"[d])}`);
+        assert.equal(await p.locator(".mw-controls").count(),i===count-1?1:0);
         assert.equal((await p.locator(".mw-ref").innerText()).trim(), "");
         assert.equal((await p.locator(".mw-refbox").innerText()).trim(), "");
         assert(await p.locator(".mw-paper-table td, .mw-paper-table th").evaluateAll(cells => cells.every(cell => getComputedStyle(cell).color === "rgb(0, 0, 0)")));
@@ -424,6 +425,7 @@ test("A-family and GL retain the correct control texts with adaptive layout", { 
       await page.locator(`[data-mw-view="${id}"]`).click();
       for(const p of await page.locator('#mwPreview .mw-paper').all()) {
         const rows=p.locator('.mw-control-items > div');
+        if(!await rows.count()){assert.notEqual(p,undefined);continue;}
         assert.equal(await rows.count(),5);
         const titleHeight=await p.locator('.mw-control-title').evaluate(el=>el.getBoundingClientRect().height);assert(titleHeight>=17.5 && titleHeight<=21);
         const top=await rows.evaluateAll(els=>els.map(el=>Math.round(el.getBoundingClientRect().top)));
@@ -811,7 +813,7 @@ test('statement asset and liability groups follow sample order with separate cur
  }finally{await browser.close();}
 });
 
-test('all main and A workpapers print bold enlarged headers and centered amounts', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+test('all main and A workpapers print proportionate bold headers and centered amounts', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
   const {page,context,errors}=await setup(browser);
@@ -831,7 +833,7 @@ test('all main and A workpapers print bold enlarged headers and centered amounts
    });
    assert(styles.meta.size>=15.4&&styles.sign.size>=14.1,id);
    assert([...styles.metaChildren,...styles.signChildren].every(s=>s.weight>=700),id);
-   assert(styles.heads.every(s=>s.weight>=700&&s.size>=16),id);
+   assert(styles.heads.every(s=>s.weight>=700&&s.size>=13&&s.size<15),id);
    const distances=await pages.locator('.mw-number-text').evaluateAll(nodes=>nodes.filter(n=>n.textContent.trim()).map(n=>{const cell=n.parentElement.getBoundingClientRect(),text=n.getBoundingClientRect();return Math.abs((cell.left+cell.right-text.left-text.right)/2);}));
    assert(distances.length>0,id);assert(distances.every(d=>d<1.1),`${id}: ${distances}`);
    if(id==='A-72')assert(await pages.locator('.mw-number-text').evaluateAll(ns=>ns.some(n=>n.textContent.includes('('))));
@@ -939,13 +941,12 @@ test('audit controls use the same reference styling and adapt only when vertical
  }finally{await browser.close();}
 });
 
-test('long GL workpaper repeats compact controls on all pages without losing rows', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+test('long GL workpaper shows controls only on the last page without losing rows', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
   const {page,context,errors}=await setup(browser);
   await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:35},(_,i)=>({'کد حساب کل':'10','عنوان حساب کل':'موجودی نقد','کد حساب معین':String(i+1),'عنوان حساب معین':'حساب ویژه '+(i+1),'بدهکار':'1','بستانکار':''}));gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
-  const pages=page.locator('#mwPreview .mw-paper');assert((await pages.count())>1);assert.equal(await pages.locator('.mw-control-items').count(),await pages.count());
-  assert(await pages.evaluateAll(xs=>xs.every(x=>x.classList.contains('mw-controls-compact'))));assert.equal(await pages.locator('tbody tr').count(),36);
+  const pages=page.locator('#mwPreview .mw-paper');assert((await pages.count())>1);assert.equal(await pages.locator('.mw-control-items').count(),1);assert.equal(await pages.last().locator('.mw-control-items').count(),1);assert.equal(await pages.locator('tbody tr').count(),36);
   assert.equal(await page.locator('#mwPrint').isEnabled(),true);await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
   const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),await pages.count());
   assert.deepEqual(errors,[]);await context.close();
@@ -1092,36 +1093,15 @@ test('biological producer and non-producer titles map separately, respect confli
  }finally{await browser.close();}
 });
 
-test('adaptive audit controls are decided independently for every main-module workpaper', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
- const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
- try{
-  const {page,context,errors}=await setup(browser);
-  await page.evaluate(()=>{
-   ACCOUNT_ROWS=[...[[1,1],[2,12],[3,24],[4,38]].flatMap(([group,count])=>Array.from({length:count},(_,i)=>({'کد حساب کل':String(group),'عنوان حساب کل':'حساب گروه '+group,'کد حساب معین':String(i+1),'عنوان حساب معین':'معین '+(i+1),'بدهکار':'1','بستانکار':''})))];
-   gotoModule('mainWorkpaper');
-  });await page.evaluate(()=>document.fonts.ready);
-  const pdfCounts=[];
-  for(const item of [{view:'accounts',code:'1',rows:2},{view:'accounts',code:'2',rows:13},{view:'accounts',code:'3',rows:25},{view:'accounts',code:'4',rows:39},{view:'A-70'},{view:'A-71'},{view:'A-72'},{view:'A-73'},{view:'accounts',code:'1',rows:2}]){
-   const selector=item.code?`[data-mw-view="accounts"][data-mw-active="${item.code}"]`:`[data-mw-view="${item.view}"]`;
-   await page.locator(selector).click();
-   const decision=await page.evaluate(()=>{
-    const host=document.querySelector('#mwPreview'),pages=[...host.querySelectorAll('.mw-paper')],rows=pages.flatMap(p=>[...p.querySelectorAll('tbody tr')].map(r=>r.cloneNode(true)));
-    const compact=pages.map(p=>p.classList.contains('mw-controls-compact'));
-    const controlsFit=pages.every(p=>{const card=p.querySelector('.mw-card').getBoundingClientRect();return [...p.querySelectorAll('.mw-control-items > div')].every(el=>{const r=el.getBoundingClientRect();return r.bottom<=card.bottom+1&&r.left>=card.left-1&&r.right<=card.right+1&&el.scrollWidth<=el.clientWidth+1;});});
-    const clone=pages[0].cloneNode(true);clone.classList.remove('mw-controls-compact');clone.style.position='absolute';clone.style.left='-20000px';clone.querySelector('tbody').replaceChildren(...rows);host.appendChild(clone);
-    const card=clone.querySelector('.mw-card'),inside=clone.querySelector('.mw-inside'),needsCompact=card.scrollHeight>card.clientHeight+1||inside.scrollHeight>inside.clientHeight+1;clone.remove();
-    return {compact,needsCompact,controlsFit,rows:rows.length};
-   });
-   assert(decision.compact.length>0);assert(decision.compact.every(x=>x===decision.needsCompact),`${item.view} ${item.code||''}: each page follows the workpaper's own measured space`);
-   if(item.rows)assert.equal(decision.rows,item.rows);assert(decision.controlsFit,'all five controls remain in the page');assert(await page.locator('#mwPrint').isEnabled());
-   if(item.code==='1'||item.code==='4'||item.view==='A-70'){
-    await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
-    const printed=page.locator('#printHost .mw-paper');assert.equal(await printed.count(),decision.compact.length);assert(await printed.evaluateAll((ps,expected)=>ps.every(p=>p.classList.contains('mw-controls-compact')===expected),decision.needsCompact));
-    const pdf=await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}));assert.equal(pdf.getPageCount(),decision.compact.length);pdfCounts.push(decision.needsCompact);
-    await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
-   }
-  }
-  assert(pdfCounts.includes(true)&&pdfCounts.includes(false),'both compact and vertical layouts were printed');assert.deepEqual(errors,[]);await context.close();
+test('audit controls appear only on the final page of each main-module workpaper', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[[1,1],[2,12],[3,24],[4,38]].flatMap(([g,n])=>Array.from({length:n},(_,i)=>({'کد حساب کل':String(g),'عنوان حساب کل':'حساب '+g,'کد حساب معین':String(i+1),'عنوان حساب معین':'معین '+(i+1),'بدهکار':'1','بستانکار':''})));gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  for(const item of [{view:'accounts',code:'1',rows:2},{view:'accounts',code:'2',rows:13},{view:'accounts',code:'3',rows:25},{view:'accounts',code:'4',rows:39},{view:'A-70'},{view:'A-71'},{view:'A-72'},{view:'A-73'}]){
+   await page.locator(item.code?`[data-mw-view="accounts"][data-mw-active="${item.code}"]`:`[data-mw-view="${item.view}"]`).click();const pages=page.locator('#mwPreview .mw-paper'),count=await pages.count();assert(count>0);if(item.rows)assert.equal(await pages.locator('tbody tr').count(),item.rows);
+   assert.equal(await pages.locator('.mw-controls').count(),1);assert.equal(await pages.last().locator('.mw-controls').count(),1);
+   for(let i=0;i<count;i++){const p=pages.nth(i);assert.equal(await p.locator('.mw-controls').count(),i===count-1?1:0);const number=(await p.locator('.mw-paper-foot').innerText()).trim();assert.equal(number,count===1?'':`صفحه ${String(i+1).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])} از ${String(count).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}`);assert(await p.evaluate(el=>{const c=el.querySelector('.mw-card'),f=el.querySelector('.mw-paper-foot');return c.scrollHeight<=c.clientHeight+1&&f.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom+1;}));}
+   assert(await page.locator('#mwPrint').isEnabled());await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});const printed=page.locator('#printHost .mw-paper');assert.equal(await printed.count(),count);assert.equal(await printed.locator('.mw-controls').count(),1);assert.equal(await printed.last().locator('.mw-controls').count(),1);const pdf=await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}));assert.equal(pdf.getPageCount(),count);await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+  }assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
 
@@ -1136,7 +1116,7 @@ test('move whole or partial ledger accounts among GL workpapers without altering
    {'کد حساب کل':'20','عنوان حساب کل':'استهلاک انباشته','کد حساب معین':'2','عنوان حساب معین':'استهلاک تجهیزات','بدهکار':'','بستانکار':'60'},
    {'کد حساب کل':'30','عنوان حساب کل':'پرداختنی','کد حساب معین':'1','عنوان حساب معین':'سایر پرداختنی','بدهکار':'','بستانکار':'50'}];gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
   const select=async id=>page.locator(`[data-mw-view="accounts"][data-mw-active="${id}"]`).click();
-  const rows=()=>page.locator('#mwPreview .mw-paper tbody tr:not(.mw-total)');
+  const rows=()=>page.locator('#mwPreview .mw-paper tbody tr:not(.mw-total):not(.mw-group)');
   const total=()=>page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount');
   await page.locator('[data-mw-view="A-70"]').click();const beforeA=await page.locator('#mwPreview tbody').innerText();
   await select('10');assert.equal(await total(),'300');
@@ -1145,7 +1125,7 @@ test('move whole or partial ledger accounts among GL workpapers without altering
   const child=d.locator('label').filter({hasText:'استهلاک ساختمان'}).locator('input');await child.check();
   await d.locator('[data-paper-cancel]').last().click();assert.equal(await total(),'300');
   await page.locator('[data-mw-paper-choose]').click();await d.locator('[data-paper-expand="20"]').click();await d.locator('label').filter({hasText:'استهلاک ساختمان'}).locator('input').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();
-  assert.equal(await total(),'260');assert.match(await rows().allTextContents().then(x=>x.join(' ')),/استهلاک ساختمان/);assert.match(await page.locator('#mwPreview .mw-total').innerText(),/جمع کاربرگ/);
+  assert.equal(await total(),'260');assert.match(await rows().allTextContents().then(x=>x.join(' ')),/استهلاک ساختمان/);assert.match(await page.locator('#mwPreview .mw-total').innerText(),/ارزش دفتری/);
   await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});assert.equal(await page.locator('#printHost [data-mw-paper-choose]').count(),0);assert.match(await page.locator('#printHost').innerText(),/استهلاک ساختمان/);const count=await page.locator('#printHost .mw-paper').count();assert.equal((await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}))).getPageCount(),count);await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
   await select('20');assert.equal(await total(),'-60');assert.equal(await rows().count(),1);assert.match(await rows().innerText(),/استهلاک تجهیزات/);assert.match(await page.locator('#mainWorkpaperModule').innerText(),/مانده دفتر/);
   await page.locator('[data-mw-view="A-70"]').click();assert.equal(await page.locator('#mwPreview tbody').innerText(),beforeA,'A-70 mappings and balances do not change');
@@ -1201,5 +1181,60 @@ test('empty workpapers are hidden and can be shown or have their original accoun
   await tab('1').click();await page.locator('[data-mw-paper-choose]').click();await dialog.locator('[data-paper-major="2"]').check();page.once('dialog',d=>d.accept());await dialog.locator('[data-paper-save]').click();assert.equal(await tab('2').count(),0,'workpaper is hidden again after being emptied again');
   await page.locator('.mw-empty-papers summary').click();page.once('dialog',d=>d.accept());await page.locator('[data-mw-return-paper="2"]').click();assert.equal(await tab('2').getAttribute('aria-current'),'page');assert.equal(await total(),'0');assert.equal(await page.locator('#mwPreview tbody tr:not(.mw-total)').count(),2);
   await tab('1').click();assert.equal(await total(),'100');await page.locator('[data-mw-view="A-70"]').click();assert.equal(await page.locator('#mwPreview tbody').innerText(),baseline);assert.equal(await page.locator('#mwPrint').isEnabled(),true);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('fixed asset workpaper has reference sections and separate blank movement analysis without fabricated amounts', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[
+   {'کد حساب کل':'10','عنوان حساب کل':'دارایی ثابت مشهود','کد حساب معین':'1','عنوان حساب معین':'زمین','بدهکار':'1000','بستانکار':''},
+   {'کد حساب کل':'10','عنوان حساب کل':'دارایی ثابت مشهود','کد حساب معین':'2','عنوان حساب معین':'ساختمان','بدهکار':'2000','بستانکار':''},
+   {'کد حساب کل':'20','عنوان حساب کل':'استهلاک انباشته دارایی ثابت','کد حساب معین':'7','عنوان حساب معین':'استهلاک انباشته ساختمان','بدهکار':'','بستانکار':'300'},
+   {'کد حساب کل':'30','عنوان حساب کل':'دارایی نامشهود','کد حساب معین':'1','عنوان حساب معین':'نرم افزار','بدهکار':'75','بستانکار':''}];gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  const asset=page.locator('[data-mw-view="accounts"][data-mw-active="10"]');await asset.click();const groups=page.locator('#mwPreview tr.mw-group');assert.deepEqual(await groups.allTextContents(),['بهای تمام‌شده','استهلاک انباشته']);
+  await page.locator('[data-mw-paper-choose]').click();const d=page.locator('#mwPaperDialog');await d.locator('[data-paper-major="20"]').check();page.once('dialog',x=>x.accept());await d.locator('[data-paper-save]').click();
+  assert.equal(await page.locator('#mwPreview .mw-total').getAttribute('data-mw-amount'),'2700');assert.match(await page.locator('#mwPreview .mw-total').innerText(),/ارزش دفتری/);
+  const texts=await page.locator('#mwPreview tbody tr').allTextContents();assert(texts.indexOf('بهای تمام‌شده')<texts.findIndex(x=>x.includes('زمین')));assert(texts.findIndex(x=>x.includes('ساختمان')&&!x.includes('استهلاک'))<texts.indexOf('استهلاک انباشته'));assert(texts.indexOf('استهلاک انباشته')<texts.findIndex(x=>x.includes('استهلاک انباشته ساختمان')));
+  assert.equal(await page.locator('[data-mw-view="asset-analysis"]').count(),1,'intangible and depreciation accounts are not treated as fixed asset accounts');
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});assert.match(await page.locator('#printHost').innerText(),/ارزش دفتری/);assert.equal(await page.locator('#printHost [data-mw-paper-choose]').count(),0);const mainPdf=await page.pdf({format:'A4',landscape:true,printBackground:true});if(process.env.SAVE_FIXED_ASSET_MAIN_PDF)fs.writeFileSync(process.env.SAVE_FIXED_ASSET_MAIN_PDF,mainPdf);await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+  await page.locator('[data-mw-view="asset-analysis"][data-mw-active="10"]').click();assert.match(await page.locator('#mwPreview .mw-preview-tools').innerText(),/خالی/);
+  const pages=page.locator('#mwPreview .mw-paper');assert((await pages.count())>=1);assert.equal(await pages.locator('.mw-controls').count(),1);assert.equal(await pages.last().locator('.mw-controls').count(),1);
+  const heads=await pages.first().locator('thead th').allTextContents();assert.deepEqual(heads,['عنوان آنالیز','عطف','زمین','ساختمان','جمع']);assert(await pages.first().locator('thead th').evaluateAll(xs=>xs.every(el=>{const s=getComputedStyle(el);return +s.fontWeight>=700&&parseFloat(s.fontSize)>=13&&parseFloat(s.fontSize)<15;})),'analysis headers use the same compact bold font');
+  assert(await pages.locator('tbody tr:not(.mw-group)').evaluateAll(rs=>rs.every(r=>[...r.cells].slice(1).every(c=>c.textContent.trim()===''))),'all analytical figures remain blank');assert.equal(await page.locator('#mwPrint').isEnabled(),true);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});const printPages=page.locator('#printHost .mw-paper'),count=await printPages.count();assert.equal(count,await pages.count());assert.equal(await printPages.locator('.mw-controls').count(),1);const bytes=await page.pdf({format:'A4',landscape:true,printBackground:true});if(process.env.SAVE_FIXED_ASSET_PDF)fs.writeFileSync(process.env.SAVE_FIXED_ASSET_PDF,bytes);const pdf=await require('pdf-lib').PDFDocument.load(bytes);assert.equal(pdf.getPageCount(),count);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('fixed asset analysis splits many real asset columns across pages and keeps controls only at the end', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=Array.from({length:13},(_,i)=>({'کد حساب کل':'10','عنوان حساب کل':'دارایی های ثابت مشهود','کد حساب معین':String(i+1),'عنوان حساب معین':'دارایی '+(i+1),'بدهکار':String(i+1),'بستانکار':''}));gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  await page.locator('[data-mw-view="asset-analysis"][data-mw-active="10"]').click();const pages=page.locator('#mwPreview .mw-paper'),count=await pages.count();assert(count>=3);assert.equal(await pages.locator('.mw-controls').count(),1);assert.equal(await pages.last().locator('.mw-controls').count(),1);
+  const headers=await pages.locator('thead').allTextContents();for(let i=1;i<=13;i++)assert(headers.some(x=>new RegExp('دارایی '+i+'(?![0-9])').test(x)),`account ${i} has an analysis column`);
+  assert(await pages.evaluateAll(ps=>ps.every(p=>{const c=p.querySelector('.mw-card'),inside=p.querySelector('.mw-inside');return c.scrollHeight<=c.clientHeight+1&&inside.scrollHeight<=inside.clientHeight+1;})));assert(await page.locator('#mwPrint').isEnabled());
+  for(let i=0;i<count;i++)assert.match(await pages.nth(i).locator('.mw-paper-foot').innerText(),/^صفحه [۰-۹]+ از [۰-۹]+$/);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});const printed=page.locator('#printHost .mw-paper');assert.equal(await printed.count(),count);assert.equal(await printed.locator('.mw-controls').count(),1);const pdf=await require('pdf-lib').PDFDocument.load(await page.pdf({format:'A4',landscape:true,printBackground:true}));assert.equal(pdf.getPageCount(),count);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('fixed asset section suggestions are reviewable without changing ledger balances or final statements', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[
+   {'کد حساب کل':'10','عنوان حساب کل':'دارایی‌های ثابت مشهود','کد حساب معین':'1','عنوان حساب معین':'حساب ناشناخته','بدهکار':'500','بستانکار':''},
+   {'کد حساب کل':'10','عنوان حساب کل':'دارایی‌های ثابت مشهود','کد حساب معین':'2','عنوان حساب معین':'استهلاک انباشته ماشین','بدهکار':'','بستانکار':'100'}];gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  await page.locator('[data-mw-view="A-70"]').click();const original=await page.locator('#mwPreview tbody').innerText();await page.locator('[data-mw-view="accounts"][data-mw-active="10"]').click();
+  await page.locator('.mw-asset-review summary').click();let item=page.locator('.mw-asset-review-item').filter({hasText:'حساب ناشناخته'});await item.locator('select').selectOption('other');assert.match(await page.locator('#mwPreview').innerText(),/سایر حساب‌های انتخاب‌شده/);assert.equal(await page.locator('#mwPreview .mw-total').last().getAttribute('data-mw-amount'),'400');assert.match(await page.locator('#mwPreview .mw-total').last().innerText(),/جمع مانده دفتر|جمع حساب کل|جمع کاربرگ/);
+  item=page.locator('.mw-asset-review-item').filter({hasText:'حساب ناشناخته'});await item.locator('select').selectOption('cost');assert.equal(await page.locator('#mwPreview .mw-total').last().getAttribute('data-mw-amount'),'400');assert.match(await page.locator('#mwPreview .mw-total').last().innerText(),/ارزش دفتری/);
+  await page.locator('[data-mw-view="asset-analysis"][data-mw-active="10"]').click();assert.match(await page.locator('#mwPreview thead').first().innerText(),/حساب ناشناخته/);await page.locator('[data-mw-view="A-70"]').click();assert.equal(await page.locator('#mwPreview tbody').innerText(),original);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('fixed asset workpaper places construction and capital items after book value without changing the final total', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);await page.evaluate(()=>{ACCOUNT_ROWS=[
+   ['1','ساختمان','200',''],['2','استهلاک انباشته ساختمان','','50'],['3','دارایی در جریان تکمیل','80',''],['4','پیش پرداخت سرمایه ای','20','']
+  ].map(([code,title,debit,credit])=>({'کد حساب کل':'10','عنوان حساب کل':'دارایی ثابت مشهود','کد حساب معین':code,'عنوان حساب معین':title,'بدهکار':debit,'بستانکار':credit}));gotoModule('mainWorkpaper');});await page.evaluate(()=>document.fonts.ready);
+  const rows=page.locator('#mwPreview tbody tr'),contents=await rows.allTextContents(),book=contents.findIndex(x=>x.includes('ارزش دفتری اقلام بالا')),construction=contents.findIndex(x=>x.includes('دارایی در جریان تکمیل')),advance=contents.findIndex(x=>x.includes('پیش پرداخت سرمایه ای'));assert(book>=0&&book<construction&&construction<advance);
+  assert.equal(await page.locator('#mwPreview .mw-asset-book').getAttribute('data-mw-amount'),'150');assert.equal(await page.locator('#mwPreview .mw-total').last().getAttribute('data-mw-amount'),'250');
+  await page.locator('[data-mw-view="asset-analysis"][data-mw-active="10"]').click();const header=await page.locator('#mwPreview thead').first().innerText();assert.match(header,/دارایی در جریان تکمیل/);assert.match(header,/پیش پرداخت سرمایه ای/);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
