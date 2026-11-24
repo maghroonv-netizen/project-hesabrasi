@@ -449,7 +449,7 @@ test("A-70 current and noncurrent asset headings fit on one real PDF page", { sk
     await page.locator('[data-mw-view="A-70"]').click();
     const pages=page.locator('#mwPreview .mw-paper');
     assert.equal(await pages.count(),1);
-    assert.equal(await pages.locator('tbody tr').count(),19);
+    assert.equal(await pages.locator('tbody tr').count(),21);
     const boxes=await pages.locator('.mw-control-items > div').evaluateAll(els=>els.map(e=>({top:Math.round(e.getBoundingClientRect().top),bottom:e.getBoundingClientRect().bottom,height:e.getBoundingClientRect().height,scroll:e.scrollHeight})));
     assert.equal(new Set(boxes.map(b=>b.top)).size,2);
     assert(boxes.every(b=>b.scroll<=b.height+1));
@@ -750,7 +750,7 @@ test('statement topics follow the reference order and maintain stable destinatio
  try{
   const {page,context,errors}=await setup(browser);
   const expected={
-   'A-70':[['A-70|0|0','A-70|0|1','A-70|0|2','A-70|0|3','A-70|0|4','A-70|0|5','A-70|0|6'],['A-70|1|0','A-70|1|2','A-70|1|1','A-70|1|3','A-70|1|4','A-70|1|5','A-70|1|6']],
+   'A-70':[['A-70|0|0','A-70|0|1','A-70|0|2','A-70|0|3','A-70|0|4','A-70|0|7','A-70|0|8','A-70|0|5','A-70|0|6'],['A-70|1|0','A-70|1|2','A-70|1|1','A-70|1|3','A-70|1|4','A-70|1|5','A-70|1|6']],
    'A-71':[[0,1,2,3,4,5,6,7,8].map(i=>`A-71|0|${i}`),[0,1,2,3].map(i=>`A-71|1|${i}`),[0,1,2,3,4,5,6,7].map(i=>`A-71|2|${i}`)],
    'A-72':[[0,1,2,3,4,5,6,7,8,9].map(i=>`A-72|0|${i}`)],
    'A-73':[['A-73|0|0','A-73|0|1'],['A-73|1|0']]
@@ -801,7 +801,7 @@ test('statement asset and liability groups follow sample order with separate cur
   await page.locator('[data-mw-view="A-70"]').click();
   const groups=await page.locator('#mwPreview tbody').evaluateAll(bodies=>{const groups=[];let current;for(const body of bodies)for(const row of body.rows){if(row.classList.contains('mw-group')){current={group:row.textContent.trim(),items:[]};groups.push(current);}else if(row.querySelector('.mw-editable-topic'))current.items.push({name:row.querySelector('.mw-editable-topic').childNodes[0].textContent.trim(),amount:row.dataset.mwAmount});}return groups;});
   assert.deepEqual(groups.map(g=>g.group),['دارایی‌های غیرجاری','دارایی‌های جاری']);
-  assert.deepEqual(groups[0].items.map(x=>x.name),['دارایی‌های ثابت مشهود','سرمایه‌گذاری در املاک','دارایی‌های نامشهود','سرمایه‌گذاری‌های بلندمدت','دریافتنی‌های تجاری و سایر دریافتنی‌ها','دارایی مالیات انتقالی','سایر دارایی‌ها']);
+  assert.deepEqual(groups[0].items.map(x=>x.name),['دارایی‌های ثابت مشهود','سرمایه‌گذاری در املاک','دارایی‌های نامشهود','سرمایه‌گذاری‌های بلندمدت','دریافتنی‌های تجاری و سایر دریافتنی‌ها','دارایی‌های زیستی مولد','دارایی‌های زیستی غیرمولد','دارایی مالیات انتقالی','سایر دارایی‌ها']);
   assert.deepEqual(groups[1].items.map(x=>x.name),['پیش‌پرداخت‌ها','موجودی مواد و کالا','دارایی‌های حاصل از قرارداد','دریافتنی‌های تجاری و سایر دریافتنی‌ها','سرمایه‌گذاری‌های کوتاه‌مدت','موجودی نقد','دارایی‌های غیرجاری نگهداری‌شده برای فروش']);
   assert.equal(groups[0].items[4].amount,'200');assert.equal(groups[1].items[3].amount,'100');
   await page.locator('[data-mw-view="A-71"]').click();
@@ -1058,6 +1058,36 @@ test('dark and light themes keep preview tools, picker, selected rows and printe
   await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});
   assert((await contrast('#printHost .mw-paper tbody td.mw-description'))>=4.5);assert((await contrast('#printHost .mw-paper th'))>=4.5);
   const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount()>=1);
+  assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('biological producer and non-producer titles map separately, respect conflicts and support manual choice', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const {page,context,errors}=await setup(browser);
+  const cases=[
+   ['حساب خاص','دارایی زیستی مولد','A-70|0|7'],['حساب خاص','دارایی زیستی غیرمولد','A-70|0|8'],
+   ['دارایی ثابت','دارایی های زیستی مولد شرکت','A-70|0|7'],['دارایی های زیستی','غیر مولد','A-70|0|8'],
+   ['دارایی های زیستی','مولد','A-70|0|7'],['حساب خاص','دارایی های زیستی غیر مولد بلندمدت','A-70|0|8'],
+   ['حساب خاص','دارایی های زیستی',''],['حساب خاص','دارایی زیستی مولد و غیرمولد',''],
+   ['دارایی ثابت','دارایی زیستی مولد و غیرمولد',''],['دارایی ثابت','دارایی زیستی مولد جاری',''],
+   ['دارایی های جاری','دارایی زیستی غیرمولد',''],['دارایی زیستی مولد','دارایی زیستی غیرمولد',''],
+   ['حساب ناشناخته','مولد',''],['حساب خاص','هزینه نگهداری دارایی زیستی مولد',''],
+   ['حساب خاص','مورد بدون تطبیق',''],['حساب خاص','دارایی زیستی غیر‌مولد','A-70|0|8'],
+   ['دارایی زیستی مولد','باغات','A-70|0|7'],['دارایی ثابت مشهود','دارایی زیستی مولد','']
+  ];
+  await page.evaluate(cases=>{ACCOUNT_ROWS=cases.map(([p,c],i)=>({'کد حساب کل':String(i+1),'عنوان حساب کل':p,'کد حساب معین':'1','عنوان حساب معین':c,'بدهکار':String(i>=15?0:(i+1)*10),'بستانکار':''}));gotoModule('mainWorkpaper');},cases);
+  await page.locator('#mwMatching summary').click();const values=await page.locator('[data-mw-map-link]').evaluateAll(xs=>Object.fromEntries(xs.map(x=>[x.dataset.mwMapLink,x.value])));
+  cases.forEach(([p,c,want],i)=>assert.equal(values[JSON.stringify([String(i+1),'1'])],want,`${p} / ${c}`));
+  await page.locator('[data-mw-view="A-70"]').click();const row=key=>page.locator(`[data-mw-topic-choose="${key}"]`).locator('xpath=ancestor::tr');
+  assert.equal(await row('A-70|0|7').getAttribute('data-mw-amount'),'90');assert.equal(await row('A-70|0|8').getAttribute('data-mw-amount'),'120');
+  await page.locator('[data-mw-topic-choose="A-70|0|8"]').click();const dialog=page.locator('#mwTopicDialog');await dialog.locator('#mwTopicSearch').fill('مورد بدون تطبیق');await dialog.locator('[data-topic-account]').check();await dialog.locator('[data-topic-save]').click();
+  assert.equal(await row('A-70|0|8').getAttribute('data-mw-amount'),'270');assert.equal(await row('A-70|0|7').getAttribute('data-mw-amount'),'90');
+  assert.equal(await page.locator('#mwPreview tbody tr.mw-total').filter({hasText:'جمع دارایی‌های غیرجاری'}).getAttribute('data-mw-amount'),'360');assert.equal(await page.locator('#mwPreview .mw-paper').count(),1);
+  await page.evaluate(()=>{window.print=()=>{};});await page.locator('#mwPrint').click();await page.emulateMedia({media:'print'});const printed=page.locator('#printHost .mw-paper');assert.match(await printed.innerText(),/دارایی‌های زیستی مولد/);assert.match(await printed.innerText(),/دارایی‌های زیستی غیرمولد/);const pdf=await page.pdf({format:'A4',landscape:true,printBackground:true});assert.equal((await require('pdf-lib').PDFDocument.load(pdf)).getPageCount(),1);await page.emulateMedia({media:'screen'});await page.evaluate(()=>window.__activePrintRestore?.());
+  page.once('dialog',d=>d.accept());await page.locator('[data-mw-topic-remove="A-70|0|8"]').click();assert.equal(await row('A-70|0|8').count(),0);
+  await page.locator('#mwPreview .mw-preview-tools summary').click();await page.locator('[data-mw-topic-restore="A-70|0|8"]').click();assert.equal(await row('A-70|0|8').getAttribute('data-mw-amount'),'');
   assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
