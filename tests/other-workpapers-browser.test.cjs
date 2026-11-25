@@ -16,8 +16,23 @@ const agedHook=`window.__agedFixture=(fixtureRows=null)=>{
  srPreviewRows=()=>fixtureRows||Array.from({length:50},(_,i)=>({groupKey:'k'+i,kolCode:i<25?'100':'200',kolTitle:i<25?'حسابهای دریافتنی':'حسابهای پرداختنی',moeinCode:String(i),moeinTitle:'حساب معین نمونه '+i,tafCode:String(i+10),tafTitle:i%9===0?'طرف حساب نمونه با عنوان چندبخشی و طولانی برای بررسی شکست متن و صفحه‌بندی شماره '+i:'طرف حساب نمونه شماره '+i,priorAmount:null,auditAmount:1000000n,followUp:100n,auditOffset:0n,finalAmount:999900n}));
  const old=document.getElementById('srFinalPreview');if(old)old.id='srFinalPreviewOld';const host=document.createElement('div');host.id='srFinalPreview';host.innerHTML=workpaperHtml();document.body.appendChild(host);paginateWorkpaperPreview(host);window.__agedPrint=()=>printReport();
 };\n`;
+const agedImportHook=`window.__agedRawPriorXlsx=async()=>{
+ Object.assign(SHEET_CFG,{year:'۱۴۰۴'});
+ const headers=['شماره سند','تاریخ','بدهکار','بستانکار','کد حساب کل','عنوان حساب کل','کد حساب معین','عنوان حساب معین','کد حساب تفصیلی','عنوان حساب تفصیلی'];
+ const values=[[1,'1403/01/01',100,0,'1','حساب های دریافتنی','10','حساب های دریافتنی تجاری','500','شرکت الف'],[2,'1403/12/30',0,0,'1','حساب های دریافتنی','10','حساب های دریافتنی تجاری','500','شرکت الف']];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...values]),'اسناد');
+ const file=new File([XLSX.write(wb,{type:'array',bookType:'xlsx'})],'1403.xlsx',{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+ const d=s=>SRE.parseDate(s).day;
+ const common={kol:'1',kolT:'حساب های دریافتنی',moein:'10',moeinT:'حساب های دریافتنی تجاری',taf:'500',tafT:'شرکت الف'};
+ const audit={id:'audit',name:'1404.xlsx',label:'1404',status:'ok',isMain:true,periodRole:'audit',data:[],start:d('1404/01/01'),end:d('1404/12/29'),keyFields:['taf'],hasOpening:true,openingDocs:new Set(['1']),closingDocs:new Set(),canon:[{...common,doc:'1',date:'1404/01/01',debit:100,credit:0},{...common,doc:'2',date:'1404/02/01',debit:0,credit:30}]};
+ SR.files=[audit];SR.auditId='audit';await addFiles([file],'prior');const prior=SR.files.find(f=>f.periodRole==='prior');if(prior.status!=='ok')throw Error(prior.error);
+ prior.start=d('1403/01/01');prior.end=d('1403/12/30');prior.canon=canonRows(prior);prior.keyFields=['taf'];prior.openingDocs=new Set(['1']);prior.closingDocs=new Set();prior.hasOpening=true;
+ buildModel();SR.roles.set('1|10',{role:'PERSON',nature:'D',confirmed:true,selected:true});runAnalysis();
+ SR.view.selectionConfirmed=true;const rows=finalWorkpaperRows();const host=document.createElement('div');host.id='realPriorResult';host.innerHTML=workpaperHtml();document.body.appendChild(host);
+ return {file:prior.name,priorNext:SR.priorResult.next?.fileId,prior:rows[0]?.priorAmount?.toString(),audit:rows[0]?.auditAmount?.toString(),final:rows[0]?.finalAmount?.toString()||null,header:host.textContent};
+};\n`;
 assert(html.includes('function auditTemplateRoot()'));html=html.replace('function auditTemplateRoot()',analysisHook+'function auditTemplateRoot()');
-assert(html.includes('function layerTable(L)'));html=html.replace('function layerTable(L)',agedHook+'function layerTable(L)');
+assert(html.includes('function layerTable(L)'));html=html.replace('function layerTable(L)',agedHook+agedImportHook+'function layerTable(L)');
 async function setup(browser){const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const page=await context.newPage(),errors=[],dialogs=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{dialogs.push(d.message());d.dismiss()});await page.route('https://fixture.test/**',r=>r.fulfill({status:200,contentType:'text/html; charset=utf-8',body:html}));await page.goto('https://fixture.test/');await page.evaluate(()=>document.fonts.load('12px workpaper-lotus'));return{context,page,errors,dialogs};}
 async function headerInfo(page,selector,type){return page.evaluate(({selector,type})=>[...document.querySelectorAll(selector)].map(root=>{const head=root.querySelector(type==='aged'?'.sr-meta-grid':'.head'),ref=head.querySelector(type==='aged'?'.sr-refbox':'.refbox'),main=head.querySelector(type==='aged'?'.sr-head-company':'.hl.right'),prep=head.querySelector(type==='aged'?'.sr-head-prep':'.hl:not(.right)'),lines=main.querySelectorAll('div'),m=head.getBoundingClientRect(),r=ref.getBoundingClientRect(),a=main.getBoundingClientRect(),b=prep.getBoundingClientRect(),st=getComputedStyle(main),ls=getComputedStyle(lines[0]);const rects=[...main.querySelectorAll('div'),...prep.querySelectorAll('div')].flatMap(el=>{const range=document.createRange();range.selectNodeContents(el);const box=el.getBoundingClientRect();return [...range.getClientRects()].map(x=>x.left>=box.left-1&&x.right<=box.right+1&&x.top>=box.top-1&&x.bottom<=box.bottom+1)});return {text:head.textContent,font:ls.fontFamily,weight:+ls.fontWeight,size:parseFloat(ls.fontSize),align:st.textAlign,separator:getComputedStyle(prep).borderRightStyle,radius:getComputedStyle(ref).borderRadius,ordered:r.left>=a.right-1&&a.left>=b.right-1,short:b.top>m.top+1&&b.bottom<m.bottom-1,rects};}),{selector,type});}
 function assertHeaders(infos){assert(infos.length);for(const p of infos){for(const str of ['شرکت نمونه حسابرسی','۱۴۰۴','علی رضایی','محمد حسینی'])assert(p.text.includes(str),str);assert(p.font.includes('workpaper-lotus'));assert(p.weight>=700&&p.size>=12&&p.align==='right');assert(p.separator==='dotted'&&parseFloat(p.radius)>0&&p.ordered&&p.short,'metadata alignment');assert(p.rects.every(Boolean),'header text remains within its block');}}
@@ -42,5 +57,42 @@ test('aged frame and grid survive grouped multipage preview and actual PDF', {sk
 });
 
 test('oversized aged amounts warn and block PDF rather than clipping', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
- const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{const {page,context,errors,dialogs}=await setup(browser);await page.evaluate(()=>window.__agedFixture([{groupKey:'long',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'معین',tafCode:'1',tafTitle:'تفصیلی',priorAmount:null,auditAmount:123456789012345678901234567890n,followUp:null,auditOffset:0n,finalAmount:null}]));assert(await page.locator('#srFinalPreview .sr-aged-page-overflow').count()>0);assert.match(await page.locator('#srFinalPreview .sr-pagination-error').innerText(),/چاپ.*متوقف/);await page.evaluate(()=>{window.__printAttempted=false;window.print=()=>window.__printAttempted=true;window.__agedPrint();});assert.equal(await page.evaluate(()=>window.__printAttempted),false);assert(dialogs.some(x=>/چاپ متوقف/.test(x)));assert.deepEqual(errors,[]);await context.close();}finally{await browser.close();}
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{const {page,context,errors,dialogs}=await setup(browser);await page.evaluate(()=>window.__agedFixture([{groupKey:'long',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'معین',tafCode:'1',tafTitle:'تفصیلی',priorAmount:null,auditAmount:123456789012345678901234567890n,followUp:null,auditOffset:0n,finalAmount:null}]));assert(await page.locator('#srFinalPreview .sr-aged-page-overflow').count()>0);assert.match(await page.locator('#srFinalPreview .sr-pagination-error').innerText(),/چاپ.*متوقف/);await page.evaluate(()=>{window.__printAttempted=false;window.print=()=>window.__printAttempted=true;window.__agedPrint();});assert.equal(await page.evaluate(()=>window.__printAttempted),false);assert(dialogs.some(x=>/چاپ.*متوقف/.test(x)));assert.deepEqual(errors,[]);await context.close();}finally{await browser.close();}
+});
+
+test('oversized aged account title is reduced only as needed in preview and printed PDF', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors,dialogs}=await setup(browser);
+  const title='عنوان حساب شخص برای کنترل کامل چاپ '.repeat(70)+'انتهای عنوان';
+  await page.evaluate(title=>window.__agedFixture([{groupKey:'long-title',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'معین',tafCode:'1',tafTitle:title,priorAmount:12n,auditAmount:1000000000n,followUp:100n,auditOffset:0n,finalAmount:999999900n}]),title);
+  assert.equal(await page.locator('#srFinalPreview .sr-aged-page-overflow').count(),0);
+  const preview=await page.locator('#srFinalPreview .sr-data-row').evaluate(r=>({title:r.querySelector('.sr-account-title').textContent,font:getComputedStyle(r.querySelector('.sr-account-title')).fontSize,money:getComputedStyle(r.querySelector('.num').nextElementSibling).fontSize}));
+  assert.equal(preview.title,title);assert(parseFloat(preview.font)<parseFloat(preview.money));
+  await page.evaluate(()=>{window.print=()=>{};window.__agedPrint();});await page.emulateMedia({media:'print'});
+  const printed=await page.locator('#printHost .sr-data-row .sr-account-title').evaluate(el=>({text:el.textContent,font:getComputedStyle(el).fontSize}));
+  assert.equal(printed.text,title);assert.equal(printed.font,preview.font);
+  const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert.equal(pdf.getPageCount(),1);
+  assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('unavoidably oversized aged title still blocks printing without clipping or shrinking amounts', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors,dialogs}=await setup(browser);const title='نام طولانی طرف حساب '.repeat(500)+'پایان';
+  await page.evaluate(title=>window.__agedFixture([{groupKey:'huge-title',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'معین',tafCode:'1',tafTitle:title,priorAmount:10n,auditAmount:1000n,followUp:100n,auditOffset:0n,finalAmount:900n}]),title);
+  assert.equal(await page.locator('#srFinalPreview .sr-aged-page-overflow').count(),1);
+  assert.match(await page.locator('#srFinalPreview .sr-pagination-error').innerText(),/صفحه ۱.*ارتفاع ردیف/);
+  assert.equal(await page.locator('#srFinalPreview .sr-data-row .sr-account-title').innerText(),title);
+  await page.evaluate(()=>{window.__printAttempted=false;window.print=()=>window.__printAttempted=true;window.__agedPrint();});
+  assert.equal(await page.evaluate(()=>window.__printAttempted),false);assert(dialogs.some(x=>/ارتفاع ردیف/.test(x)));assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+
+test('real 1403 XLSX upload feeds 1404 follow-up and displays comparative amount', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors}=await setup(browser);const result=await page.evaluate(()=>window.__agedRawPriorXlsx());
+  assert.equal(result.file,'1403.xlsx');assert.equal(result.priorNext,'audit');assert.equal(result.prior,'70');assert.equal(result.audit,'70');assert.equal(result.final,null);
+  assert.match(result.header,/۱۴۰۳/);assert.equal(await page.locator('#realPriorResult .sr-data-row').count(),1);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
 });

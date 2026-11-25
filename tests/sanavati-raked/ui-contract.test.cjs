@@ -157,8 +157,8 @@ const finalRowsStart = html.indexOf('function finalWorkpaperRows(');
 const finalRowsEnd = html.indexOf('\nfunction signedText(', finalRowsStart);
 assert(finalRowsStart >= 0 && finalRowsEnd > finalRowsStart);
 const finalRowsCode = html.slice(finalRowsStart, finalRowsEnd);
-assert.match(finalRowsCode, /const visible=rows\.filter\(r=>rangeHasNonZero\(r\.finalRange\)\|\|\(!r\.finalRange&&r\.priorAmount!==null&&r\.priorAmount!==undefined&&r\.priorAmount!==0n\)\)/,
-  'final worksheet shows nonzero final balances and historical-only prior-year items whose current-year result is unavailable');
+assert.match(finalRowsCode, /!r\.finalRange&&\(rangeHasNonZero\(r\.auditAmountRange\)/,
+  'current-year aged items stay visible when next-year follow-up is unavailable');
 assert.match(workpaperMarkup, /amountHead\('سال',yearPlan\?\.prior\)\}\$\{amountHead\('سال',yearPlan\?\.audit\)/,
   'workpaper headings identify the prior and audit fiscal years directly');
 assert.match(workpaperMarkup, /amountHead\('پیگیری سال مالی بعد',yearPlan\?\.next\)\}\$\{amountHead\('تهاتر',yearPlan\?\.audit\)/,
@@ -226,7 +226,7 @@ assert.match(html, /function paginateMeasuredWorkpaperGroups\(/,
   'both workpaper modules share measured row-based pagination with group titles and subtotals');
 assert.match(html, /first\.cells\[0\]\.rowSpan=span/,
   'consecutive identical moein codes and titles are vertically merged');
-assert.match(html, /maxBodyHeight:Math\.max\(0,available-fixedHeight-1\)/,
+assert.match(html, /maxBodyHeight=Math\.max\(0,available-fixedHeight-1\)/,
   'pagination measures available body height after the frame and headers');
 assert.match(html, /max-height:541\.7pt!important/,
   'the outer worksheet frame is capped at 541.7 points');

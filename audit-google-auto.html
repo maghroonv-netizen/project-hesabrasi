@@ -14105,9 +14105,9 @@ function runAnalysis(){
   const next=SR.files.find(f=>f.periodRole==='next'), prior=SR.files.find(f=>f.periodRole==='prior');
   const history=SR.files.find(f=>f.periodRole==='history');
   SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null; SR.priorComparison=null;
-  // بازسازی مستقل Y−1: فایل خام جایگزین کاربرگ است؛ Y−2 فقط در صورت ارائه زنجیره را عقب‌تر می‌برد.
+  // بازسازی مستقل Y−1؛ Y−2 سابقه و Y اسناد پیگیری سال قبل را تأمین می‌کند، نه سال Y+1.
   if(prior){
-    const priorFiles=source.filter(f=>f.id===prior.id||(history&&f.id===history.id));
+    const priorFiles=source.filter(f=>f.id===prior.id||f.id===SR.auditId||(history&&f.id===history.id));
     SR.priorModel=SRE.build({files:priorFiles,auditFileId:prior.id});
     SR.priorResult=SRE.analyze(SR.priorModel,srSettingsFor(SR.priorModel));
   }
@@ -14123,7 +14123,7 @@ function runAnalysis(){
       const hit=[...unused].find(x=>x.groupKey&&x.groupKey===row.groupKey)||[...unused].find(x=>srNormMatch(x.sub)===srNormMatch(row.subPlain)&&srNormMatch(x.detail)===srNormMatch(row.detailPlain));
       if(!hit){stats.unmatchedRaw++;continue;}
       unused.delete(hit);stats.matched++;
-      const rawAmount=singleRangeAmount(signedRange(row.combinedFinal?{min:row.combinedFinal,max:row.combinedFinal}:null,row.combinedSide));
+      const rawAmount=singleRangeAmount(signedRange(row.combinedFinal,row.combinedSide));
       if(rawAmount!==hit.amount)stats.different++;
     }
     stats.unmatchedWorksheet=unused.size; SR.priorComparison={...stats};
@@ -14162,6 +14162,7 @@ function renderReports(){
     <h1>کاربرگ اقلام سنواتی و راکد</h1>
     ${SR.priorComparison?`<div class="card ${SR.priorComparison.different||SR.priorComparison.unmatchedRaw||SR.priorComparison.unmatchedWorksheet?'sr-party-match-warning':''}"><b>مقایسهٔ Y−1: اسناد خام با کاربرگ قبلی</b><p class="hint">تطبیق‌شده: ${fa(SR.priorComparison.matched)}؛ اختلاف مبلغ: ${fa(SR.priorComparison.different)}؛ فقط در بازسازی خام: ${fa(SR.priorComparison.unmatchedRaw)}؛ فقط در کاربرگ: ${fa(SR.priorComparison.unmatchedWorksheet)}. محاسبهٔ سابقه از اسناد خام انجام شده و کاربرگ قبلی جداگانه مقایسه شده است؛ مبالغ دوباره‌شماری نشده‌اند.</p></div>`:''}
     ${!SR.nextResult?`<div class="card sr-party-match-warning"><b>پیگیری Y+1 ارائه نشده است.</b><p class="hint">ستون پیگیری خالی است؛ ماندهٔ نهایی از نظر پیگیری سال بعد تأییدنشده تلقی می‌شود و نبود داده صفر فرض نمی‌شود.</p></div>`:''}
+    ${SR.priorResult?`<div class="card"><p class="hint">ستون ${srYearText(srYearPlan()?.prior)} از اسناد خام سال قبل و گردش سال رسیدگی برای پیگیری بازسازی شده است؛ کامل‌بودن فایل‌ها، افتتاحیه و مدارک تسویه را بررسی کنید. گردش خلاف‌جهت به‌تنهایی اثبات تسویه واقعی نیست.</p></div>`:''}
     ${R.checks.length?`<div class="card"><div class="err"><b>کنترل صحت محاسبات در ${fa(R.checks.length)} مورد ناموفق بود.</b> مبالغ کلیدهای دارای کنترل ناموفق نیازمند بررسی‌اند. ${R.checks.slice(0,5).map(c=>e_((c.key||'')+' — '+c.detail)).join('<br>')}</div></div>`:'<p class="sr-okbar">کنترل جمع لایه‌ها با ماندهٔ دفتر و استقلال محاسبهٔ سال بعد برقرار است.</p>'}
     <div class="sr-tabs">${TABS.map(([id,label])=>`<button type="button" class="${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('')}</div>
     <div class="sr-tools"><input class="sr-search" id="srQ" placeholder="جست‌وجوی کد یا عنوان معین و تفصیلی" value="${e_(SR.view.filter)}">
@@ -14253,8 +14254,33 @@ function paginateWorkpaperPreview(host){
   const carryHeight=rowHeight(carrySample),finalHeight=grandTotal?rowHeight(grandTotal):0;
   const expected=Array.from({length:5},(_,i)=>groups.reduce((sum,g)=>sum+BigInt(g.subtotal?.dataset[`srTotal${i}`]??0),0n)),grandExpected=grandTotal?Array.from({length:5},(_,i)=>BigInt(grandTotal.dataset[`srTotal${i}`]??0)):expected;
   if(expected.some((value,i)=>value!==grandExpected[i])){measureBox.remove();host.innerHTML='<div class="sr-pagination-error" role="alert">کنترل خودکار جمع گروه‌ها با جمع کل کاربرگ مطابقت ندارد؛ خروجی ساخته نشد.</div>';return;}
+  const maxBodyHeight=Math.max(0,available-fixedHeight-1);
+  // فقط عنوان‌های واقعاً بلند، با حداقل اندازهٔ خوانا کوچک می‌شوند؛ مبلغ هرگز کوچک نمی‌شود.
+  // اندازه‌گیری روی همان قاب چاپ و پیش از صفحه‌بندی است و اندازه به نسخهٔ چاپ هم منتقل می‌شود.
+  const fitTextRow=(row,limit)=>{
+    if(!row)return;
+    const clone=row.cloneNode(true);measureBody.appendChild(clone);
+    const textCells=[...clone.querySelectorAll('td.sr-workpaper-account,td.sr-account-title,td.sr-total-label,tr.sr-major-title td')];
+    const tooWide=()=>textCells.some(cell=>cell.scrollWidth>cell.clientWidth+1);
+    if((clone.getBoundingClientRect().height>Math.max(0,limit)+0.5||tooWide())&&textCells.length){
+      for(let size=7.5;size>=6;size-=0.5){
+        textCells.forEach(cell=>cell.style.setProperty('font-size',size+'pt','important'));
+        if(clone.getBoundingClientRect().height<=Math.max(0,limit)+0.5&&!tooWide())break;
+      }
+      textCells.forEach(cell=>{const index=[...clone.cells].indexOf(cell),original=row.cells[index];if(original)original.style.setProperty('font-size',cell.style.getPropertyValue('font-size'),'important');});
+      heightCache.delete(row);
+    }
+    clone.remove();
+  };
+  groups.forEach(g=>{
+    fitTextRow(g.title,maxBodyHeight-carryHeight*2-finalHeight);
+    const titleHeight=rowHeight(g.title);
+    fitTextRow(g.subtotal,maxBodyHeight-titleHeight-carryHeight*2-finalHeight);
+    const reserved=titleHeight+rowHeight(g.subtotal)+carryHeight*2+finalHeight;
+    g.details.forEach(row=>fitTextRow(row,maxBodyHeight-reserved));
+  });
   let plans;
-  try{plans=paginateMeasuredWorkpaperGroups({groups,maxBodyHeight:Math.max(0,available-fixedHeight-1),carryHeight,finalHeight,rowHeight,readValues:row=>Array.from({length:5},(_,i)=>row.dataset[`srAmount${i}`]??0),expectedTotals:expected});}
+  try{plans=paginateMeasuredWorkpaperGroups({groups,maxBodyHeight,carryHeight,finalHeight,rowHeight,readValues:row=>Array.from({length:5},(_,i)=>row.dataset[`srAmount${i}`]??0),expectedTotals:expected});}
   catch(error){measureBox.remove();host.innerHTML=`<div class="sr-pagination-error" role="alert">${e_(error.message||'کنترل جمع‌های انتقالی ناموفق بود؛ خروجی ساخته نشد.')}</div>`;return;}
   const makeCarry=(kind,pageIndex,values)=>{const row=document.createElement('tr');row.className=kind==='out'?'sr-page-carry':'sr-page-transfer';const label=kind==='out'?`جمع تا پایان صفحهٔ ${fa(pageIndex)}`:'انتقال از صفحات قبل';row.innerHTML=`<td colspan="4" class="sr-total-label">${e_(label)}</td>${values.map(v=>{const n=BigInt(v??0),cls=n<0n?'sr-money-negative':n>0n?'sr-money-positive':'sr-money-zero';return `<td class="num ${cls}">${signedBalanceText(n)}</td>`;}).join('')}`;return row;};
   const pagesHost=document.createElement('div');pagesHost.className='sr-aged-preview-pages';source.replaceWith(pagesHost);
@@ -14274,12 +14300,18 @@ function paginateWorkpaperPreview(host){
   measureBox.remove();
   // Measure the finished, merged rows as well as the framing: a long amount
   // must never disappear under a neighbouring cell or the inner frame in PDF.
-  let overflow=false;pagesHost.querySelectorAll('.sr-aged-page').forEach(box=>{
+  let overflow=false;const overflowReasons=[];pagesHost.querySelectorAll('.sr-aged-page').forEach(box=>{
     const content=box.querySelector('.sr-aged-content'),table=box.querySelector('.sr-paper-table'),frame=content?.getBoundingClientRect(),bounds=table?.getBoundingClientRect();
-    const clipped=!!(content&&table&&(content.scrollHeight>content.clientHeight+1||bounds.left<frame.left-1||bounds.right>frame.right+1||[...table.querySelectorAll('td,th')].some(cell=>cell.scrollWidth>cell.clientWidth+1)));
-    if(clipped)box.classList.add('sr-aged-page-overflow');if(box.classList.contains('sr-aged-page-overflow'))overflow=true;
+    const wide=table?[...table.querySelectorAll('td,th')].filter(cell=>cell.scrollWidth>cell.clientWidth+1):[];
+    const clipped=!!(content&&table&&(content.scrollHeight>content.clientHeight+1||bounds.left<frame.left-1||bounds.right>frame.right+1||wide.length));
+    if(clipped)box.classList.add('sr-aged-page-overflow');
+    if(box.classList.contains('sr-aged-page-overflow')){
+      overflow=true;
+      const kinds=[...new Set(wide.map(cell=>cell.classList.contains('num')?'مبلغ':cell.classList.contains('sr-code')?'کد حساب':'عنوان یا سربرگ'))];
+      overflowReasons.push('صفحه '+fa(box.dataset.pageIndex)+': '+(kinds.length?kinds.join('، '):'ارتفاع ردیف یا قاب'));
+    }
   });
-  if(overflow){const warning=document.createElement('div');warning.className='sr-pagination-error';warning.setAttribute('role','alert');warning.textContent='مبلغ یا محتوای یک خانه در کادر صفحه جا نمی‌شود؛ چاپ برای جلوگیری از بریدگی متوقف است.';pagesHost.before(warning);}
+  if(overflow){const warning=document.createElement('div');warning.className='sr-pagination-error';warning.setAttribute('role','alert');warning.textContent='محتوا در کادر صفحه جا نمی‌شود؛ چاپ برای جلوگیری از بریدگی متوقف است. '+overflowReasons.join('؛ ')+'. مبالغ کوچک نشده‌اند؛ حساب یا عنوان بلند را بررسی کنید.';pagesHost.before(warning);}
 }
 
 function bindReport(){
@@ -14462,7 +14494,7 @@ function finalWorkpaperRows(accountFilter=null){
       kolCode:base.kolCode,kolTitle:base.kolTitle,moeinCode:base.moeinCode,moeinTitle:base.moeinTitle,detailCode:base.detailCode,detailTitle:base.detailTitle,
       tafCode:base.tafCode||'',tafTitle:base.tafTitle||'',taf1Code:base.taf1Code||'',taf1Title:base.taf1Title||'',taf2Code:base.taf2Code||'',taf2Title:base.taf2Title||'',accountIds:base.accountIds||[],
       priorAmountRange:p?signedRange(p.combinedFinal,p.combinedSide):null,
-      priorAmount:p?(p.combinedFinal?singleRangeAmount(signedRange(p.combinedFinal,p.combinedSide)):0n):null,
+      priorAmount:p?singleRangeAmount(signedRange(p.combinedFinal,p.combinedSide)):null,
       auditAmountRange:c?signedRange(c.combinedBeforeOffset,c.combinedSide):zero,
       auditAmount:c?singleRangeAmount(signedRange(c.combinedBeforeOffset,c.combinedSide)):0n,
       followUpRange:c?signedRange(c.followUpRemaining,c.combinedSide):null,
@@ -14486,10 +14518,9 @@ function finalWorkpaperRows(accountFilter=null){
     }
   }
   const rangeHasNonZero=range=>!!range&&(range.min!==0n||range.max!==0n);
-  // ماندهٔ نهاییِ غیرصفر نمایش داده می‌شود؛ ردیف تاریخیِ Y−1 که در دادهٔ سال جاری
-  // همتای قابل تطبیق ندارد نیز برای شفافیت نمایش می‌یابد، اما مبلغ نهایی آن خالی می‌ماند.
-  // گردش یا تهاتر میانی به‌تنهایی ردیفی را که ماندهٔ نهایی صفرِ معلوم دارد زنده نمی‌کند.
-  const visible=rows.filter(r=>rangeHasNonZero(r.finalRange)||(!r.finalRange&&r.priorAmount!==null&&r.priorAmount!==undefined&&r.priorAmount!==0n));
+  // وقتی پیگیری موجود نیست، اقلام جاری و تاریخی غیرصفر را با نتیجهٔ نهایی خالی نگه می‌داریم.
+  // نتیجهٔ نهایی صفرِ معلوم همچنان از کاربرگ نهایی حذف می‌شود.
+  const visible=rows.filter(r=>rangeHasNonZero(r.finalRange)||(!r.finalRange&&(rangeHasNonZero(r.auditAmountRange)||(r.priorAmount!==null&&r.priorAmount!==undefined&&r.priorAmount!==0n))));
   visible.sort((a,b)=>a.sortSub.localeCompare(b.sortSub,'fa',{numeric:true})||a.sortDetail.localeCompare(b.sortDetail,'fa',{numeric:true}));
   return visible;
 }
@@ -14672,7 +14703,7 @@ function detailHtml(){
 function helpHtml(){
   const plan=srYearPlan(),prior=plan?srYearText(plan.prior):'سال قبل',audit=plan?srYearText(plan.audit):'سال رسیدگی',next=plan?srYearText(plan.next):'سال آتی';
   return `<h2>روش محاسبهٔ کاربرگ</h2><div class="sr-help">
-    <p><b>ستون ${prior}:</b> در صورت بارگذاری کاربرگ قبلی، مبلغ نهایی سال قبل از آن دریافت می‌شود؛ در غیر این صورت این ستون خالی می‌ماند و صفر فرض نمی‌شود.</p>
+    <p><b>ستون ${prior}:</b> با فایل خام سال قبل، مبلغ قدیمی آن سال با گردش سال رسیدگی برای پیگیری بازسازی می‌شود. اگر فایل خام ارائه نشود، مبلغ از کاربرگ قبلی دریافت می‌شود؛ بدون هیچ‌یک از این مدارک ستون خالی است، نه صفر قطعی. این بازسازی به کامل‌بودن اسناد و بررسی واقعی تسویه‌ها وابسته است.</p>
     <p><b>ستون ${audit}:</b> مبلغ اولیهٔ یک مجموعه واحد از اقلامی را نشان می‌دهد که در پایان ${audit} بر اساس قدمت لایه‌ها مشمول بررسی سنواتی و راکد شده‌اند. این مبلغ پیش از تهاتر و پیگیری سال بعد است و به‌تنهایی نتیجه نهایی محسوب نمی‌شود.</p>
     <p><b>ادغام سنواتی و راکد:</b> سنواتی و راکد دو گروه مستقل برای جمع‌زدن نیستند و می‌توانند یک لایه مشترک داشته باشند. برنامه به‌جای جمع آن‌ها، بازه‌ای را انتخاب می‌کند که اتحاد هر دو طبقه را پوشش دهد؛ یعنی مبنای قدیمی‌تر/گسترده‌تر از دو آستانه. به این ترتیب یک لایه دوبار شمرده نمی‌شود و در خروجی فقط یک مبلغ نمایش داده می‌شود.</p>
     <p><b>پیگیری ${next}:</b> موتور محاسبه، فقط لایه‌های اولیه‌ای را که در ستون ${audit} مشمول بررسی شده‌اند به ${next} منتقل و اثر گردش‌های سال بعد بر همان لایه‌ها را بررسی می‌کند. این ستون ماندهٔ قابل ردیابی همان اقلام است، نه مانده خالص کل حساب و نه شامل اقلام جدید یا لایه‌های غیرمشمول ایجادشده در ${next}. در نبود فایل سال بعد، اطلاعات این ستون و نتیجه نهایی قابل تعیین نیست.</p>
@@ -14680,7 +14711,7 @@ function helpHtml(){
     <p><b>هشدارهای نیازمند بررسی:</b> هشدار انتقال یا شباهت عنوان اشخاص به‌خودی‌خود از ماندهٔ دفتر یا تراز کم نمی‌شود و ثبت اصلاحی ایجاد نمی‌کند. انتقال‌های علامت‌گذاری‌شده تسویهٔ واقعی محسوب نمی‌شوند و ابهام منشأ آن‌ها در بازه‌های محاسباتی منعکس می‌شود. ستون تهاتر جداگانه نشان داده می‌شود و فقط در محاسبهٔ مبلغ سنواتی/راکدِ قابل تهاتر اثر دارد، نه در ماندهٔ دفتری حساب.</p>
     <p><b>ستون «راکد و سنواتی» ${audit}:</b> مبلغ نهایی پس از اعمال تهاتر ${audit} و تطبیق با ماندهٔ لایه‌های قابل پیگیری در ${next} است. این ستون تنها یک مبلغ واحد دارد؛ تفکیک مبلغ به سنواتی و راکد انجام نمی‌شود، زیرا هم‌پوشانی ممکن است موجب دوباره‌شماری شود.</p>
     <p><b>ماندن یا خروج از وضعیت:</b> کاهش یا افزایش مانده کل حساب به‌تنهایی قدمت لایه قدیمی را از بین نمی‌برد. فقط مبلغی که با گردش‌ها و شواهد قابل اتکا به همان لایه تخصیص یابد از آن کسر می‌شود. در نبود تخصیص قابل اتکا، دامنهٔ عدم‌قطعیت در بازه‌های محاسبات و نمای ریز حساب منعکس می‌شود.</p>
-    <p><b>محدودیت بازسازی:</b> چون فایل خام سال بلافاصله پیش از سال رسیدگی درخواست نمی‌شود، کاربرگ ${prior} در صورت ارائه فقط رقم مقایسه‌ای را تأمین می‌کند و جایگزین جزئیات گردش آن سال نیست. در نبود افتتاحیهٔ معتبر یا زنجیرهٔ اسناد کافی، قدمت بخشی از مانده‌ها نامشخص می‌ماند؛ برنامه این ابهام را صفر یا قطعیت فرض نمی‌کند. آستانه رکود نیز سیاست تحلیلی قابل تنظیم است و تعریف ثابت استاندارد حسابرسی نیست.</p>
+    <p><b>محدودیت بازسازی:</b> کاربرگ ${prior} در صورت ارائه فقط رقم مقایسه‌ای را تأمین می‌کند و جایگزین جزئیات گردش آن سال نیست. فایل خام سال قبل و دو سال قبل اختیاری‌اند. در نبود افتتاحیهٔ معتبر یا زنجیرهٔ اسناد کافی، قدمت بخشی از مانده‌ها نامشخص می‌ماند. آستانه رکود نیز سیاست تحلیلی قابل تنظیم است و تعریف ثابت استاندارد حسابرسی نیست.</p>
     <p><b>دامنه:</b> دارایی‌های ثابت، موجودی‌ها و حساب‌های موقتِ قابل تشخیص از عنوان حساب در این نسخه وارد کاربرگ نمی‌شوند. مبالغ با کد و بر پایه ارقام فایل محاسبه می‌شوند و هوش مصنوعی در محاسبات عددی دخالت ندارد.</p>
   </div>`;
 }
@@ -14688,7 +14719,7 @@ function printReport(){
   if(!SR.view.selectionConfirmed){window.alert('ابتدا حساب‌ها را در تراز انتخاب و تأیید کنید.');return;}
   const preview=$('srFinalPreview'),pageNodes=preview?[...preview.querySelectorAll('.sr-aged-preview-pages>.sr-aged-page')]:[];
   if(!pageNodes.length){window.alert('پیش‌نمایش صفحه‌بندی‌شده آماده نیست؛ پس از تأیید حساب‌ها دوباره تلاش کنید.');return;}
-  if(pageNodes.some(page=>page.classList.contains('sr-aged-page-overflow'))){window.alert('مبلغ یا محتوای یک خانه در صفحه جا نشده است؛ برای جلوگیری از بریدن اطلاعات، چاپ متوقف شد. لطفاً ردیف‌ها و مبالغ بسیار بلند را بررسی کنید.');return;}
+  if(pageNodes.some(page=>page.classList.contains('sr-aged-page-overflow'))){const reason=$('srFinalPreview')?.querySelector('.sr-pagination-error')?.textContent;window.alert(reason||'محتوا در صفحه جا نشده است؛ برای جلوگیری از بریدن اطلاعات، چاپ متوقف شد.');return;}
   if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();
   const ph=$('printHost');if(!ph){window.alert('بخش چاپ در صفحه پیدا نشد؛ صفحه را تازه‌سازی و دوباره تلاش کنید.');return;}
   let done=false;const old=document.title,rule=document.createElement('style');rule.dataset.srLandscapePrint='true';
