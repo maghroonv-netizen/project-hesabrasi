@@ -15809,8 +15809,13 @@ function render(){sync();const h=document.getElementById('mainWorkpaperModule');
  });
  if(sheetMenu)sheetMenu.querySelector('[data-mw-sheet-action]').onclick=()=>{
   const item=sheets.find(x=>x.key===sheetMenu.dataset.key);if(!item)return;
+  // Rebuilding the preview may replace several pages and clamp the document's
+  // scroll position. Keep the sheet bar anchored where the user was working.
+  const barTop=h.querySelector('.mw-nav-wrap')?.getBoundingClientRect().top;
   if(isHiddenSheet(item)){MW.hiddenSheets.delete(item.key);if(item.code&&!occupied.has(item.code))(item.view==='accounts'?MW.visibleEmptyPapers:MW.visibleEmptyAnalyses).add(item.code);MW.view=item.view;if(item.code)MW.active=item.code;}
-  else MW.hiddenSheets.add(item.key);closeSheetMenu();render();[...h.querySelectorAll('[data-mw-sheet-more]')].find(button=>button.dataset.mwSheetMore===item.key)?.focus({preventScroll:true});
+  else MW.hiddenSheets.add(item.key);closeSheetMenu();render();
+  const nextBar=h.querySelector('.mw-nav-wrap');if(nextBar&&barTop!=null)window.scrollBy({top:nextBar.getBoundingClientRect().top-barTop,left:0,behavior:'instant'});
+  [...h.querySelectorAll('[data-mw-sheet-more]')].find(button=>button.dataset.mwSheetMore===item.key)?.focus({preventScroll:true});
  };
  const previewReview=h.querySelector('#mwPreview');if(previewReview)previewReview.onchange=event=>{const input=event.target.closest('[data-mw-asset-review]');if(!input)return;if(input.value==='auto')MW.assetBuckets.delete(input.dataset.mwAssetReview);else if(['cost','depreciation','postbook','other'].includes(input.value))MW.assetBuckets.set(input.dataset.mwAssetReview,input.value);MW.assetReviewOpen=true;paginate();};
  const hiddenNav=h.querySelector('.mw-hidden-nav');if(hiddenNav){const left=h.querySelector('[data-mw-hidden-scroll="left"]'),right=h.querySelector('[data-mw-hidden-scroll="right"]');hiddenNav.scrollLeft=MW.hiddenNavScroll;hiddenNav.onscroll=()=>{MW.hiddenNavScroll=hiddenNav.scrollLeft;updateWorkpaperNavArrows();};left.onclick=()=>hiddenNav.scrollBy({left:-Math.max(120,hiddenNav.clientWidth*.75),behavior:'smooth'});right.onclick=()=>hiddenNav.scrollBy({left:Math.max(120,hiddenNav.clientWidth*.75),behavior:'smooth'});}
