@@ -15728,7 +15728,7 @@ function workpaperColumnWidths(data){
  ctx.font='400 9.4pt workpaper-lotus';let label=0;rows.forEach(r=>{const cell=r.querySelector('.mw-description');if(!cell)return;cell.querySelector('.mw-row-actions')?.remove();label=Math.max(label,ctx.measureText(cell.textContent.trim()).width);});
  ctx.font='700 10pt workpaper-lotus';label=Math.max(label,ctx.measureText(data.summary?'شرح':'عنوان معین').width);const description=Math.min(data.summary?14:17,Math.max(8,(label+9)*100/paperWidth));
  let code=0;if(!data.summary){ctx.font='700 9.6pt workpaper-lotus';let widest=ctx.measureText('کد معین').width;rows.forEach(r=>{widest=Math.max(widest,ctx.measureText(r.querySelector('.mw-code')?.textContent.trim()||'').width);});code=Math.min(9,Math.max(4,(widest+9)*100/paperWidth));}
- const reference=data.summary?5:3,amount=(100-code-description-reference)/11;return {description,code,reference,amount};
+ const reference=data.summary?6:5,amount=(100-code-description-reference)/11;return {description,code,reference,amount};
 }
 function widthKey(){return sheetKey(MW.view,MW.view==='accounts'||MW.view==='asset-analysis'?MW.active:'');}
 function installColumnResizing(host){
