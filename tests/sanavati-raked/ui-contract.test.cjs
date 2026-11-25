@@ -238,8 +238,10 @@ assert.match(html, /td\.sr-account-title\{text-align:right!important;font-size:8
   'aged-workpaper account text is slightly larger for readability');
 assert.match(html, /font-size:8pt!important;padding:1\.6pt 2pt!important;line-height:1\.2!important/,
   'printed aged-workpaper rows use the same slightly roomier typography');
-assert.match(html, /width:768\.1pt!important/,
-  'the printable table spans exactly 768.1 points');
+assert.match(html, /const totalWidth=widths\.reduce\([\s\S]*100\*w\/totalWidth/,
+  'the printable table scales the nine established column proportions to the inner frame');
+assert.match(html, /sr-aged-content[\s\S]*border:1\.5px solid #9e0000/,
+  'the workpaper restores the red inner frame');
 assert.match(html, /#fbe3a0!important/,
   'kol and grand total rows use the specified amber fill');
 assert.match(html, /sr-page-carry[\s\S]*sr-page-transfer/ ,
