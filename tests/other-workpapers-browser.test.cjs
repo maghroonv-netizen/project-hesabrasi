@@ -16,6 +16,14 @@ const agedHook=`window.__agedFixture=(fixtureRows=null)=>{
  srPreviewRows=()=>fixtureRows||Array.from({length:50},(_,i)=>({groupKey:'k'+i,kolCode:i<25?'100':'200',kolTitle:i<25?'حسابهای دریافتنی':'حسابهای پرداختنی',moeinCode:String(i),moeinTitle:'حساب معین نمونه '+i,tafCode:String(i+10),tafTitle:i%9===0?'طرف حساب نمونه با عنوان چندبخشی و طولانی برای بررسی شکست متن و صفحه‌بندی شماره '+i:'طرف حساب نمونه شماره '+i,priorAmount:null,auditAmount:1000000n,followUp:100n,auditOffset:0n,finalAmount:999900n}));
  const old=document.getElementById('srFinalPreview');if(old)old.id='srFinalPreviewOld';const host=document.createElement('div');host.id='srFinalPreview';host.innerHTML=workpaperHtml();document.body.appendChild(host);paginateWorkpaperPreview(host);window.__agedPrint=()=>printReport();
 };\n`;
+const agedHiddenStepHook=`window.__agedHiddenStep=()=>{
+ document.getElementById('projectMeta').hidden=true;document.body.classList.remove('meta-stage-active');
+ Object.assign(SHEET_CFG,{company:'شرکت نمونه حسابرسی',year:'۱۴۰۴',date:'۱۴۰۴/۱۲/۲۹',prep:'تهیه کننده',rev:'بررسی کننده'});
+ FULL_ROWS=[];ACCOUNT_ROWS=[{'کد حساب کل':'1','عنوان حساب کل':'دریافتنی','کد حساب معین':'10','عنوان حساب معین':'حساب','بدهکار':'100','بستانکار':'0'}];
+ SR.files=[];SR.model={};SR.result={checks:[],exceptions:[],audit:{id:'audit',label:'۱۴۰۴'},settings:{thresholds:[12]}};SR.priorResult=null;SR.priorWorkpaper=null;SR.nextResult=null;SR.view.tab='work';SR.view.selectionConfirmed=true;SR.view.accountSelection=null;
+ srPreviewRows=()=>Array.from({length:5},(_,i)=>({groupKey:'h'+i,kolCode:'1',kolTitle:'دریافتنی',moeinCode:'10',moeinTitle:'حساب',tafCode:String(i),tafTitle:'طرف حساب '+i,priorAmount:null,auditAmount:1000n,followUp:null,auditOffset:0n,finalAmount:null}));
+ CUR_MODULE='sr';CUR_STEP='s5';paint();gotoStep('s6');
+};\n`;
 const agedImportHook=`window.__agedRawPriorXlsx=async()=>{
  Object.assign(SHEET_CFG,{year:'۱۴۰۴'});
  const headers=['شماره سند','تاریخ','بدهکار','بستانکار','کد حساب کل','عنوان حساب کل','کد حساب معین','عنوان حساب معین','کد حساب تفصیلی','عنوان حساب تفصیلی'];
@@ -32,7 +40,7 @@ const agedImportHook=`window.__agedRawPriorXlsx=async()=>{
  return {file:prior.name,priorNext:SR.priorResult.next?.fileId,prior:rows[0]?.priorAmount?.toString(),audit:rows[0]?.auditAmount?.toString(),final:rows[0]?.finalAmount?.toString()||null,header:host.textContent};
 };\n`;
 assert(html.includes('function auditTemplateRoot()'));html=html.replace('function auditTemplateRoot()',analysisHook+'function auditTemplateRoot()');
-assert(html.includes('function layerTable(L)'));html=html.replace('function layerTable(L)',agedHook+agedImportHook+'function layerTable(L)');
+assert(html.includes('function layerTable(L)'));html=html.replace('function layerTable(L)',agedHook+agedImportHook+agedHiddenStepHook+'function layerTable(L)');
 async function setup(browser){const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const page=await context.newPage(),errors=[],dialogs=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{dialogs.push(d.message());d.dismiss()});await page.route('https://fixture.test/**',r=>r.fulfill({status:200,contentType:'text/html; charset=utf-8',body:html}));await page.goto('https://fixture.test/');await page.evaluate(()=>document.fonts.load('12px workpaper-lotus'));return{context,page,errors,dialogs};}
 async function headerInfo(page,selector,type){return page.evaluate(({selector,type})=>[...document.querySelectorAll(selector)].map(root=>{const head=root.querySelector(type==='aged'?'.sr-meta-grid':'.head'),ref=head.querySelector(type==='aged'?'.sr-refbox':'.refbox'),main=head.querySelector(type==='aged'?'.sr-head-company':'.hl.right'),prep=head.querySelector(type==='aged'?'.sr-head-prep':'.hl:not(.right)'),lines=main.querySelectorAll('div'),m=head.getBoundingClientRect(),r=ref.getBoundingClientRect(),a=main.getBoundingClientRect(),b=prep.getBoundingClientRect(),st=getComputedStyle(main),ls=getComputedStyle(lines[0]);const rects=[...main.querySelectorAll('div'),...prep.querySelectorAll('div')].flatMap(el=>{const range=document.createRange();range.selectNodeContents(el);const box=el.getBoundingClientRect();return [...range.getClientRects()].map(x=>x.left>=box.left-1&&x.right<=box.right+1&&x.top>=box.top-1&&x.bottom<=box.bottom+1)});return {text:head.textContent,font:ls.fontFamily,weight:+ls.fontWeight,size:parseFloat(ls.fontSize),align:st.textAlign,separator:getComputedStyle(prep).borderRightStyle,radius:getComputedStyle(ref).borderRadius,ordered:r.left>=a.right-1&&a.left>=b.right-1,short:b.top>m.top+1&&b.bottom<m.bottom-1,rects};}),{selector,type});}
 function assertHeaders(infos){assert(infos.length);for(const p of infos){for(const str of ['شرکت نمونه حسابرسی','۱۴۰۴','علی رضایی','محمد حسینی'])assert(p.text.includes(str),str);assert(p.font.includes('workpaper-lotus'));assert(p.weight>=700&&p.size>=12&&p.align==='right');assert(p.separator==='dotted'&&parseFloat(p.radius)>0&&p.ordered&&p.short,'metadata alignment');assert(p.rects.every(Boolean),'header text remains within its block');}}
@@ -56,8 +64,8 @@ test('aged frame and grid survive grouped multipage preview and actual PDF', {sk
  }finally{await browser.close();}
 });
 
-test('oversized aged amounts warn and block PDF rather than clipping', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
- const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{const {page,context,errors,dialogs}=await setup(browser);await page.evaluate(()=>window.__agedFixture([{groupKey:'long',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'معین',tafCode:'1',tafTitle:'تفصیلی',priorAmount:null,auditAmount:123456789012345678901234567890n,followUp:null,auditOffset:0n,finalAmount:null}]));assert(await page.locator('#srFinalPreview .sr-aged-page-overflow').count()>0);assert.match(await page.locator('#srFinalPreview .sr-pagination-error').innerText(),/چاپ.*متوقف/);await page.evaluate(()=>{window.__printAttempted=false;window.print=()=>window.__printAttempted=true;window.__agedPrint();});assert.equal(await page.evaluate(()=>window.__printAttempted),false);assert(dialogs.some(x=>/چاپ.*متوقف/.test(x)));assert.deepEqual(errors,[]);await context.close();}finally{await browser.close();}
+test('oversized aged amounts remain marked but no longer block test printing', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{const {page,context,errors,dialogs}=await setup(browser);await page.evaluate(()=>window.__agedFixture([{groupKey:'long',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'معین',tafCode:'1',tafTitle:'تفصیلی',priorAmount:null,auditAmount:123456789012345678901234567890n,followUp:null,auditOffset:0n,finalAmount:null}]));assert(await page.locator('#srFinalPreview .sr-aged-page-overflow').count()>0);assert.equal(await page.locator('#srFinalPreview .sr-pagination-error').count(),0);await page.evaluate(()=>{window.__printAttempted=false;window.print=()=>window.__printAttempted=true;window.__agedPrint();});assert.equal(await page.evaluate(()=>window.__printAttempted),true);await page.emulateMedia({media:'print'});assert.equal(await page.locator('#printHost .sr-data-row').count(),1);const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert.ok(pdf.getPageCount()>=1);assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);await context.close();}finally{await browser.close();}
 });
 
 test('oversized aged account title is reduced only as needed in preview and printed PDF', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
@@ -76,15 +84,15 @@ test('oversized aged account title is reduced only as needed in preview and prin
  }finally{await browser.close();}
 });
 
-test('unavoidably oversized aged title still blocks printing without clipping or shrinking amounts', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+test('unavoidably oversized aged title remains marked while test printing is allowed', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
  const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
   const {page,context,errors,dialogs}=await setup(browser);const title='نام طولانی طرف حساب '.repeat(500)+'پایان';
   await page.evaluate(title=>window.__agedFixture([{groupKey:'huge-title',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'معین',tafCode:'1',tafTitle:title,priorAmount:10n,auditAmount:1000n,followUp:100n,auditOffset:0n,finalAmount:900n}]),title);
   assert.equal(await page.locator('#srFinalPreview .sr-aged-page-overflow').count(),1);
-  assert.match(await page.locator('#srFinalPreview .sr-pagination-error').innerText(),/صفحه ۱.*ارتفاع ردیف/);
+  assert.equal(await page.locator('#srFinalPreview .sr-pagination-error').count(),0);
   assert.equal(await page.locator('#srFinalPreview .sr-data-row .sr-account-title').innerText(),title);
   await page.evaluate(()=>{window.__printAttempted=false;window.print=()=>window.__printAttempted=true;window.__agedPrint();});
-  assert.equal(await page.evaluate(()=>window.__printAttempted),false);assert(dialogs.some(x=>/ارتفاع ردیف/.test(x)));assert.deepEqual(errors,[]);await context.close();
+  assert.equal(await page.evaluate(()=>window.__printAttempted),true);assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 });
 
@@ -94,5 +102,58 @@ test('real 1403 XLSX upload feeds 1404 follow-up and displays comparative amount
   const {page,context,errors}=await setup(browser);const result=await page.evaluate(()=>window.__agedRawPriorXlsx());
   assert.equal(result.file,'1403.xlsx');assert.equal(result.priorNext,'audit');assert.equal(result.prior,'70');assert.equal(result.audit,'70');assert.equal(result.final,null);
   assert.match(result.header,/۱۴۰۳/);assert.equal(await page.locator('#realPriorResult .sr-data-row').count(),1);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+
+test('aged workpaper returning from another step waits until the stage is visible before pagination', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{const {page,context,errors,dialogs}=await setup(browser);await page.evaluate(()=>window.__agedHiddenStep());
+ await page.waitForSelector('#srFinalPreview .sr-aged-page');assert.equal(await page.locator('#srFinalPreview .sr-aged-page').count(),1);assert.equal(await page.locator('#srFinalPreview .sr-aged-page-overflow').count(),0);assert.equal(await page.locator('#srFinalPreview .sr-data-row').count(),5);
+ await page.evaluate(()=>{window.print=()=>{};});await page.locator('#srPrint').click();await page.emulateMedia({media:'print'});assert.equal(await page.locator('#printHost .sr-data-row').count(),5);const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert.equal(pdf.getPageCount(),1);assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+
+test('aged pagination measures consistently under inherited page zoom and marks real overflow', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{const {page,context,errors,dialogs}=await setup(browser);
+ let baseline;
+ for(const zoom of [1,0.8,1.25]){
+  await page.evaluate(z=>{document.body.style.zoom=z;window.__agedFixture();},zoom);
+  const result=await page.evaluate(()=>[...document.querySelectorAll('#srFinalPreview .sr-aged-page')].map(b=>({rows:b.querySelectorAll('.sr-data-row').length,overflow:b.classList.contains('sr-aged-page-overflow')})));
+  assert.ok(result.length>1);assert.ok(result.every(p=>!p.overflow),`zoom ${zoom}: ${JSON.stringify(result)}`);
+  if(!baseline)baseline=result.map(p=>p.rows);else assert.deepEqual(result.map(p=>p.rows),baseline);
+ }
+ await page.evaluate(()=>{document.body.style.zoom='1';window.print=()=>{};window.__agedPrint();});await page.emulateMedia({media:'print'});assert.equal(await page.locator('#printHost .sr-data-row').count(),50);const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert.equal(pdf.getPageCount(),baseline.length);
+ await page.emulateMedia({media:'screen'});await page.evaluate(()=>{document.body.style.zoom='0.8';window.__agedFixture([{groupKey:'1',kolCode:'1',kolTitle:'حساب',moeinCode:'1',moeinTitle:'حساب',tafCode:'1',tafTitle:'طرف حساب',priorAmount:null,auditAmount:111111111111111111111111111111111111111111111n,followUp:null,auditOffset:0n,finalAmount:null}]);window.__agedPrint();});
+ assert.ok(await page.locator('#srFinalPreview .sr-aged-page-overflow').count()>0);assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+
+test('aged row height and space before page numbers match in preview and PDF print', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors,dialogs}=await setup(browser);await page.evaluate(()=>window.__agedFixture());
+  const inspect=selector=>page.evaluate(selector=>[...document.querySelectorAll(selector)].map(sheet=>{
+   const table=sheet.querySelector('.sr-paper-table').getBoundingClientRect(),footer=sheet.querySelector('.sr-aged-page-number'),range=document.createRange();range.selectNodeContents(footer);const text=range.getBoundingClientRect(),frame=sheet.querySelector('.sr-aged-content').getBoundingClientRect();
+   return {gap:text.top-table.bottom,footerBottom:footer.getBoundingClientRect().bottom,frameBottom:frame.bottom,heights:[...sheet.querySelectorAll('.sr-data-row')].map(r=>r.getBoundingClientRect().height),amounts:[...sheet.querySelectorAll('.sr-data-row')].map(r=>r.dataset.srAmount1)};
+  }),selector);
+  const preview=await inspect('#srFinalPreview .sr-aged-page-sheet');assert.ok(preview.length>1);for(const p of preview){assert.ok(p.gap>=7,JSON.stringify(p));assert.ok(p.footerBottom<=p.frameBottom+1);assert.ok(p.heights.every(h=>h>=24.5),JSON.stringify(p));}
+  await page.evaluate(()=>{window.print=()=>{};window.__agedPrint();});await page.emulateMedia({media:'print'});const printed=await inspect('#printHost .sr-aged-page-sheet');assert.deepEqual(printed.map(p=>p.amounts),preview.map(p=>p.amounts));for(let i=0;i<printed.length;i++){assert.ok(printed[i].gap>=7,JSON.stringify(printed[i]));assert.ok(printed[i].footerBottom<=printed[i].frameBottom+1);for(let j=0;j<printed[i].heights.length;j++)assert.ok(Math.abs(printed[i].heights[j]-preview[i].heights[j])<1);}
+  const pdf=await PDFDocument.load(await page.pdf({printBackground:true,preferCSSPageSize:true}));assert.equal(pdf.getPageCount(),preview.length);assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);await context.close();
+ }finally{await browser.close();}
+});
+
+test('aged alternating data, merged accounts and special rows retain preview colors in printed PDF', {skip:!executablePath&&'Set CHROMIUM_PATH'},async()=>{
+ const browser=await chromium.launch({executablePath,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+  const {page,context,errors,dialogs}=await setup(browser);await page.evaluate(()=>{
+   const rows=Array.from({length:70},(_,i)=>({groupKey:'key'+i,kolCode:String(Math.floor(i/14)),kolTitle:'گروه '+Math.floor(i/14),moeinCode:String(Math.floor(i/4)),moeinTitle:'معین '+Math.floor(i/4),tafCode:String(i),tafTitle:'طرف حساب '+i,priorAmount:null,auditAmount:1234567n,followUp:100n,auditOffset:0n,finalAmount:1234467n}));window.__agedFixture(rows);
+  });
+  const colors=selector=>page.evaluate(selector=>[...document.querySelectorAll(selector+' .sr-paper-table tbody tr')].map(row=>({kind:row.className,cells:[...row.cells].map(cell=>({span:cell.rowSpan,color:getComputedStyle(cell).backgroundColor}))})),selector);
+  const preview=await colors('#srFinalPreview');assert.ok(preview.some(r=>r.cells.some(c=>c.span>1)));const data=preview.filter(r=>r.kind.includes('sr-data-row'));assert.equal(data.length,70);
+  data.forEach((r,i)=>{assert.equal(r.cells.find(c=>c.span===1).color,i%2?'rgb(255, 252, 242)':'rgb(255, 255, 255)');});
+  await page.evaluate(()=>{window.print=()=>{};window.__agedPrint();});await page.emulateMedia({media:'print'});const printed=await colors('#printHost');assert.deepEqual(printed,preview,'each cell keeps exactly the same background including merged, subtotal and carry rows');
+  const {PDFArray,decodePDFRawStream}=require('pdf-lib'),doc=await PDFDocument.load(await page.pdf({printBackground:false,preferCSSPageSize:true}));assert.ok(doc.getPageCount()>1);
+  let streams='';for(const p of doc.getPages()){const content=p.node.Contents(),parts=content instanceof PDFArray?content.asArray().map(x=>doc.context.lookup(x)):[doc.context.lookup(content)];streams+=parts.map(x=>Buffer.from(decodePDFRawStream(x).decode()).toString('latin1')).join('\n');}
+  assert.match(streams,/1 \.9882 \.949(?:0)? rg/,'stripe color is present in actual PDF even without background setting');assert.doesNotMatch(streams,/\.9686 \.9686 \.9686 rg/,'generic grey table striping is absent');assert.deepEqual(errors,[]);assert.deepEqual(dialogs,[]);await context.close();
  }finally{await browser.close();}
 });
