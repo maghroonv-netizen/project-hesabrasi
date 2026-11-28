@@ -2928,15 +2928,33 @@ let TYPE_OVERRIDES = new Map();
 // Closing decisions are per uploaded ledger; suggestions are never applied without review.
 let CLOSING_REVIEW={source:null,decisions:new Map(),suggestions:new Map()};
 function closingDocKey(v){return SRE.normCode(v);}
-function ensureClosingReview(rows){if(CLOSING_REVIEW.source===rows)return;const suggestions=new Map(),flags=new Map();for(const r of rows){const doc=closingDocKey(r['شماره سند']);if(!doc)continue;const text=norm(String(r['شرح سند']||'')+' '+String(r['شرح ردیف']||'')),old=flags.get(doc)||{temp:false,permanent:false};old.temp||=/بستن\s*(?:حساب\s*)?(?:های\s*)?(?:موقت|درآمد|هزینه|عملکرد|سود\s*(?:و|\/)\s*زیان)|اختتام\s*(?:حساب\s*)?(?:های\s*)?موقت|انتقال\s*(?:حساب\s*)?(?:های\s*)?(?:درآمد|هزینه)\s*به\s*(?:خلاصه\s*)?(?:سود\s*و\s*زیان|عملکرد)/.test(text);old.permanent||=/اختتامیه|اختتام\s*(?:حساب\s*)?(?:های\s*)?دائم|بستن\s*(?:حساب\s*)?(?:های\s*)?دائم/.test(text);if(old.temp||old.permanent)flags.set(doc,old);}
- for(const [doc,{temp,permanent}] of flags)suggestions.set(doc,temp&&permanent?'موقت یا دائم؛ بررسی کنید':temp?'احتمال بستن موقت':'احتمال بستن دائم');
- CLOSING_REVIEW={source:rows,decisions:new Map(),suggestions};}
+// Closing detection is evidence for a human review, not an accounting decision.
+function closingDescription(value){return SRE.normText(String(value??'').normalize('NFKC')).replace(/[\u064b-\u065f\u0670\u0640\u200d\u200e\u200f]/g,'').replace(/[ئىي]/g,'ی').replace(/ؤ/g,'و').replace(/[،,؛;:()（）._\-–—/\\]+/g,' ').replace(/\s+/g,' ').trim();}
+function closingClues(value){
+ const text=closingDescription(value),verb=/(?:^|\s)(?:بستن|بست|بسته|بندش|اختتام|اختتامیه|مختومه|صفر\s*(?:کردن|نمودن))(?=\s|$)/.test(text),transfer=/(?:^|\s)(?:انتقال|نقل|بستن|بست|بسته)(?=\s|$)/.test(text);
+ const temp=/موقت|عملکرد|درامد|هزینه|فروش|بهای تمام شده|سود\s*(?:و\s*)?زیان|سود\s*زیانی|سود خالص|زیان خالص/.test(text),permanent=/دائم|دايم|دایم|دایمی|دائمی|ترازنامه ای|ترازنامه|دارایی\s*ها|بدهی\s*ها|حقوق مالکانه/.test(text),accounts=/حساب|دفاتر|دفتر|ترازنامه/.test(text);
+ const bankOnly=/حساب\s*(?:بانک|بانکی)|افتتاح\s*حساب/.test(text)&&!/دفاتر|دفتر کل|حساب\s*(?:های|ها)\s*(?:دائم|موقت)|ترازنامه/.test(text);
+ const explicitTemporary=!bankOnly&&((verb&&temp)||(/(?:^|\s)(?:تسویه|تصفیه)(?=\s|$)/.test(text)&&/حساب\s*(?:های|ها)?\s*موقت/.test(text))),transferred=transfer&&((/درامد|هزینه/.test(text)&&/سود\s*(?:و\s*)?زیان|عملکرد/.test(text))||(/سود\s*(?:و\s*)?زیان|سود خالص|زیان خالص|عملکرد/.test(text)&&/انباشته/.test(text)));
+ // اختتامیهٔ حساب موقت به خودی خود اختتامیهٔ دائم نیست.
+ const temporaryEkhtetam=/اختتام(?:یه)?\s*(?:سند\s*)?(?:حساب\s*(?:های|ها)?\s*)?موقت/.test(text);
+ const explicitPermanent=!bankOnly&&((verb&&permanent)||(verb&&/دفاتر|دفتر\s*کل|دفتر\s*قانونی/.test(text))||(/اختتامیه/.test(text)&&!temporaryEkhtetam));
+ const generic=verb&&(accounts||(/سال مالی|پایان سال|پایان دوره/.test(text)&&!/قرارداد|پروژه|پرونده|تسهیلات/.test(text)))&&!temp&&!permanent&&!bankOnly&&!explicitPermanent;
+ return {temp:explicitTemporary||transferred,permanent:explicitPermanent,generic};
+}
+function ensureClosingReview(rows){
+ if(CLOSING_REVIEW.source===rows)return;
+ const docs=new Map();rows.forEach((r,index)=>{const doc=closingDocKey(r['شماره سند']);if(!doc)return;let item=docs.get(doc);if(!item){item={temp:false,permanent:false,generic:false,lastIndex:index};docs.set(doc,item);}item.lastIndex=index;for(const text of [r['شرح سند'],r['شرح ردیف']]){const clue=closingClues(text);item.temp||=clue.temp;item.permanent||=clue.permanent;item.generic||=clue.generic;}});
+ // Position is only a weak review cue: a late ordinary voucher must never be classified automatically.
+ const keys=[...docs.keys()].sort((a,b)=>docs.get(a).lastIndex-docs.get(b).lastIndex),lateCount=Math.min(10,Math.max(3,Math.ceil(keys.length*.2))),late=new Set(keys.slice(Math.max(1,keys.length-lateCount))),suggestions=new Map(),reasons=new Map();
+ for(const doc of [...keys].reverse()){const x=docs.get(doc),ambiguous=x.generic&&late.has(doc)&&!x.temp&&!x.permanent,temp=x.temp||ambiguous,permanent=x.permanent||ambiguous;if(temp||permanent){suggestions.set(doc,temp&&permanent?'موقت یا دائم؛ بررسی کنید':temp?'احتمال بستن موقت':'احتمال بستن دائم');reasons.set(doc,late.has(doc)?'عبارت مرتبط در شرح؛ نزدیک انتهای فایل':'عبارت مرتبط در شرح');}}
+ CLOSING_REVIEW={source:rows,decisions:new Map(),suggestions,reasons};
+}
 function selectedClosingDocs(kind){const set=new Set();for(const [doc,decision] of CLOSING_REVIEW.decisions)if(decision===kind)set.add(doc);return set;}
 function closingReviewError(){ensureClosingReview(FULL_ROWS);for(const doc of CLOSING_REVIEW.suggestions.keys())if(!CLOSING_REVIEW.decisions.has(doc))return 'برای هر سند پیشنهادی، نوع «بستن موقت»، «بستن دائم» یا «سند عادی» را مشخص کنید.';for(const [doc,kind] of CLOSING_REVIEW.decisions)if(kind==='temporary'||kind==='permanent'){const rows=FULL_ROWS.filter(r=>closingDocKey(r['شماره سند'])===doc);if(rows.some(r=>r['نوع سند']==='ابتدای سال'))return 'سند '+doc+' هم افتتاحیه و هم اختتامیه انتخاب شده است؛ نوع آن را اصلاح کنید.';let debit=0n,credit=0n;for(const r of rows){const d=SRE.parseAmount(r['بدهکار']),c=SRE.parseAmount(r['بستانکار']);if(!d.ok||!c.ok)return 'مبلغ سند بستن '+doc+' نامعتبر است؛ فایل را اصلاح کنید.';debit+=d.value;credit+=c.value;}if(debit!==credit)return 'سند بستن '+doc+' به‌تنهایی متوازن نیست؛ تمام ردیف‌های سند را در فایل بررسی کنید.';}return '';}
 function renderClosingReview(area){
  ensureClosingReview(FULL_ROWS);CLOSING_REVIEW.rejected ||= new Map();
  const box=document.createElement('section');box.className='closing-review';
- box.innerHTML='<h2>تعیین اسناد بستن حساب‌ها</h2><div class="closing-boxes"></div><p id="closingReviewStatus" role="alert" class="err"></p>';
+ box.innerHTML='<h2>تعیین اسناد بستن حساب‌ها</h2><p class="hint">سند بستن موقت، حساب‌های درآمد و هزینه را می‌بندد؛ سند بستن دائم، حساب‌های ترازنامه را برای اختتام دفاتر می‌بندد. پیشنهادها را بررسی و تأیید یا رد کنید؛ شماره سند جاافتاده را در باکس مربوط وارد کنید.</p><div class="closing-boxes"></div><p id="closingReviewStatus" role="alert" class="err"></p>';
  const groups=box.querySelector('.closing-boxes'),grouped=new Map();
  for(const r of FULL_ROWS){const doc=closingDocKey(r['شماره سند']);if(doc){if(!grouped.has(doc))grouped.set(doc,[]);grouped.get(doc).push(r);}}
  const redraw=()=>renderTypeControlCard(computeDocTypesAndOpeningTest(FULL_ROWS));
@@ -2951,7 +2969,7 @@ function renderClosingReview(area){
   const chosen=[...CLOSING_REVIEW.decisions].filter(([,value])=>value===kind);
   if(chosen.length){const selected=document.createElement('div');selected.className='restore-row';const label=document.createElement('b');label.textContent='اسناد انتخاب‌شده:';selected.appendChild(label);for(const [doc] of chosen){const chip=document.createElement('span');chip.className='restore-chip';chip.append('سند '+doc);const remove=document.createElement('button');remove.type='button';remove.className='restore-btn';remove.dataset.closingRemove=doc;remove.textContent='حذف';remove.onclick=()=>{CLOSING_REVIEW.decisions.set(doc,'ordinary');redraw();};chip.appendChild(remove);selected.appendChild(chip);}panel.appendChild(selected);}
   const candidates=[...CLOSING_REVIEW.suggestions].filter(([doc,suggestion])=>!CLOSING_REVIEW.decisions.has(doc)&&!CLOSING_REVIEW.rejected.get(doc)?.has(kind)&&(suggestion.includes(kind==='temporary'?'موقت':'دائم')));
-  if(candidates.length){const list=document.createElement('div');list.className='restore-row';const label=document.createElement('b');label.textContent='اسناد پیشنهادی:';list.appendChild(label);for(const [doc,suggestion] of candidates){const item=document.createElement('div');item.className='candidate-row';const text=document.createElement('span');text.style.flex='1';const rows=grouped.get(doc)||[],descriptions=[...new Set(rows.map(r=>String(r['شرح سند']||r['شرح ردیف']||'').trim()).filter(Boolean))].slice(0,2);text.textContent='سند '+doc+(descriptions.length?' — '+descriptions.join('، '):'')+' ('+rows.length.toLocaleString('fa-IR')+' ردیف)';let debit=0n,credit=0n,valid=true;for(const r of rows){const d=SRE.parseAmount(r['بدهکار']),c=SRE.parseAmount(r['بستانکار']);if(!d.ok||!c.ok)valid=false;else{debit+=d.value;credit+=c.value;}}const accounts=[...new Set(rows.map(r=>String(r['عنوان حساب کل']||r['کد حساب کل']||'').trim()).filter(Boolean))].slice(0,5),details=document.createElement('small');details.className='closing-detail';details.textContent=(valid?'بدهکار '+debit.toLocaleString('fa-IR')+' / بستانکار '+credit.toLocaleString('fa-IR'):'مبالغ نامعتبر')+(accounts.length?' — '+accounts.join('، '):'');text.appendChild(details);const yes=document.createElement('button');yes.type='button';yes.className='candidate-yes';yes.dataset.closingAccept=doc;yes.textContent='بله، '+title+' است';yes.onclick=()=>{CLOSING_REVIEW.decisions.set(doc,kind);redraw();};const no=document.createElement('button');no.type='button';no.className='candidate-no';no.dataset.closingReject=doc;no.textContent='خیر';no.onclick=()=>{const rejected=CLOSING_REVIEW.rejected.get(doc)||new Set();rejected.add(kind);CLOSING_REVIEW.rejected.set(doc,rejected);const ambiguous=suggestion.includes('موقت')&&suggestion.includes('دائم');if(!ambiguous||rejected.size===2)CLOSING_REVIEW.decisions.set(doc,'ordinary');redraw();};item.append(text,yes,no);list.appendChild(item);}panel.appendChild(list);}
+  if(candidates.length){const list=document.createElement('div');list.className='restore-row';const label=document.createElement('b');label.textContent='اسناد پیشنهادی:';list.appendChild(label);for(const [doc,suggestion] of candidates){const item=document.createElement('div');item.className='candidate-row';const text=document.createElement('span');text.style.flex='1';const rows=grouped.get(doc)||[],descriptions=[...new Set(rows.flatMap(r=>[r['شرح سند'],r['شرح ردیف']].map(v=>String(v||'').trim())).filter(Boolean))].slice(0,2);text.textContent='سند '+doc+(descriptions.length?' — '+descriptions.join('، '):'')+' ('+rows.length.toLocaleString('fa-IR')+' ردیف)';let debit=0n,credit=0n,valid=true;for(const r of rows){const d=SRE.parseAmount(r['بدهکار']),c=SRE.parseAmount(r['بستانکار']);if(!d.ok||!c.ok)valid=false;else{debit+=d.value;credit+=c.value;}}const accounts=[...new Set(rows.map(r=>String(r['عنوان حساب کل']||r['کد حساب کل']||'').trim()).filter(Boolean))].slice(0,5),details=document.createElement('small');details.className='closing-detail';details.textContent=(CLOSING_REVIEW.reasons?.get(doc)||'پیشنهاد نیازمند بررسی')+' — '+(valid?'بدهکار '+debit.toLocaleString('fa-IR')+' / بستانکار '+credit.toLocaleString('fa-IR'):'مبالغ نامعتبر')+(accounts.length?' — '+accounts.join('، '):'');text.appendChild(details);const yes=document.createElement('button');yes.type='button';yes.className='candidate-yes';yes.dataset.closingAccept=doc;yes.textContent='بله، '+title+' است';yes.onclick=()=>{CLOSING_REVIEW.decisions.set(doc,kind);redraw();};const no=document.createElement('button');no.type='button';no.className='candidate-no';no.dataset.closingReject=doc;no.textContent='خیر';no.onclick=()=>{const rejected=CLOSING_REVIEW.rejected.get(doc)||new Set();rejected.add(kind);CLOSING_REVIEW.rejected.set(doc,rejected);const ambiguous=suggestion.includes('موقت')&&suggestion.includes('دائم');if(!ambiguous||rejected.size===2)CLOSING_REVIEW.decisions.set(doc,'ordinary');redraw();};item.append(text,yes,no);list.appendChild(item);}panel.appendChild(list);}
   groups.appendChild(panel);
  }
  area.querySelector('#openingContinueBtn').parentElement.before(box);
@@ -3181,12 +3199,13 @@ function detectDocType(docNumber, docDesc){
 
 function computeDocTypesAndOpeningTest(fullRows){
   EARLY_DOC_THRESHOLD = computeEarlyThreshold(fullRows);
-  const candidateDocs = new Map();
+  const candidateDocs = new Map(), rejectedDocs = new Map();
   fullRows.forEach(r=>{
     const key = norm(r['شماره سند']);
     if(!TYPE_OVERRIDES.has(key) && classifyOpening(r['شماره سند'], r['شرح سند']) === 'candidate' && !candidateDocs.has(key)){
       candidateDocs.set(key, r['شرح سند']);
     }
+    if(TYPE_OVERRIDES.get(key)==='سند جاری'&&classifyOpening(r['شماره سند'],r['شرح سند'])!=='none'&&!rejectedDocs.has(key))rejectedDocs.set(key,r['شرح سند']);
     r['نوع سند'] = detectDocType(r['شماره سند'], r['شرح سند']);
   });
   const openingRows = fullRows.filter(r=>r['نوع سند']==='ابتدای سال');
@@ -3194,7 +3213,7 @@ function computeDocTypesAndOpeningTest(fullRows){
   const totalCredit = openingRows.reduce((s,r)=>s+parseAmount(r['بستانکار']),0);
   const docNums = [...new Set(openingRows.map(r=>norm(r['شماره سند'])))];
   const candidates = [...candidateDocs.entries()].map(([doc,desc])=>({doc,desc}));
-  return {totalDebit, totalCredit, docNums, candidates, ok: Math.abs(totalDebit-totalCredit) < 0.5};
+  return {totalDebit, totalCredit, docNums, candidates, rejected:[...rejectedDocs.entries()].map(([doc,desc])=>({doc,desc})), ok: Math.abs(totalDebit-totalCredit) < 0.5};
 }
 
 function reapplyTypesAndRefresh(){
@@ -3241,6 +3260,7 @@ function renderTypeControlCard(result){
     ${candidateBlock}
     <div class="btnrow"><button type="button" class="confirm" id="openingContinueBtn">تأیید اسناد افتتاحیه و ادامه به انتخاب حساب ←</button></div>
   </div>`;
+  if(result.rejected?.length){const section=document.createElement('div');section.className='restore-row';section.dataset.openingRejected='';const title=document.createElement('b');title.textContent='پیشنهادهای افتتاحیه کنارگذاشته‌شده:';section.appendChild(title);for(const {doc,desc} of result.rejected){const row=document.createElement('div');row.className='candidate-row';const label=document.createElement('span');label.style.flex='1';label.textContent='سند '+doc+(desc?' — '+String(desc).slice(0,70):'');const restore=document.createElement('button');restore.type='button';restore.className='candidate-yes';restore.dataset.openingRestore=doc;restore.textContent='بازگرداندن به افتتاحیه';restore.onclick=()=>{TYPE_OVERRIDES.set(doc,'ابتدای سال');reapplyTypesAndRefresh();};row.append(label,restore);section.appendChild(row);}area.querySelector('#openingContinueBtn').parentElement.before(section);}
   renderClosingReview(area);
   document.getElementById('openingContinueBtn').addEventListener('click',()=>{const error=closingReviewError();if(error){area.querySelector('#closingReviewStatus').textContent=error;return;}gotoStep(4);});
 
