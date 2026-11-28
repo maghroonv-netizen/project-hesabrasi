@@ -9,6 +9,7 @@
     "test:variance": "node --test tests/expense-variance.test.cjs tests/variance-workpaper.test.cjs tests/variance-workpaper-browser.test.cjs",
     "test:main-workpaper": "node --test tests/main-workpaper-browser.test.cjs",
     "test:main-workpaper-mapping": "node --test tests/main-workpaper-mapping-browser.test.cjs",
+    "test:main-workpaper-closing": "node --test tests/main-workpaper-closing-browser.test.cjs",
     "test:import-balance": "node --test tests/import-balance-browser.test.cjs",
     "test:account-picker": "node --test tests/account-balance-picker-browser.test.cjs",
     "test:workpaper-styles": "node --test tests/other-workpapers-browser.test.cjs tests/sampling-preview.test.cjs tests/variance-workpaper-browser.test.cjs"
