@@ -3733,6 +3733,17 @@ const CFG_HELP = {
 function printHint(){
   return '<p class="hint no-print" style="margin:0 0 10px;">خروجی به‌صورت پیش‌فرض در حالت <b>افقی (Landscape)</b> تنظیم شده است. در همین پیش‌نمایش می‌توانید <b>مرز بین عناوین ستون‌ها را در بالای جدول با ماوس بکشید</b> تا عرض ستون‌ها بهینه شود و اسناد بیشتری در هر صفحه جا بگیرند. برای حذف رویداد ناخواسته، × کنار شماره ردیف را بزنید؛ فقط همان ردیف حذف می‌شود، حتی اگر شماره سند تکراری باشد. فایل اصلی اکسل تغییر نمی‌کند.</p>';
 }
+// Shared, session-only row sizing controls. The owner is the current sheet,
+// never a module-wide default shared between account tabs.
+function rowSizeVars(owner){const h=owner?.rowHeights||{};return `${h.title?`--user-title-row:${h.title}mm;`:''}${h.total?`--user-total-row:${h.total}mm;`:''}`;}
+function rowSizePanel(owner){const h=owner.rowHeights||{};return `<div class="row-size-panel no-print" data-row-size-panel><b>ارتفاع ردیف‌های این کاربرگ (میلی‌متر)</b><label>عنوان و شرح <input data-row-size="title" inputmode="decimal" value="${h.title??''}" placeholder="خودکار"></label><label>جمع <input data-row-size="total" inputmode="decimal" value="${h.total??''}" placeholder="خودکار"></label><button type="button" class="btn" data-row-size-apply>اعمال</button><button type="button" class="btn" data-row-size-reset>بازنشانی</button><span data-row-size-status role="status"></span></div>`;}
+function bindRowSizePanel(panel,owner,rerender){if(!panel)return;panel.querySelector('[data-row-size-apply]').onclick=()=>{const get=key=>panel.querySelector(`[data-row-size="${key}"]`).value.trim().replace(/[۰-۹٠-٩]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.includes(c)?'۰۱۲۳۴۵۶۷۸۹'.indexOf(c):'٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[٫،]/g,'.');const values=[get('title'),get('total')];if(!values.every(x=>!x||/^\d+(?:\.\d+)?$/.test(x)&&Number(x)>=5&&Number(x)<=20&&Number(x)*2===Math.round(Number(x)*2))){panel.querySelector('[data-row-size-status]').textContent='ارتفاع باید خالی یا بین ۵ تا ۲۰ میلی‌متر با گام نیم میلی‌متر باشد.';return;}owner.rowHeights={title:values[0]?Number(values[0]):null,total:values[1]?Number(values[1]):null};rerender();};panel.querySelector('[data-row-size-reset]').onclick=()=>{delete owner.rowHeights;rerender();};}
+function installGroupRowHandles(root,selector,isTotal,owner,rerender){
+ root.querySelectorAll(selector).forEach(row=>{const cell=row.cells[row.cells.length-1];if(!cell||cell.querySelector('.group-row-handle'))return;const kind=isTotal(row)?'total':'title',handle=document.createElement('span');handle.className='group-row-handle no-print';handle.dataset.rowResize=kind;handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');handle.setAttribute('aria-label',kind==='total'?'تنظیم ارتفاع همه ردیف‌های جمع این کاربرگ':'تنظیم ارتفاع همه ردیف‌های عنوان و شرح این کاربرگ');handle.title='مرز ردیف را بکشید یا کلیدهای بالا و پایین را بزنید';cell.classList.add('row-resize-cell');cell.append(handle);
+ const height=()=>{const paper=row.closest('.sample-paper-box,.variance-print-page,.audit-template')||row;const scale=paper.getBoundingClientRect().width/(paper.offsetWidth||1);return row.getBoundingClientRect().height/(scale||1)*25.4/96;};const set=(value,focus=false)=>{owner.rowHeights={...(owner.rowHeights||{}),[kind]:Math.max(5,Math.min(20,Math.round(value*2)/2))};const x=window.scrollX,y=window.scrollY,scope=row.closest('#sheetViews,#anaOutput,#varianceV4,#srFinalPreview');rerender();window.scrollTo(x,y);if(focus)scope?.querySelector(`.group-row-handle[data-row-resize="${kind}"]`)?.focus({preventScroll:true});};
+ handle.onpointerdown=event=>{if(event.button!==0)return;event.preventDefault();event.stopPropagation();const y=event.clientY,start=height(),paper=row.closest('.sample-paper-box,.variance-print-page,.audit-template')||row,scale=paper.getBoundingClientRect().width/(paper.offsetWidth||1);handle.setPointerCapture(event.pointerId);handle.onpointerup=ev=>{handle.onpointerup=null;if(Math.abs(ev.clientY-y)>1)set(start+(ev.clientY-y)/(scale||1)*25.4/96);};handle.onpointercancel=()=>{handle.onpointerup=null;};};handle.onkeydown=event=>{if(!['ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();set((owner.rowHeights?.[kind]??height())+(event.key==='ArrowDown'?.5:-.5),true);};
+ });
+}
 function sheetHTML(w, sel, excludedRows=[]){
   const layout=samplePrintLayout(w),c=SHEET_CFG,n=Math.max(1,Math.min(15,Math.round(Number(c.ctrl)||10))),cpCtx=cpWorksheetContext(),SPAN=8+n;
   CP_REPORT.filled=0;CP_REPORT.blank=0;CP_REPORT.reasons={};
@@ -3765,7 +3776,7 @@ function sheetHTML(w, sel, excludedRows=[]){
   const controlFont=Math.max(8.5,Math.min(11,(perCtrlMm*96/25.4-1.5)/1.2));
   const headLabels=['ردیف','سند','تاریخ','شرح','طرف حساب','عطف','بدهکار (ریال)','بستانکار (ریال)'];
   const resizableHeads=headLabels.map((lbl,i)=>`<th rowspan="2">${lbl}<span class="col-resize-handle no-print" data-col-resize="${i}" title="برای تغییر عرض ستون بکشید (دوبار کلیک: بازنشانی)"></span></th>`).join('');
-  return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" data-sample-density="${layout.density||'normal'}" style="--sample-full-width:${layout.paperWidth}mm;--sample-full-height:${layout.paperHeight}mm;--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-control-font:${controlFont.toFixed(2)}px"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
+  return `<div class="sheet sampling-template paper" data-sample-orientation="${layout.orientation}" data-sample-density="${layout.density||'normal'}" style="--sample-full-width:${layout.paperWidth}mm;--sample-full-height:${layout.paperHeight}mm;--sample-paper-width:${layout.width}mm;--sample-paper-height:${layout.height}mm;--sample-table-width:${layout.table}mm;--sample-control-font:${controlFont.toFixed(2)}px;${rowSizeVars(w)}"><div class="inner"><div class="frame sample-main-frame"><table class="main"><colgroup>${cols}</colgroup><thead>
   <tr><th colspan="${SPAN}" class="sample-header-cell"><div class="meta"><div class="ref-oval" aria-label="محل عطف دستی"></div><div class="sample-meta-main"><div class="big"><span class="k">نام واحد مورد رسیدگی :</span> <span class="v">${esc(c.company)}</span></div><div class="big"><span class="k">موضوع :</span> <span class="v">کاربرگ نمونه‌گیری — ${esc(subjectText)}</span></div><div class="big"><span class="k">سال مالی مورد رسیدگی :</span> <span class="v">${esc(sampleDisplayDigits(c.year))}</span></div></div><div class="sample-meta-prep"><div><span class="k">تاریخ تهیه :</span> <span class="v">${esc(sampleDisplayDigits(c.date))}</span></div><div><span class="k">تهیه‌کننده :</span> <span class="v">${esc(c.prep)}</span></div><div><span class="k">بررسی‌کننده :</span> <span class="v">${esc(c.rev)}</span></div></div></div></th></tr>
   <tr class="cols">${resizableHeads}<th class="sample-controls-title" colspan="${n}">کنترل‌های حسابرسی</th></tr><tr class="cols">${nums}</tr></thead><tbody>${body}${total}</tbody></table></div>
   <div class="recap frame sample-recap"><div class="ttl">تفکیک گردش و مانده</div><table class="sum"><thead><tr><th style="width:34%">تفکیک</th><th>بدهکار (ریال)</th><th style="width:11%">درصد</th><th>بستانکار (ریال)</th><th style="width:11%">درصد</th></tr></thead><tbody>${R('افتتاحیه (مانده ابتدای سال)',opD,opC)}${R('اقلام رسیدگی‌شده',sd,sc)}${R('سایر اقلام (رسیدگی‌نشده)',othD,othC)}${R('جمع',totD,totC,'sumrow')}<tr class="rest"><td class="lab">مانده در پایان سال مالی</td><td class="num" colspan="4" style="text-align:right;padding-right:14px;direction:rtl">${fmtSignedBalance(end)}</td></tr></tbody></table></div></div></div>`;
@@ -3830,7 +3841,7 @@ function sampleCopyPreviewForPrint(host,target){
  const boxes=[...canvas.children].filter(e=>e.classList.contains('sample-paper-box'));
  if(!boxes.length)throw new Error('صفحات پیش‌نمایش در دسترس نیست؛ چاپ متوقف شد.');
  target.replaceChildren(...boxes.map(box=>box.cloneNode(true)));
- target.querySelectorAll('.col-resize-handle,.cp-ws-anchor,.sample-row-remove').forEach(el=>el.remove());
+ target.querySelectorAll('.col-resize-handle,.cp-ws-anchor,.sample-row-remove,.group-row-handle').forEach(el=>el.remove());
  if(typeof cpWorksheetPreparePrint==='function')cpWorksheetPreparePrint(target);
 }
 function printSheet(host){
@@ -4044,10 +4055,12 @@ function drawSheets(preserveScroll){
       <div class="btnrow no-print" style="justify-content:flex-start;margin:0 0 10px">${samplePrintControls(x.w)}<span class="sample-page-badge" data-page-badge="${k}"></span>${typeof sampleColumnToolsHTML==='function'?sampleColumnToolsHTML(x.w,k):''}${x.rawPreview?'<span class="raw-preview-tag">پیش‌نمایش خام</span>':'<button class="confirm print-btn native-print-btn">چاپ / ذخیره PDF</button>'}</div>
       ${x.rawPreview?'<div class="raw-preview-banner no-print">همهٔ رویدادهای جاری حساب نمایش داده شده‌اند؛ هنوز نمونه‌گیری اعمال نشده است.</div>':''}
       ${x.error?`<div class="err sample-output-error no-print">${esc(x.error)}</div>`:''}
+      ${rowSizePanel(x.w)}
       ${samplePopulationHTML(x)}
       ${x.rawPreview?'':printHint()}
       <div class="scrollx" data-sheet-canvas="${k}">${sheetHTML(x.w,x.sel,x.excludedRows)}</div>
     </div>`).join('');
+  document.querySelectorAll('.sheetwrap').forEach(v=>{const item=SHEET_OUT[Number(v.dataset.view)];if(item)bindRowSizePanel(v.querySelector('[data-row-size-panel]'),item.w,()=>drawSheets(true));});
   document.querySelectorAll('select[data-sample-orientation]').forEach(el=>el.addEventListener('change',()=>{SHEET_CFG.orientation=el.value;drawSheets(true);}));
   document.querySelectorAll('select[data-sample-density]').forEach(el=>el.addEventListener('change',()=>{SHEET_CFG.density=el.value;drawSheets(true);}));
   document.querySelectorAll('[data-col-auto]').forEach(b=>b.addEventListener('click',()=>{
@@ -4057,10 +4070,6 @@ function drawSheets(preserveScroll){
   document.querySelectorAll('[data-col-reset]').forEach(b=>b.addEventListener('click',()=>{
     const idx=Number(b.dataset.colReset);
     if(typeof sampleResetColumns==='function')sampleResetColumns(idx);
-  }));
-  document.querySelectorAll('[data-col-apply-all]').forEach(b=>b.addEventListener('click',()=>{
-    const idx=Number(b.dataset.colApplyAll);
-    if(typeof sampleApplyColumnsToAll==='function')sampleApplyColumnsToAll(idx);
   }));
   tabs.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{
     ACTIVE_SHEET=+b.dataset.tab;
@@ -4855,6 +4864,7 @@ function renderAnalysisOutput(){
   document.getElementById('anaBackToAccounts').addEventListener('click',()=>gotoStep('a2'));
   document.getElementById('anaPrint').addEventListener('click',()=>auditTemplatePrint(document.getElementById('anaSheet')));
   anaPaintAI(); anaPaintSheet();
+  const sizeHost=document.createElement('div');sizeHost.innerHTML=rowSizePanel(ANA.out[ANA.active]);el.querySelector('#anaSheet').before(sizeHost);bindRowSizePanel(sizeHost.querySelector('[data-row-size-panel]'),ANA.out[ANA.active],()=>renderAnalysisOutput());
   const reportHost=document.getElementById('reportControls');
   if(reportHost){reportHost.innerHTML=reportControlsHTML(ANA.out[ANA.active]);document.getElementById('reportRun').addEventListener('click',()=>reportRun());}
   auditCategorizedDocs(ANA.out[ANA.active]);
@@ -6705,7 +6715,8 @@ function auditTemplateAlign(root){
     const count=groups[0].rows.length;
     for(let i=0;i<count;i++){
       const list=groups.map(g=>g.rows[i]);list.forEach(r=>{r.style.height='';[...r.cells].forEach(c=>c.style.height='');});
-      const height=Math.ceil(Math.max(...list.map(r=>r.getBoundingClientRect().height),26));
+      const kind=list[0].classList.contains('tot')?'--user-total-row':'--user-title-row',value=parseFloat(getComputedStyle(grid).getPropertyValue(kind))||0;
+      const height=Math.ceil(Math.max(...list.map(r=>r.getBoundingClientRect().height),value?value*96/25.4:26));
       list.forEach(r=>{r.style.height=height+'px';[...r.cells].forEach(c=>c.style.height=height+'px');});
     }
   }
@@ -6721,7 +6732,7 @@ function auditTemplatePaint(o,host){
   text('nature',String(o.sec['ماهیت']?.text||''));
   for(const field of ['ref-box','follow-up','issues','conclusion'])text(field,edits[field]??'');
   root.querySelector('.grid').replaceWith(auditTemplateGrid(o,auditTemplateRows(o)));
-  host.replaceChildren(root);auditTemplateAlign(root);
+  root.style.cssText+=rowSizeVars(o);host.replaceChildren(root);auditTemplateAlign(root);installGroupRowHandles(root,'.descs tbody tr',r=>r.classList.contains('tot'),o,()=>renderAnalysisOutput());
   if(document.fonts&&!document.fonts.check('12px workpaper-lotus'))document.fonts.load('12px workpaper-lotus').then(()=>{if(root.isConnected)auditTemplateAlign(root);}).catch(()=>{});
   root.querySelectorAll('[data-report-ref]').forEach(button=>button.onclick=()=>reportOpenReference(button.dataset.reportRef));
   root.querySelectorAll('[contenteditable]').forEach(e=>{
@@ -7047,12 +7058,12 @@ function sampleComputeResizedVector(startVec,dividerIdx,dxMm,minVec){
 function sampleHasCustomColumns(w){
  const o=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
  const target=w||(SHEET_OUT[ACTIVE_SHEET]?.w);
- return !!(target?._customCols?.[o]||SHEET_CFG.customCols?.[o]);
+ return !!(target?._customCols?.[o]);
 }
 function samplePrintLayout(w){
  const m=sampleBasePrintMetrics();
  const target=w||(SHEET_OUT[ACTIVE_SHEET]?.w)||null;
- const rawVec=target?._customCols?.[m.orientation]||SHEET_CFG.customCols?.[m.orientation]||null;
+ const rawVec=target?._customCols?.[m.orientation]||null;
  const vec=rawVec?sampleNormalizeColumnVector(rawVec,m):sampleDefaultColumnVector(m);
  return {
   orientation:m.orientation,
@@ -7078,35 +7089,21 @@ function samplePrintControls(w){
  return `${cpModePill}<label class="sample-print-controls">جهت کاغذ <select data-sample-orientation aria-label="جهت کاغذ"><option value="landscape" ${l.orientation==='landscape'?'selected':''}>افقی — Landscape (پیشنهادی)</option><option value="portrait" ${l.orientation==='portrait'?'selected':''}>عمودی — Portrait</option></select></label><label class="sample-print-controls">تراکم سطرها <select data-sample-density aria-label="تراکم سطرها"><option value="normal" ${l.density==='normal'?'selected':''}>استاندارد</option><option value="compact" ${l.density==='compact'?'selected':''}>فشرده (اسناد بیشتر در هر صفحه)</option></select></label>`;
 }
 function sampleColumnToolsHTML(w,viewIdx){
- const customized=sampleHasCustomColumns(w),orientation=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
- const localOnly=!!w?._customCols?.[orientation]&&!SHEET_CFG.customCols?.[orientation];
- return `<span class="sample-col-tools"><span class="sample-col-hint">↔ تغییر دستی عرض ستون‌ها با کشیدن مرز عناوین جدول؛ عرض انتخاب‌شده روی همهٔ حساب‌ها اعمال می‌شود</span><button type="button" class="sample-col-btn" data-col-auto="${viewIdx}" title="تنظیم هوشمند نسبت ستون شرح و طرف حساب بر اساس طول واقعی متن‌های همین حساب">چیدمان هوشمند ستون‌ها</button>${customized?`${localOnly&&SHEET_OUT.length>1?`<button type="button" class="sample-col-btn" data-col-apply-all="${viewIdx}">اعمال به همه تب‌ها</button>`:''}<button type="button" class="sample-col-btn" data-col-reset="${viewIdx}">بازنشانی ستون‌ها</button>`:''}</span>`;
+ const customized=sampleHasCustomColumns(w);
+ return `<span class="sample-col-tools"><span class="sample-col-hint">↔ تغییر دستی عرض ستون‌ها با کشیدن مرز عناوین جدول؛ عرض فقط برای همین کاربرگ تغییر می‌کند</span><button type="button" class="sample-col-btn" data-col-auto="${viewIdx}" title="تنظیم هوشمند نسبت ستون شرح و طرف حساب بر اساس طول واقعی متن‌های همین حساب">چیدمان هوشمند ستون‌ها</button>${customized?`<button type="button" class="sample-col-btn" data-col-reset="${viewIdx}">بازنشانی ستون‌ها</button>`:''}</span>`;
 }
-function sampleSetWorksheetColumns(viewIdx,vec,applyAll=true){
+function sampleSetWorksheetColumns(viewIdx,vec){
  const item=SHEET_OUT[viewIdx];if(!item)return;
  const m=sampleBasePrintMetrics();
- const clean=sampleNormalizeColumnVector(vec,m);
- if(applyAll){
-  if(!SHEET_CFG.customCols)SHEET_CFG.customCols={};
-  SHEET_CFG.customCols[m.orientation]=clean.slice();
-  SHEET_OUT.forEach(x=>{if(x.w._customCols){delete x.w._customCols[m.orientation];if(!Object.keys(x.w._customCols).length)delete x.w._customCols;}});
- }else{
-  if(!item.w._customCols)item.w._customCols={};
-  item.w._customCols[m.orientation]=clean;
- }
+ if(!item.w._customCols)item.w._customCols={};
+ item.w._customCols[m.orientation]=sampleNormalizeColumnVector(vec,m);
  drawSheets(true);
 }
 function sampleResetColumns(viewIdx){
  const item=SHEET_OUT[viewIdx];
  const o=SHEET_CFG.orientation==='portrait'?'portrait':'landscape';
  if(item?.w?._customCols)delete item.w._customCols[o];
- if(SHEET_CFG.customCols)delete SHEET_CFG.customCols[o];
  drawSheets(true);
-}
-function sampleApplyColumnsToAll(viewIdx){
- const item=SHEET_OUT[viewIdx];if(!item)return;
- const l=samplePrintLayout(item.w);
- sampleSetWorksheetColumns(viewIdx,l.vector,true);
 }
 function sampleAutoOptimizeColumns(viewIdx){
  const item=SHEET_OUT[viewIdx];if(!item)return;
@@ -7132,7 +7129,7 @@ function sampleAutoOptimizeColumns(viewIdx){
  const ratioD=Math.min(0.62,Math.max(0.20,dNeed/(dNeed+cNeed)));
  vec[3]=Math.max(minV[3],+(pool*ratioD).toFixed(3));
  vec[4]=Math.max(minV[4],+(pool-vec[3]).toFixed(3));
- sampleSetWorksheetColumns(viewIdx,vec,false);
+ sampleSetWorksheetColumns(viewIdx,vec);
 }
 function sampleUniformRows(p){
  if(!p||p.getBoundingClientRect().width<1)return;
@@ -7436,6 +7433,7 @@ function sampleRenderOnScreenPages(viewEl){
   const pages=sampleTemplatePreparePrint(measure,{screenMode:true,worksheet:ws});
   if(!pages.length)throw new Error('هیچ صفحه‌ای ساخته نشد.');
   canvas.replaceChildren(...measure.childNodes);canvas.dataset.paginated='1';samplePositionEvidence(canvas);
+  if(ws)installGroupRowHandles(canvas,'.sampling-template tr.item,.sampling-template tr.sample-continuation,.sampling-template tr.sample-page-total,.sampling-template tr.sample-brought-forward,.sampling-template .recap tr.sumrow',r=>r.matches('.sample-page-total,.sample-brought-forward,.sumrow'),ws,()=>drawSheets(true));
   requestAnimationFrame(()=>{if(canvas.isConnected)samplePositionEvidence(canvas);});
   const badge=viewEl.querySelector('[data-page-badge]');
   if(badge)badge.textContent=`صفحه‌بندی خودکار: ${faNum(pages.length||1)} صفحه (${lay.orientation==='landscape'?'افقی':'عمودی'}${lay.density==='compact'?' · فشرده':''})`;
@@ -13636,7 +13634,7 @@ window.srEnter=function(){
     const existing=SR.files.find(f=>f.isMain);
     if(!existing||existing.mainRowsRef!==rows){
       SR.files=[]; SR.auditId=null; SR.mapped=false; SR.model=null; SR.result=null; SR.priorModel=null; SR.priorResult=null; SR.nextModel=null; SR.nextResult=null; SR.priorWorkpaper=null;
-      SR.roles.clear(); SR.tagOverrides.clear(); SR.linkOk.clear(); SR.codingOk.clear(); SR.view.filter=''; SR.view.tbFilter=''; SR.view.tbSelection=new Set(); SR.view.accountSelection=null; SR.view.selectionConfirmed=false;
+      SR.roles.clear(); SR.tagOverrides.clear(); SR.linkOk.clear(); SR.codingOk.clear(); SR.view.filter=''; SR.view.tbFilter=''; SR.view.tbSelection=new Set(); SR.view.accountSelection=null; SR.view.selectionConfirmed=false; delete SR.view.rowHeights;
       addMainFile();
     }
   }
@@ -14344,6 +14342,7 @@ function paginateWorkpaperPreview(host){
     if(!host._srFontPending){host._srFontPending=true;document.fonts.load('12px workpaper-lotus').then(faces=>{if(!faces.length||!document.fonts.check('12px workpaper-lotus'))throw new Error('Lotus font unavailable');host._srFontPending=false;if(source.isConnected)paginateWorkpaperPreview(host);}).catch(()=>{host._srFontPending=false;if(source.isConnected)host.innerHTML='<div class="sr-pagination-error" role="alert">فونت کاربرگ آماده نشد؛ چاپ متوقف است.</div>';});}
     return;
   }
+  bindRowSizePanel(host.querySelector('[data-row-size-panel]'),SR.view,()=>{host.innerHTML=workpaperHtml();paginateWorkpaperPreview(host);});
   const body=sourceTable.tBodies[0];if(!body)return;
   const rows=[...body.rows].map(row=>row.cloneNode(true)),groups=[];let group=null,grandTotal=null;
   rows.forEach(row=>{
@@ -14415,6 +14414,7 @@ function paginateWorkpaperPreview(host){
     box.appendChild(sheet);box.dataset.pageIndex=String(pageIndex+1);box.dataset.pageCount=String(plans.pages.length);pagesHost.appendChild(box);
   });
   measureBox.remove();
+  installGroupRowHandles(pagesHost,'.sr-paper-table tbody tr',r=>r.matches('.sr-workpaper-subtotal,.sr-workpaper-total,.sr-page-carry,.sr-page-transfer'),SR.view,()=>{host.innerHTML=workpaperHtml();paginateWorkpaperPreview(host);});
   // Mark detected overflow in the preview; test printing is not blocked.
   pagesHost.querySelectorAll('.sr-aged-page').forEach(box=>{
     const content=box.querySelector('.sr-aged-content'),table=box.querySelector('.sr-paper-table'),frame=content?.getBoundingClientRect(),bounds=table?.getBoundingClientRect();
@@ -14739,7 +14739,7 @@ function workpaperHtml(){
   const excludedCount=SR.view.excludedWorkpaperRows instanceof Set?SR.view.excludedWorkpaperRows.size:0;
   const reviewTools=`<div class="sr-workpaper-review-tools"><span>اقلام پیشنهادی را حسابرس بازبینی کند؛ با × هر قلم فقط از کاربرگ نهایی و جمع‌های آن حذف می‌شود.</span>${excludedCount?`<b>${fa(excludedCount)} قلم حذف‌شده</b><button type="button" class="btn ghost" data-sr-restore-excluded>بازگرداندن اقلام حذف‌شده</button>`:''}</div>`;
   const amountHead=(title,year)=>`<th>${e_(title)}${year?` ${e_(srYearText(year))}`:''}<br><span class="sr-unit-label">(ریال)</span></th>`;
-  return `${reviewTools}<section class="sheet sampling-template sr-paper sr-workpaper-source" dir="rtl">
+  return `${reviewTools}${rowSizePanel(SR.view)}<section class="sheet sampling-template sr-paper sr-workpaper-source" dir="rtl" style="${rowSizeVars(SR.view)}">
     <div class="inner">
       <div class="meta sr-screen-head">
         <div class="sr-refbox" aria-label="محل درج عطف کاربرگ"></div>
@@ -14868,7 +14868,7 @@ function printReport(){
       .sr-aged-page-number{font-family:workpaper-lotus,serif!important;font-size:10.5px!important;font-weight:700!important;line-height:1.25!important;padding-top:6pt!important;text-align:center!important;color:#111827!important}
     }`;
   const restore=()=>{if(done)return;done=true;if(window.__activePrintRestore===restore)window.__activePrintRestore=null;document.title=old;document.body.classList.remove('printing');ph.replaceChildren();rule.remove();};
-  ph.replaceChildren(...pageNodes.map(node=>node.cloneNode(true)));
+  ph.replaceChildren(...pageNodes.map(node=>{const copy=node.cloneNode(true);copy.querySelectorAll('.group-row-handle').forEach(e=>e.remove());return copy;}));
   ph.querySelectorAll('.sr-workpaper-exclude,.sr-workpaper-review-tools').forEach(node=>node.remove());
   ph.querySelectorAll('.sr-aged-page-number').forEach((el,i)=>{el.textContent=`صفحه ${fa(i+1)} از ${fa(pageNodes.length)}`;});
   document.head.appendChild(rule);document.body.classList.add('printing');document.title=' ';
@@ -15191,7 +15191,7 @@ vyearDefaults();
 function vDetectYear(rows,dateIndex,displayRows){if(!Array.isArray(rows)||!Number.isInteger(dateIndex)||dateIndex<0)return null;const counts=new Map();for(let i=0;i<rows.length;i++){const raw=rows[i]?.[dateIndex],display=displayRows?.[i]?.[dateIndex],value=raw===null||raw===undefined||raw===''?display:raw,parsed=SRE.parseDate(value);if(!parsed.ok)continue;const year=SRE.dayToJalali(parsed.day).jy;counts.set(year,(counts.get(year)||0)+1);}if(!counts.size)return null;return [...counts].sort((a,b)=>b[1]-a[1]||b[0]-a[0])[0][0];}
 function vYearLabel(year){return year?vdigits(year):'از ستون تاریخ شناسایی نشد';}
 function vYearsValid(){const ys=V.years.map(y=>SRE.latinDigits(String(y??'')).trim());return ys.every(y=>/^(?:1[34]\d{2}|19\d{2}|20\d{2})$/.test(y))&&Number(ys[0])<Number(ys[1]);}
-function vSyncCurrent(){const source=Array.isArray(FULL_ROWS)&&FULL_ROWS.length?FULL_ROWS:(Array.isArray(ACCOUNT_ROWS)?ACCOUNT_ROWS:[]);if(!source.length){V.currentSource=source;V.files[1]=null;return false;}if(V.currentSource!==source){V.currentSource=source;V.units[1]='rial';const data=source.map(r=>V_CURRENT_HEADERS.map(h=>String(r?.[h]??'')));V.files[1]={name:'فایل سال جاری بارگذاری‌شده در ابتدای پرونده',status:'ok',mapped:true,unit:'rial',headers:V_CURRENT_HEADERS,data,displayData:data,mapping:{kol:0,kolT:1,sub:2,subT:3,category:-1,amount:-1,debit:4,credit:5,desc:6,descDoc:7,date:8}};V.selected.clear();V.rows=[];}
+function vSyncCurrent(){const source=Array.isArray(FULL_ROWS)&&FULL_ROWS.length?FULL_ROWS:(Array.isArray(ACCOUNT_ROWS)?ACCOUNT_ROWS:[]);if(!source.length){V.currentSource=source;V.files[1]=null;return false;}if(V.currentSource!==source){V.rowHeights=null;V.currentSource=source;V.units[1]='rial';const data=source.map(r=>V_CURRENT_HEADERS.map(h=>String(r?.[h]??'')));V.files[1]={name:'فایل سال جاری بارگذاری‌شده در ابتدای پرونده',status:'ok',mapped:true,unit:'rial',headers:V_CURRENT_HEADERS,data,displayData:data,mapping:{kol:0,kolT:1,sub:2,subT:3,category:-1,amount:-1,debit:4,credit:5,desc:6,descDoc:7,date:8}};V.selected.clear();V.rows=[];}
 if(V.files[1])V.years[1]=vDetectYear(V.files[1].data,V.files[1].mapping.date,V.files[1].displayData);if(V.files[1])V.files[1].unit=V.units[1];return !!V.files[1];}
 function vReady(n){if(n==='v1'||n==='v2')return !!(vSyncCurrent()&&V.files[0]?.status==='ok'&&V.units[0]&&V.units[1]);if(n==='v3')return !!(vSyncCurrent()&&V.files[0]?.mapped&&V.files[1]?.mapped&&vYearsValid()&&V.rows.length>0);if(n==='v4')return V.rows.length>0&&V.selected.size>0;return false;}
 function vStage(){return CUR_STEP;}
@@ -15333,8 +15333,9 @@ function vRender4(){
  const summaryWidths=orientation==='portrait'?[24,19,19,19,19]:[30,17.5,17.5,17.5,17.5];
  const descHeading=hasDesc?'<th>توضیحات</th>':'';
  const aiHint=hasDesc?'متن توضیحات را می‌توانی در پیش‌نمایش هر ردیف ویرایش کنی.':'ستون توضیحات فعلاً خاموش است؛ برای نمایش و چاپ توضیحات، گزینهٔ «نمایش ستون توضیحات» را روشن کن.';
- h.innerHTML=`<div class="variance-controls variance-workpaper-settings"><button class="btn ghost" type="button" data-vback="v3">→ بازگشت به انتخاب حساب</button><label class="variance-setting"><input type="checkbox" data-vdesc ${hasDesc?'checked':''}> نمایش ستون توضیحات</label><label class="variance-setting">جهت صفحه <select data-vorientation><option value="landscape" ${orientation==='landscape'?'selected':''}>افقی (Landscape)</option><option value="portrait" ${orientation==='portrait'?'selected':''}>عمودی (Portrait)</option></select></label><button class="btn ghost" type="button" data-vprint>چاپ / ذخیره PDF</button></div><p class="variance-note" role="status" data-vamount-status>${vInvalidAmounts(rows)?'مبلغ نامعتبر است؛ یک عدد صحیح ریالی وارد کنید. تا اصلاح آن چاپ امکان‌پذیر نیست.':'مبالغ قابل ویرایش‌اند؛ تغییرات و جمع‌ها خودکار محاسبه می‌شوند. ویرایش‌ها فقط در این نشست می‌مانند.'}</p><div class="variance-screen-sheet" data-orientation="${orientation}"><div class="variance-preview-pages"></div><div class="variance-workpaper-source"><header class="variance-meta"><div class="variance-ref" aria-label="کادر مرجع خالی"></div><div class="variance-meta-right"><div class="variance-line"><b class="variance-label">نام واحد مورد رسیدگی :</b> <strong class="variance-value">${vx(cfg.company||'')}</strong></div><div class="variance-line"><b class="variance-label">موضوع :</b> <strong class="variance-value">کاربرگ بررسی نوسانات هزینه</strong></div><div class="variance-line"><b class="variance-label">سال مالی مورد رسیدگی :</b> <strong class="variance-value">سال مالی منتهی به ۲۹ اسفند ${vx(vdigits(V.years[1]||''))}</strong></div></div><div class="variance-meta-left"><div class="variance-line"><b class="variance-label">تاریخ تهیه :</b> <span class="variance-value-light">${vx(vDateText(cfg.date||''))}</span></div><div class="variance-line"><b class="variance-label">تهیه‌کننده :</b> <span class="variance-value-light">${vx(cfg.prep||'')}</span></div><div class="variance-line"><b class="variance-label">بررسی‌کننده :</b> <span class="variance-value-light">${vx(cfg.rev||'')}</span></div></div></header><table class="variance-paper-table"><colgroup>${widths.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead><tr><th class="vhead-small">ردیف</th><th class="vhead-small">کد</th><th>شرح حساب</th><th>سال ${vx(vdigits(V.years[1]||''))}<br><span class="vunit-label">(ریال)</span></th><th>سال ${vx(vdigits(V.years[0]||''))}<br><span class="vunit-label">(ریال)</span></th><th class="vhead-small">مبلغ تغییرات نسبت به سال قبل</th><th class="vhead-small">درصد تغییرات نسبت به سال قبل</th>${descHeading}</tr></thead><tbody>${vWorkpaperBody(rows)}</tbody></table><section class="variance-summary"><div class="variance-summary-title">خلاصه نوسانات به تفکیک کل</div><table class="variance-summary-table"><colgroup>${summaryWidths.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead><tr><th>کل</th><th>سال جاری (ریال)</th><th>سال قبل (ریال)</th><th>مبلغ تغییرات (ریال)</th><th>درصد تغییرات</th></tr></thead><tbody>${vSummaryBody(rows)}</tbody></table></section></div></div><section class="variance-ai-box"><h2>توضیح کوتاه نوسان با هوش مصنوعی</h2><p>${aiHint} کد فقط دسته، جهت و حداکثر دو شرح کوتاه را برای نوشتن توضیح می‌فرستد؛ مبلغ، درصد و کد حساب ارسال نمی‌شوند.</p><p class="variance-scope" id="vScope">${rows.length} حساب انتخاب‌شده · ${reqSize.toLocaleString('fa-IR')} گروه نوشتاری پس از دسته‌بندی محلی.</p><div class="variance-ai-actions"><button type="button" class="confirm" data-vai ${V.busy||!hasDesc?'disabled':''}>${V.busy?'در حال نوشتن…':hasDesc?'نوشتن توضیحات کوتاه برای نوسان‌ها':'برای استفاده از هوش مصنوعی، ستون توضیحات را روشن کن'}</button><button type="button" class="btn ghost" data-vclear-ai>پاک‌کردن پیشنهادهای AI</button><span role="status" id="vAiStatus">${vx(V.result?.status||'')}</span></div></section><div class="sr-nav"><button class="btn ghost" type="button" data-vback="v3">→ انتخاب حساب</button></div>`;
+ h.innerHTML=`<div class="variance-controls variance-workpaper-settings"><button class="btn ghost" type="button" data-vback="v3">→ بازگشت به انتخاب حساب</button><label class="variance-setting"><input type="checkbox" data-vdesc ${hasDesc?'checked':''}> نمایش ستون توضیحات</label><label class="variance-setting">جهت صفحه <select data-vorientation><option value="landscape" ${orientation==='landscape'?'selected':''}>افقی (Landscape)</option><option value="portrait" ${orientation==='portrait'?'selected':''}>عمودی (Portrait)</option></select></label><button class="btn ghost" type="button" data-vprint>چاپ / ذخیره PDF</button></div>${rowSizePanel(V)}<p class="variance-note" role="status" data-vamount-status>${vInvalidAmounts(rows)?'مبلغ نامعتبر است؛ یک عدد صحیح ریالی وارد کنید. تا اصلاح آن چاپ امکان‌پذیر نیست.':'مبالغ قابل ویرایش‌اند؛ تغییرات و جمع‌ها خودکار محاسبه می‌شوند. ویرایش‌ها فقط در این نشست می‌مانند.'}</p><div class="variance-screen-sheet" data-orientation="${orientation}"><div class="variance-preview-pages"></div><div class="variance-workpaper-source"><header class="variance-meta"><div class="variance-ref" aria-label="کادر مرجع خالی"></div><div class="variance-meta-right"><div class="variance-line"><b class="variance-label">نام واحد مورد رسیدگی :</b> <strong class="variance-value">${vx(cfg.company||'')}</strong></div><div class="variance-line"><b class="variance-label">موضوع :</b> <strong class="variance-value">کاربرگ بررسی نوسانات هزینه</strong></div><div class="variance-line"><b class="variance-label">سال مالی مورد رسیدگی :</b> <strong class="variance-value">سال مالی منتهی به ۲۹ اسفند ${vx(vdigits(V.years[1]||''))}</strong></div></div><div class="variance-meta-left"><div class="variance-line"><b class="variance-label">تاریخ تهیه :</b> <span class="variance-value-light">${vx(vDateText(cfg.date||''))}</span></div><div class="variance-line"><b class="variance-label">تهیه‌کننده :</b> <span class="variance-value-light">${vx(cfg.prep||'')}</span></div><div class="variance-line"><b class="variance-label">بررسی‌کننده :</b> <span class="variance-value-light">${vx(cfg.rev||'')}</span></div></div></header><table class="variance-paper-table"><colgroup>${widths.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead><tr><th class="vhead-small">ردیف</th><th class="vhead-small">کد</th><th>شرح حساب</th><th>سال ${vx(vdigits(V.years[1]||''))}<br><span class="vunit-label">(ریال)</span></th><th>سال ${vx(vdigits(V.years[0]||''))}<br><span class="vunit-label">(ریال)</span></th><th class="vhead-small">مبلغ تغییرات نسبت به سال قبل</th><th class="vhead-small">درصد تغییرات نسبت به سال قبل</th>${descHeading}</tr></thead><tbody>${vWorkpaperBody(rows)}</tbody></table><section class="variance-summary"><div class="variance-summary-title">خلاصه نوسانات به تفکیک کل</div><table class="variance-summary-table"><colgroup>${summaryWidths.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead><tr><th>کل</th><th>سال جاری (ریال)</th><th>سال قبل (ریال)</th><th>مبلغ تغییرات (ریال)</th><th>درصد تغییرات</th></tr></thead><tbody>${vSummaryBody(rows)}</tbody></table></section></div></div><section class="variance-ai-box"><h2>توضیح کوتاه نوسان با هوش مصنوعی</h2><p>${aiHint} کد فقط دسته، جهت و حداکثر دو شرح کوتاه را برای نوشتن توضیح می‌فرستد؛ مبلغ، درصد و کد حساب ارسال نمی‌شوند.</p><p class="variance-scope" id="vScope">${rows.length} حساب انتخاب‌شده · ${reqSize.toLocaleString('fa-IR')} گروه نوشتاری پس از دسته‌بندی محلی.</p><div class="variance-ai-actions"><button type="button" class="confirm" data-vai ${V.busy||!hasDesc?'disabled':''}>${V.busy?'در حال نوشتن…':hasDesc?'نوشتن توضیحات کوتاه برای نوسان‌ها':'برای استفاده از هوش مصنوعی، ستون توضیحات را روشن کن'}</button><button type="button" class="btn ghost" data-vclear-ai>پاک‌کردن پیشنهادهای AI</button><span role="status" id="vAiStatus">${vx(V.result?.status||'')}</span></div></section><div class="sr-nav"><button class="btn ghost" type="button" data-vback="v3">→ انتخاب حساب</button></div>`;
  const source=h.querySelector('.variance-workpaper-source'),preview=h.querySelector('.variance-preview-pages');
+ bindRowSizePanel(h.querySelector('[data-row-size-panel]'),V,()=>vRender4());
  let repaginateTimer,rebuildingPreview=false;
  const rebuildPreview=(restoreFocus=false)=>{
   if(!preview||!source.isConnected)return;
@@ -15342,6 +15343,7 @@ function vRender4(){
   const focus=active&&active.matches('textarea[data-vnote],input[data-vamount]')?{note:active.dataset.vnote,id:active.dataset.vamount,year:active.dataset.vyear,start:active.selectionStart,end:active.selectionEnd}:null;
   const left=preview.scrollLeft,top=preview.scrollTop,scrollX=window.scrollX,scrollY=window.scrollY;
   rebuildingPreview=true;preview.replaceChildren(...vBuildPrintPages(source));rebuildingPreview=false;
+  installGroupRowHandles(preview,'.variance-paper-table tbody tr,.variance-summary-table tbody tr',r=>r.matches('.variance-workpaper-subtotal,.variance-page-carry,.variance-page-transfer,.variance-grand-total'),V,()=>vRender4());
   preview.querySelectorAll('textarea[data-vnote]').forEach(editor=>{
    vFitNote(editor);
    editor.addEventListener('input',()=>{
@@ -15371,6 +15373,7 @@ function vRender4(){
     }
    }
    const summary=preview.querySelector('.variance-summary');if(summary)summary.replaceWith(source.querySelector('.variance-summary').cloneNode(true));
+   installGroupRowHandles(preview,'.variance-summary-table tbody tr',r=>r.classList.contains('variance-grand-total'),V,()=>vRender4());
   };
   preview.querySelectorAll('input[data-vamount]').forEach(editor=>{
    editor.addEventListener('input',()=>{
@@ -15424,7 +15427,7 @@ async function vRunAI(){
 function vFitNote(editor){editor.style.height='auto';editor.style.height=Math.max(12,editor.scrollHeight||12)+'px';}
 function vPrintRowEstimate(row){if(row.classList.contains('variance-group-title'))return 18;if(row.classList.contains('variance-workpaper-subtotal'))return 20;const text=row.querySelector('.vdesc')?.textContent||'';return Math.max(18,8+Math.ceil(text.length/70)*9);}
 function vCreatePrintPage(source,root){
- const page=document.createElement('section');page.className='variance-print-page';page.dataset.orientation=V.orientation==='portrait'?'portrait':'landscape';
+ const page=document.createElement('section');page.className='variance-print-page';page.style.cssText=rowSizeVars(V);page.dataset.orientation=V.orientation==='portrait'?'portrait':'landscape';
  const outer=document.createElement('div');outer.className='variance-outer';
  const mid=document.createElement('div');mid.className='variance-mid';
  const inner=document.createElement('div');inner.className='variance-inner';inner.append(source.querySelector('.variance-meta').cloneNode(true));
@@ -16008,6 +16011,17 @@ function installColumnResizing(host){
  handle.onkeydown=event=>{if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();const {widths}=actualWidths(),state=snapshot();resize(widths,event.key==='ArrowLeft'?0.5:-0.5,state);paginate();host.querySelector(`[data-mw-column-index="${idx}"]`)?.focus({preventScroll:true});};
  }});}
 }
+// Row handles change the whole title or total group on this workpaper only.
+function installRowResizing(host){
+ const updateInputs=()=>{const heights=MW.rowHeights.get(widthKey())||{};for(const [id,key] of [['mwTitleRowHeight','title'],['mwTotalRowHeight','total']]){const input=document.getElementById(id);if(input)input.value=heights[key]??'';}};
+ const setHeight=(kind,value,focus)=>{const heights={...(MW.rowHeights.get(widthKey())||{})};heights[kind]=Math.max(5,Math.min(20,Math.round(value*2)/2));MW.rowHeights.set(widthKey(),heights);updateInputs();const y=window.scrollY,x=window.scrollX;paginate();window.scrollTo(x,y);if(focus)host.querySelector(`[data-mw-row-resize="${kind}"]`)?.focus({preventScroll:true});};
+ host.querySelectorAll('.mw-paper-table tbody tr').forEach(row=>{
+  const cell=row.cells[row.cells.length-1];if(!cell)return;const kind=row.classList.contains('mw-total')?'total':'title';const handle=document.createElement('span');handle.className='mw-row-resize';handle.dataset.mwRowResize=kind;handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');handle.setAttribute('aria-label',kind==='total'?'تنظیم ارتفاع همه ردیف‌های جمع این کاربرگ':'تنظیم ارتفاع همه ردیف‌های عنوان و شرح این کاربرگ');handle.title='مرز ردیف را بکشید یا با کلیدهای بالا و پایین تنظیم کنید';cell.appendChild(handle);
+  const height=()=>{const page=row.closest('.mw-paper'),scale=page.getBoundingClientRect().width/(page.offsetWidth||1);return row.getBoundingClientRect().height/(scale||1)*25.4/96;};
+  handle.onpointerdown=event=>{if(event.button!==0)return;event.preventDefault();event.stopPropagation();const y=event.clientY,start=height(),page=row.closest('.mw-paper'),scale=page.getBoundingClientRect().width/(page.offsetWidth||1);handle.setPointerCapture(event.pointerId);handle.onpointerup=ev=>{handle.onpointerup=null;if(Math.abs(ev.clientY-y)>1)setHeight(kind,start+(ev.clientY-y)/(scale||1)*25.4/96,false);};handle.onpointercancel=()=>{handle.onpointerup=null;};};
+  handle.onkeydown=event=>{if(!['ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();setHeight(kind,((MW.rowHeights.get(widthKey())||{})[kind]??height())+(event.key==='ArrowDown'?.5:-.5),true);};
+ });
+}
 function paginate(){
  const host=document.getElementById('mwPreview'),data=paperRows(),notices=document.getElementById('mwNotices');if(!host)return;host.innerHTML=previewTools();if(notices)notices.replaceChildren();
  if(data?.positionDifference!=null&&data.positionDifference!==0n){const n=document.createElement('p');n.className='mw-balance-warning';n.setAttribute('role','alert');n.textContent='اختلاف جمع دارایی‌ها و بدهی‌ها و حقوق مالکانه: '+money(data.positionDifference)+' ریال. اتصال حساب‌ها، اسناد بستن، حساب‌های کنارگذاشته‌شده و سایر اقلام سود جامع را بررسی کنید؛ این اختلاف خودکار اصلاح نشده است.';notices?.appendChild(n);}
@@ -16053,7 +16067,7 @@ function paginate(){
  // A saved manual layout may become unsafe when new figures are introduced.
  // Fall back to measured widths instead of keeping a cropped or cramped number.
  if(made.some(p=>MW.columnWidths.has(columnLayoutKey(p.querySelectorAll('colgroup col').length))&&[...p.querySelectorAll('td.mw-number .mw-number-text')].some(n=>!workpaperAmountFits(n)))){resetColumnLayouts();paginate();return;}
- made.forEach(p=>{if(over(p)||[...p.querySelectorAll('td,th')].some(cell=>cell.scrollWidth>cell.clientWidth+1)||[...p.querySelectorAll('td.mw-number .mw-number-text')].some(n=>!workpaperAmountFits(n)))overflow=true;});MW.previewOverflow=overflow;installColumnResizing(host);validateWorkpaperPrint();
+ made.forEach(p=>{if(over(p)||[...p.querySelectorAll('td,th')].some(cell=>cell.scrollWidth>cell.clientWidth+1)||[...p.querySelectorAll('td.mw-number .mw-number-text')].some(n=>!workpaperAmountFits(n)))overflow=true;});MW.previewOverflow=overflow;installColumnResizing(host);installRowResizing(host);validateWorkpaperPrint();
 }
 
 // Check rendered text against the requested physical clearance, including after
@@ -16064,7 +16078,7 @@ function workpaperAmountFits(text){
  return rect.left>=box.left+space-0.1&&rect.right<=box.right-space+0.1;
 }
 function validateWorkpaperPrint(){const host=document.getElementById('mwPreview'),print=document.getElementById('mwPrint'),warning=document.getElementById('mwPaginationWarning');if(!host||!print)return;const wide=[...host.querySelectorAll('.mw-paper-table td,.mw-paper-table th')].some(cell=>cell.scrollWidth>cell.clientWidth+1)||[...host.querySelectorAll('.mw-paper-table td.mw-number .mw-number-text')].some(n=>!workpaperAmountFits(n));print.disabled=!!MW.previewOverflow||wide;const moved=movedClassificationAccounts().length>0,missing=summaries.some(s=>s.id===MW.view)&&missingClassificationLinks().length>0;print.disabled=print.disabled||missing||moved;if(warning)warning.textContent=wide||MW.previewOverflow?'متن، مبلغ یا سربرگ در صفحه A4 جا نمی‌شود؛ برای حفظ اندازه قلم و جلوگیری از بریدگی، چاپ متوقف شد.':moved?'یک حساب کل ثبت‌شده به کاربرگ دیگری منتقل شده است؛ ابتدا جای نمایش معین‌های آن را به کاربرگ کل اصلی بازگردانید.':missing?'اثر طبقه‌بندی برای بعضی حساب‌ها به سرفصل وصل نیست یا سرفصل آن پنهان شده است؛ قبل از چاپ اتصال‌ها را بررسی کنید.':'';}
-function printPaper(){const pages=document.querySelectorAll('#mwPreview .mw-paper');if(!pages.length||document.getElementById('mwPrint').disabled)return;const ph=document.getElementById('printHost');if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();ph.replaceChildren(...[...pages].map(p=>{const clone=p.cloneNode(true);clone.querySelectorAll('.mw-row-actions,.mw-column-handle').forEach(el=>el.remove());clone.querySelectorAll('.mw-paper-total-edit').forEach(el=>el.classList.remove('mw-paper-total-edit'));return clone;}));const rule=document.createElement('style');rule.textContent='@page{size:A4 landscape;margin:0}@media print{html,body{margin:0!important;padding:0!important}body.printing>*:not(#printHost){display:none!important}body.printing #printHost{display:block!important}.mw-paper{margin:0!important;page-break-after:always;break-after:page}.mw-paper:last-child{page-break-after:auto;break-after:auto}}';document.head.appendChild(rule);document.body.classList.add('printing');let done=false;const restore=()=>{if(done)return;done=true;document.body.classList.remove('printing');ph.replaceChildren();rule.remove();if(window.__activePrintRestore===restore)window.__activePrintRestore=null};window.__activePrintRestore=restore;if(typeof schedulePrintRestore==='function')schedulePrintRestore(restore);else window.addEventListener('afterprint',restore,{once:true});window.print();}
+function printPaper(){const pages=document.querySelectorAll('#mwPreview .mw-paper');if(!pages.length||document.getElementById('mwPrint').disabled)return;const ph=document.getElementById('printHost');if(typeof window.__activePrintRestore==='function')window.__activePrintRestore();ph.replaceChildren(...[...pages].map(p=>{const clone=p.cloneNode(true);clone.querySelectorAll('.mw-row-actions,.mw-column-handle,.mw-row-resize').forEach(el=>el.remove());clone.querySelectorAll('.mw-paper-total-edit').forEach(el=>el.classList.remove('mw-paper-total-edit'));return clone;}));const rule=document.createElement('style');rule.textContent='@page{size:A4 landscape;margin:0}@media print{html,body{margin:0!important;padding:0!important}body.printing>*:not(#printHost){display:none!important}body.printing #printHost{display:block!important}.mw-paper{margin:0!important;page-break-after:always;break-after:page}.mw-paper:last-child{page-break-after:auto;break-after:auto}}';document.head.appendChild(rule);document.body.classList.add('printing');let done=false;const restore=()=>{if(done)return;done=true;document.body.classList.remove('printing');ph.replaceChildren();rule.remove();if(window.__activePrintRestore===restore)window.__activePrintRestore=null};window.__activePrintRestore=restore;if(typeof schedulePrintRestore==='function')schedulePrintRestore(restore);else window.addEventListener('afterprint',restore,{once:true});window.print();}
 function previewTools(){if(MW.view==='asset-analysis')return '<div class="mw-preview-tools"><p>قالب از عناوین دفتر ساخته شده است؛ مبالغ و گردش‌ها محاسبه نشده‌اند.</p></div>';if(MW.view==='accounts'&&isFixedAsset(workpaperAccounts().find(a=>a.code===MW.active))){const a=workpaperAccounts().find(a=>a.code===MW.active),entries=paperEntries(a),labels={cost:'بهای تمام‌شده',depreciation:'استهلاک انباشته',postbook:'دارایی در جریان تکمیل و اقلام سرمایه‌ای',other:'سایر حساب‌ها / بررسی'};return `<div class="mw-preview-tools"><p>تفکیک پیشنهادی را بررسی کنید؛ مانده دفتر تغییر نمی‌کند.</p><details class="mw-asset-review" ${MW.assetReviewOpen?'open':''}><summary>بازبینی بخش حساب‌های دارایی ثابت</summary>${entries.map(x=>{const id=key(a.code,x.c.id),val=MW.assetBuckets.get(id)||'auto';return `<label class="mw-asset-review-item"><span>${e(assetEntryLabel(a,x))} <small>— ${e(labels[assetBucket(a,x)])}</small></span><select data-mw-asset-review="${e(id)}" aria-label="بخش نمایش ${e(x.c.title)}"><option value="auto" ${val==='auto'?'selected':''}>پیشنهاد خودکار</option>${Object.entries(labels).map(([v,label])=>`<option value="${v}" ${val===v?'selected':''}>${e(label)}</option>`).join('')}</select></label>`;}).join('')||'<p>حسابی در این کاربرگ نیست.</p>'}</details></div>`;}const sheet=summaries.find(s=>s.id===MW.view);if(!sheet)return '';const hidden=destinationList.filter(d=>d.id===sheet.id&&MW.hiddenTopics.has(d.key));return `<div class="mw-preview-tools">${sheet.id==='A-70'?'<p>در نمونه، دریافتنی‌ها در هر دو بخش جاری و غیرجاری آمده‌اند؛ سررسید حساب‌های متصل را بررسی کنید.</p>':sheet.id==='A-71'?'<p>در نمونه، پرداختنی‌ها در هر دو بخش جاری و غیرجاری آمده‌اند؛ سررسید حساب‌های متصل را بررسی کنید.</p>':''}${sheet.id==='A-72'?`<details class="mw-eps" ${MW.epsOpen?'open':''}><summary>ورود اختیاری سود / زیان پایه هر سهم</summary><p>رقم قابل اتکا را وارد کنید؛ خالی‌گذاشتن هر دو مقدار، ردیف را پنهان می‌کند.</p><div class="mw-eps-fields"><label>سال جاری (ریال) <input data-mw-eps="current" inputmode="decimal" maxlength="70" value="${e(MW.eps.current)}"></label><label>سال مقایسه‌ای (ریال) <input data-mw-eps="prior" inputmode="decimal" maxlength="70" value="${e(MW.eps.prior)}"></label><button type="button" class="btn" data-mw-eps-save>ثبت ارقام هر سهم</button></div><p class="err" data-mw-eps-error role="alert"></p></details>`:''}<p>در پیش‌نمایش، <b>＋</b> برای بازبینی اتصال و <b>×</b> برای حذف سرفصل است.</p>${hidden.length?`<details><summary>افزودن / بازگردانی سرفصل‌های پنهان (${fa(hidden.length)})</summary>${hidden.map(d=>`<button type="button" class="btn" data-mw-topic-restore="${e(d.key)}">بازگردانی ${e(d.group+' — '+topicName(d))}</button>`).join('')}</details>`:''}</div>`;}
 function openPaperPicker(){
  if(MW.view!=='accounts')return;
@@ -16115,7 +16129,7 @@ function render(){sync();const h=document.getElementById('mainWorkpaperModule');
  let selected=visibleSheets.find(x=>x.view===MW.view&&(!x.code||x.code===MW.active));
  if(!selected&&MW.view!=='classification'){selected=visibleSheets.find(x=>x.view==='accounts')||visibleSheets[0];MW.view=selected?.view||'none';if(selected?.code)MW.active=selected.code;}
  h.innerHTML=`<h1>کاربرگ‌های اصلی و نهایی</h1><p class="sub">کاربرگ را از نوار زیر پیش‌نمایش انتخاب کنید.</p><div class="variance-note">مانده‌ها موقت‌اند؛ تاریخ، اسناد بستن، ابطال و کامل‌بودن دفتر را بررسی کنید. ثبت تعدیلات آماده نیست؛ افتتاحیه الزاماً رقم نهایی سال قبل نیست. جدول حقوق مالکانه و جزئیات یادداشت‌ها کامل نیستند.</div>
- ${acc.length?`<div class="mw-class-open"><button type="button" class="btn" id="mwMapReview">بازبینی اتصال حساب‌های کل</button> <button type="button" class="btn" id="mwClassOpen">صورت ریز طبقه‌بندی و تجدید ارائه</button></div>${MW.view==='classification'?classificationForm():''}<dialog id="mwPaperDialog" class="mw-topic-dialog mw-paper-dialog" aria-labelledby="mwPaperTitle"><div id="mwPaperDialogContent"></div></dialog><details class="mw-layout-settings"><summary>تنظیم اندازه ستون‌ها و ردیف‌های این کاربرگ</summary><p>اندازه‌ها در همه صفحات همین کاربرگ و فقط در این نشست اعمال می‌شوند.</p><div class="mw-size-controls"><div><b>عرض ستون‌های مبلغ با هم</b><button type="button" class="btn" data-mw-amount-width="-1">کوچک‌تر</button><button type="button" class="btn" data-mw-amount-width="1">بزرگ‌تر</button></div><label>حداقل ارتفاع ردیف‌های عنوان و شرح (میلی‌متر) <input id="mwTitleRowHeight" type="text" inputmode="decimal" placeholder="خودکار"></label><label>حداقل ارتفاع ردیف‌های جمع (میلی‌متر) <input id="mwTotalRowHeight" type="text" inputmode="decimal" placeholder="خودکار"></label><button type="button" class="btn" id="mwApplyHeights">اعمال ارتفاع‌ها</button><button type="button" class="btn" id="mwResetHeights">بازنشانی ارتفاع‌ها</button></div><p id="mwSizeStatus" role="status"></p></details><div class="mw-actions"><button class="btn" id="mwPrint">چاپ / ذخیره PDF این کاربرگ</button><button type="button" class="btn" id="mwResetWidths">بازنشانی عرض ستون‌ها</button></div><div id="mwPreview" class="mw-preview"></div><div id="mwNotices"></div><div id="mwInputNotices"> ${movedClassificationAccounts().length?`<div class="err" role="status">ثبت در سطح کل با انتقال نمایشی معین‌های آن تداخل دارد: ${movedClassificationAccounts().map(id=>e(classificationLabel(id))).join('؛ ')}. معین‌ها را به کاربرگ کل اصلی بازگردانید؛ چاپ تا رفع تداخل متوقف است.</div>`:''}
+ ${acc.length?`<div class="mw-class-open"><button type="button" class="btn" id="mwMapReview">بازبینی اتصال حساب‌های کل</button> <button type="button" class="btn" id="mwClassOpen">صورت ریز طبقه‌بندی و تجدید ارائه</button></div>${MW.view==='classification'?classificationForm():''}<dialog id="mwPaperDialog" class="mw-topic-dialog mw-paper-dialog" aria-labelledby="mwPaperTitle"><div id="mwPaperDialogContent"></div></dialog><details class="mw-layout-settings" open><summary>تنظیم اندازه ستون‌ها و ردیف‌های این کاربرگ</summary><p>مرز هر ردیف را بکشید؛ همه ردیف‌های همان گروه در این کاربرگ تغییر می‌کنند. تنظیمات فقط در این نشست می‌مانند.</p><div class="mw-size-controls"><div><b>عرض ستون‌های مبلغ با هم</b><button type="button" class="btn" data-mw-amount-width="-1">کوچک‌تر</button><button type="button" class="btn" data-mw-amount-width="1">بزرگ‌تر</button></div><label>حداقل ارتفاع ردیف‌های عنوان و شرح (میلی‌متر) <input id="mwTitleRowHeight" type="text" inputmode="decimal" placeholder="خودکار"></label><label>حداقل ارتفاع ردیف‌های جمع (میلی‌متر) <input id="mwTotalRowHeight" type="text" inputmode="decimal" placeholder="خودکار"></label><button type="button" class="btn" id="mwApplyHeights">اعمال ارتفاع‌ها</button><button type="button" class="btn" id="mwResetHeights">بازنشانی ارتفاع‌ها</button></div><p id="mwSizeStatus" role="status"></p></details><div class="mw-actions"><button class="btn" id="mwPrint">چاپ / ذخیره PDF این کاربرگ</button><button type="button" class="btn" id="mwResetWidths">بازنشانی عرض ستون‌ها</button></div><div id="mwPreview" class="mw-preview"></div><div id="mwNotices"></div><div id="mwInputNotices"> ${movedClassificationAccounts().length?`<div class="err" role="status">ثبت در سطح کل با انتقال نمایشی معین‌های آن تداخل دارد: ${movedClassificationAccounts().map(id=>e(classificationLabel(id))).join('؛ ')}. معین‌ها را به کاربرگ کل اصلی بازگردانید؛ چاپ تا رفع تداخل متوقف است.</div>`:''}
  ${missingClassificationLinks().length?`<div class="err" role="status">آثار طبقه‌بندی این حساب‌ها کامل نیست (فاقد اتصال یا سرفصل پنهان): ${missingClassificationLinks().map(id=>e(classificationLabel(id))).join('؛ ')}. اتصال‌ها را بررسی کنید؛ چاپ کاربرگ نهایی تا رفع مشکل متوقف است.</div>`:''}
  ${MW.model.issues.length?`<div class="err">${fa(MW.model.issues.length)} مشکل ورودی؛ مانده حساب دارای مبلغ نامعتبر خالی می‌ماند. ${e(MW.model.issues.slice(0,4).join('؛ '))}</div>`:''}
 </div><span id="mwPaginationWarning" class="err" role="status"></span><div class="mw-nav-wrap" dir="rtl"><button type="button" class="mw-nav-arrow" data-mw-scroll="right" aria-label="پیمایش کاربرگ‌ها به راست" title="پیمایش به راست">›</button><nav class="mw-nav" aria-label="انتخاب کاربرگ؛ نوار افقی قابل پیمایش" tabindex="0">${visibleSheets.map(x=>sheetTab(x,false)).join('')}</nav><button type="button" class="mw-nav-arrow" data-mw-scroll="left" aria-label="پیمایش کاربرگ‌ها به چپ" title="پیمایش به چپ">‹</button></div>${hiddenSheets.length?`<div class="mw-hidden-wrap" dir="rtl"><span class="mw-hidden-title">حذف‌شده</span><button type="button" class="mw-nav-arrow" data-mw-hidden-scroll="right" aria-label="پیمایش شیت‌های حذف‌شده به راست">›</button><nav class="mw-hidden-nav" aria-label="کاربرگ‌های حذف‌شده" tabindex="0">${hiddenSheets.map(x=>sheetTab(x,true)).join('')}</nav><button type="button" class="mw-nav-arrow" data-mw-hidden-scroll="left" aria-label="پیمایش شیت‌های حذف‌شده به چپ">‹</button></div>`:''}${excludedMajorBar()}<div id="mwSheetMenu" class="mw-sheet-menu" role="menu" hidden><button type="button" role="menuitem" data-mw-sheet-action></button></div>
@@ -16157,6 +16171,7 @@ const style=document.createElement('style');style.textContent=`
  .mw-map-wizard{max-width:none;margin:0 auto;color:var(--ink)}.mw-map-wizard p{line-height:1.55;margin:5px 0}.mw-map-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0}.mw-map-toolbar .mw-map-progress{flex:1 1 260px}.mw-map-toolbar .mw-map-bottom{margin:0}.mw-map-progress{font-weight:700;padding:7px;background:var(--ok-bg);border-radius:8px}.mw-map-layout{display:grid;grid-template-columns:minmax(220px,0.8fr) minmax(0,1.4fr);gap:12px;align-items:start}.mw-map-listbox,.mw-map-account{min-width:0;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:12px}.mw-map-listbox label,.mw-map-account label{display:flex;flex-direction:column;gap:5px}.mw-map-topic-edit,.mw-map-custom{padding:8px;margin:8px 0;border:1px solid var(--line);border-radius:8px}.mw-map-custom summary{cursor:pointer;font-weight:700}.mw-map-custom[open] summary{margin-bottom:8px}.mw-map-topic-edit summary{cursor:pointer;font-weight:700}.mw-map-topic-edit[open] summary{margin-bottom:8px}.mw-map-topic-edit small,.mw-map-custom small{display:block;color:var(--muted)}
  .mw-map-listbox input,.mw-map-listbox select,.mw-map-account input,.mw-map-account select{width:100%;min-width:0;min-height:44px;padding:8px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;font:inherit}.mw-map-list{max-height:50vh;overflow:auto;margin-top:8px}.mw-map-listrow{display:flex;align-items:stretch;gap:4px}.mw-map-listrow .mw-map-item{flex:1;min-width:0}.mw-map-remove{flex:none;min-height:44px;padding:4px 9px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;font:inherit;cursor:pointer}.mw-map-item{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:46px;padding:7px;text-align:right;color:var(--ink);background:var(--panel);border:0;border-bottom:1px solid var(--line);font:inherit;cursor:pointer}.mw-map-item span{overflow-wrap:anywhere}.mw-map-item small{flex:none;color:var(--muted)}.mw-map-item.is-active{background:var(--ok-bg);outline:2px solid var(--accent);outline-offset:-2px}.mw-map-pagination,.mw-map-account-actions,.mw-map-bottom{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.mw-map-pagination button,.mw-map-account-actions button,.mw-map-bottom button{min-height:44px}.mw-map-suggestion{padding:8px;background:var(--bg);border-radius:6px}.mw-map-bottom span{font-size:.88rem;color:var(--muted)}@media(max-width:700px){.mw-map-layout{grid-template-columns:1fr}.mw-map-list{max-height:25vh}.mw-map-account-actions button,.mw-map-bottom button{flex:1}}
 
+ .mw-paper-table tbody td:last-child{position:relative}.mw-row-resize{position:absolute;bottom:-4px;left:3px;right:3px;height:9px;cursor:row-resize;touch-action:none;z-index:4}.mw-row-resize::after{content:'';position:absolute;left:30%;right:30%;top:4px;border-top:2px solid #0070c077}.mw-row-resize:hover::after,.mw-row-resize:focus::after{border-color:#0070c0}@media print{.mw-row-resize{display:none!important}}
  .mw-paper-table thead th{position:relative}.mw-column-handle{position:absolute;left:0;top:0;bottom:0;width:8px;cursor:col-resize;touch-action:none;z-index:5}.mw-column-handle::after{content:'';position:absolute;left:3px;top:15%;bottom:15%;width:2px;background:#9e000055}.mw-column-handle:hover::after,.mw-column-handle:focus::after{background:#0070c0;width:3px}@media print{.mw-column-handle{display:none!important}}
  .mw-class-endpoint{display:flex;flex-direction:column;gap:6px;min-width:0}.mw-class-endpoint span{overflow-wrap:anywhere}.mw-class-endpoint label{display:flex;flex-direction:column;gap:5px}.mw-class-endpoint label[hidden]{display:none}.mw-class-dialog-head,.mw-class-dialog-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mw-class-dialog-head{justify-content:space-between}.mw-class-dialog-head h2{margin:0}.mw-class-dialog-tools{margin:10px 0}.mw-class-dialog-tools input{flex:1;min-width:180px}.mw-class-tree-scroll{overflow-y:auto;overflow-x:hidden;max-height:50vh;min-width:0}.mw-class-tree{border-collapse:collapse;table-layout:fixed;width:100%}.mw-class-tree td,.mw-class-tree th{border:1px solid var(--line);padding:6px;text-align:right;white-space:normal;overflow-wrap:anywhere;word-break:normal}.mw-class-tree th{padding:0;position:sticky;top:0;z-index:1;background:var(--panel)}.mw-class-tree th button{width:100%;min-height:44px;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:5px;white-space:normal;overflow-wrap:anywhere}.mw-class-dialog-tools button,.mw-class-dialog-head button{min-height:40px}.mw-class-path{overflow-wrap:anywhere;color:var(--muted)}.mw-class-check{display:flex;align-items:center;gap:8px;min-width:0}.mw-class-check b{min-width:0;overflow-wrap:anywhere}.mw-class-credit{color:var(--bad)}.mw-class-check input{flex:none;width:20px;height:20px}.mw-class-tree tr[data-class-row-expand]{cursor:pointer}
  #mwClassDialogContent{height:100%;display:flex;flex-direction:column;min-height:0}#mwClassDialogContent>p{margin:6px 0;font-size:.88rem;line-height:1.45}#mwClassDialogContent>.mw-class-tree-scroll{flex:1 1 auto;min-height:70px;max-height:none}#mwClassDialogContent>.mw-class-dialog-head,#mwClassDialogContent>.mw-class-dialog-tools,#mwClassDialogContent>.mw-class-path,#mwClassDialogContent>p{flex:none}@media(max-height:600px){#mwClassDialog{height:90dvh;overflow:hidden}#mwClassDialogContent{height:100%}}
@@ -16185,6 +16200,16 @@ const style=document.createElement('style');style.textContent=`
 `;document.head.appendChild(style);
 })();
 /* <<<MAIN-WORKPAPER-END>>> */
+const rowSizeCss=document.createElement('style');rowSizeCss.textContent=`
+.row-size-panel{display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:8px;margin:8px 0;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}.row-size-panel label{display:flex;flex-direction:column;gap:3px}.row-size-panel input{width:95px;min-height:38px;padding:4px;font:inherit}.row-size-panel button{min-height:38px}.row-resize-cell{position:relative!important}.group-row-handle{position:absolute;bottom:-4px;left:3px;right:3px;height:9px;cursor:row-resize;touch-action:none;z-index:4}.group-row-handle:after{content:'';position:absolute;left:30%;right:30%;top:4px;border-top:2px solid #0070c077}.group-row-handle:hover:after,.group-row-handle:focus:after{border-color:#0070c0}
+.sheet.sampling-template[style*="--user-title-row"] table.main tbody tr.item>td,.sheet.sampling-template[style*="--user-title-row"] table.main tbody tr.sample-continuation>td{height:var(--user-title-row)!important}
+.sheet.sampling-template[style*="--user-total-row"] tr.sample-page-total>td,.sheet.sampling-template[style*="--user-total-row"] tr.sample-brought-forward>td,.sheet.sampling-template[style*="--user-total-row"] .recap tr.sumrow>td{height:var(--user-total-row)!important}
+.sheet.sr-aged-page-sheet[style*="--user-title-row"] .sr-paper-table tbody tr.sr-major-title>td,.sheet.sr-aged-page-sheet[style*="--user-title-row"] .sr-paper-table tbody tr.sr-data-row>td{height:var(--user-title-row)!important}
+.sheet.sr-aged-page-sheet[style*="--user-total-row"] .sr-paper-table tbody tr.sr-workpaper-subtotal>td,.sheet.sr-aged-page-sheet[style*="--user-total-row"] .sr-paper-table tbody tr.sr-workpaper-total>td,.sheet.sr-aged-page-sheet[style*="--user-total-row"] .sr-paper-table tbody tr.sr-page-carry>td,.sheet.sr-aged-page-sheet[style*="--user-total-row"] .sr-paper-table tbody tr.sr-page-transfer>td{height:var(--user-total-row)!important}
+.variance-print-page[style*="--user-title-row"] .variance-paper-table tbody tr.variance-data-row>td,.variance-print-page[style*="--user-title-row"] .variance-paper-table tbody tr.variance-group-title>td,.variance-print-page[style*="--user-title-row"] .variance-summary-table tbody tr:not(.variance-grand-total)>td{height:var(--user-title-row)!important}
+.variance-print-page[style*="--user-total-row"] .variance-paper-table tbody tr.variance-workpaper-subtotal>td,.variance-print-page[style*="--user-total-row"] .variance-paper-table tbody tr.variance-page-carry>td,.variance-print-page[style*="--user-total-row"] .variance-paper-table tbody tr.variance-page-transfer>td,.variance-print-page[style*="--user-total-row"] .variance-summary-table tbody tr.variance-grand-total>td{height:var(--user-total-row)!important}
+@media print{.group-row-handle,.row-size-panel{display:none!important}}
+`;document.head.appendChild(rowSizeCss);
 
 </script>
 

@@ -66,11 +66,11 @@ function dispatchFile(input, file) {
     assert.ok(w.document.querySelector('[data-open="variance"]'), 'expense variance appears in the module picker');
     w.document.querySelector('[data-open="variance"]').click();
     assert.equal(w.document.querySelectorAll('#varianceV1 .v-unit').length, 0, 'amount units are fixed to rial');
-    assert.ok(w.document.querySelector('#varianceV1').textContent.includes('تمام مبالغ فایل‌ها به‌صورت ریال'), 'amounts are processed as rials without a million-rial option');
+    assert.ok(w.document.querySelector('#varianceV1').textContent.includes('مبالغ به ریال‌اند'), 'amounts are processed as rials without a million-rial option');
 
     assert.equal(w.document.querySelectorAll('#varianceV1 input.v-file').length, 1, 'only the prior-year file is requested here');
     assert.equal(w.document.querySelectorAll('#varianceV1 .v-year').length, 0, 'fiscal years are not entered manually');
-    assert.ok(w.document.querySelector('#varianceV1').textContent.includes('بارگذاری دوباره لازم نیست'), 'the already-loaded current-year source is reused');
+    assert.ok(w.document.querySelector('#varianceV1').textContent.includes('فقط فایل مقایسه سال قبل را بارگذاری کنید'), 'the already-loaded current-year source is reused');
     const headers = ['کد حساب کل', 'عنوان حساب کل', 'کد حساب معین', 'عنوان حساب معین', 'بدهکار', 'بستانکار', 'شرح ردیف', 'شرح سند', 'تاریخ'];
     const prior = makeFile('سال قبل', [
       headers,
